@@ -1,0 +1,7 @@
+_target_: src.models.BERTBiEncoder
+
+bert_name: bert-base-chinese
+mid_size: 768
+output_size: 2
+lr: 5e-5
+weight_decay: 0.0005

@@ -1,0 +1,10 @@
+_target_: src.datamodules.TokenClassificationDataModule
+data_dir: ${data_dir}
+data_name: clue_ner
+max_length: 50
+batch_size: 20
+pin_memory: True
+num_workers: 20
+storer: oss
+label_pad_id: -100
+tokenizer_name: bert-base-chinese

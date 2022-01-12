@@ -1,0 +1,6 @@
+_target_: src.models.token_classification.BertSoftmax
+bert_name: bert-base-chinese
+hidden_size: 256
+dropout: 0.5
+lr: 5e-5 
+weight_decay: 0.001
