@@ -1,0 +1,7 @@
+_target_: src.models.BERTGlobalPointer
+
+hidden_size: 64           
+dropout: 0.2
+lr: 5e-5
+weight_decay: 0.0
+

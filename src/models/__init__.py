@@ -1,3 +1,4 @@
 from .sentence_pair_classification import BERTCrossEncoder, BERTBiEncoder
 from .text_classification_singlelabel import BERTSequenceClassification
-from .token_classification import BertSoftmax
+from .token_classification import BertSoftmax, BertCRF
+from .span_classification import BERTGlobalPointer

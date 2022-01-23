@@ -32,18 +32,20 @@ def train(config: DictConfig) -> Optional[float]:
         seed_everything(config.seed, workers=True)
 
     # Init lightning datamodule
-    if config.get("datamodule"):
-        
+    if len(config.datamodule) > 0:
         log.info(f"Instantiating datamodule <{config.datamodule._target_}>")
         datamodule: LightningDataModule = hydra.utils.instantiate(config.datamodule)
+        datamodule.prepare_data()
+        datamodule.setup(stage='fit')
     else : datamodule = None
-    datamodule.prepare_data()
-    datamodule.setup(stage='fit')
 
     # Init lightning model
-    log.info(f"Instantiating model <{config.model._target_}>")
-    model: LightningModule = hydra.utils.instantiate(config.model, 
-                                                    label2id=datamodule.label2id)
+    if datamodule is not None:
+        log.info(f"Instantiating model <{config.model._target_}>")
+        model: LightningModule = hydra.utils.instantiate(config.model, **datamodule.hparams,label2id=datamodule.label2id)
+    else: 
+        log.info(f"Instantiating model <{config.model._target_}>")
+        model = hydra.utils.instantiate(config.model)
 
     # Init lightning callbacks
     callbacks: List[Callback] = []
@@ -80,11 +82,16 @@ def train(config: DictConfig) -> Optional[float]:
 
     # Train the model
     log.info("Starting training!")
-
     trainer.fit(model=model, datamodule=datamodule)
 
     # Get metric score for hyperparameter optimization
-    score = trainer.callback_metrics.get(config.get("optimized_metric"))
+    optimized_metric = config.get("optimized_metric")
+    if optimized_metric and optimized_metric not in trainer.callback_metrics:
+        raise Exception(
+            "Metric for hyperparameter optimization not found! "
+            "Make sure the `optimized_metric` in `hparams_search` config is correct!"
+        )
+    score = trainer.callback_metrics.get(optimized_metric)
 
     # Test the model
     if config.get("test_after_training") and not config.trainer.get("fast_dev_run"):

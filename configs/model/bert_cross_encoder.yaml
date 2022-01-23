@@ -1,7 +1,7 @@
 _target_: src.models.BERTCrossEncoder
 
 bert_name: bert-base-chinese       # bert名称或者路径
-mid_size: 512                      # pooler线性层的大小
+mid_size: 256                     # pooler线性层的大小
 output_size: 2                      # 分类层输出的大小
 lr: 5e-5                            # 学习率
 weight_decay: 0.0005                # 权重衰减

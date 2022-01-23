@@ -1,10 +1,12 @@
 _target_: src.datamodules.TokenClassificationDataModule
+
 data_dir: ${data_dir}
-data_name: clue_ner
-max_length: 50
-batch_size: 20
+pretrained_dir: ${pretrained_dir}
+pretrained_model: chinese-roberta-wwm-ext
+dataset: clue_ner_chartoken
+max_length: 52
+batch_size: 32
 pin_memory: True
-num_workers: 20
+num_workers: 10
 storer: oss
 label_pad_id: -100
-tokenizer_name: bert-base-chinese

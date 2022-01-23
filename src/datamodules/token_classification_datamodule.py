@@ -3,57 +3,72 @@ import os
 from ..storers import OSSStorer
 import zipfile
 from datasets import load_from_disk
-from transformers import AutoTokenizer
+from transformers import BertTokenizer
 import srsly
 from torch.utils.data import DataLoader
 import torch
+from ..utils.preprocessing import fine_grade_tokenize
 
 
 class TokenClassificationDataModule(pl.LightningDataModule):
-    '''序列标注数据模块'''
+    '''序列标注数据模块
+    '''
     def __init__(self,
-                data_name: str,
-                tokenizer_name: str,
+                dataset: str,
+                pretrained_model: str,
                 max_length: int,
                 batch_size: int,
                 pin_memory: bool,
                 num_workers: int,
+                pretrained_dir: str,
                 storer: str = 'oss',
                 data_dir: str = 'data/',
                 label_pad_id: int = -100):
         super().__init__()
-        self.save_hyperparameters()
-        self.file_name = data_name + '.zip'
+        self.pretrained_file = pretrained_model + '.zip'
+        self.data_file = dataset + '.zip'
         self.storage = OSSStorer()
-        self.tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path=tokenizer_name)
+        self.tokenzier = None
         self.label2id = None
         self.train_dataset = None
         self.valid_dataset = None
         self.test_dataset = None
         self.label_pad_id = label_pad_id
         self.max_length = max_length
+
+        self.save_hyperparameters()
         
     def prepare_data(self):
-        '''下载数据集'''
-        if not os.path.exists(self.hparams.data_dir + self.hparams.data_name):
-            self.storage.download(filename = self.file_name, 
-                                localfile = self.hparams.data_dir + self.file_name)
-            with zipfile.ZipFile(file=self.hparams.data_dir + self.file_name, mode='r') as zf:
+        '''下载数据集和预训练模型'''
+        if not os.path.exists(self.hparams.data_dir + self.hparams.dataset):
+            self.storage.download(filename = self.data_file, 
+                                localfile = self.hparams.data_dir + self.data_file)
+            with zipfile.ZipFile(file=self.hparams.data_dir + self.data_file, mode='r') as zf:
                 zf.extractall(path=self.hparams.data_dir)
-            os.remove(path=self.hparams.data_dir + self.file_name)
+            os.remove(path=self.hparams.data_dir + self.data_file)
+
+        if not os.path.exists(self.hparams.pretrained_dir + self.hparams.pretrained_model):
+            self.storage.download(filename = self.pretrained_file, 
+                                localfile = self.hparams.pretrained_dir + self.pretrained_file)
+            with zipfile.ZipFile(file=self.hparams.pretrained_dir + self.pretrained_file, mode='r') as zf:
+                zf.extractall(path=self.hparams.pretrained_dir)
+            os.remove(path=self.hparams.pretrained_dir + self.pretrained_file)
 
     def set_transform(self, example):
         tokens = example['tokens'][0]
-        inputs = self.tokenizer(
+        text = ''.join(tokens)
+        tokens = fine_grade_tokenize(text, self.tokenizer)
+        inputs = self.tokenizer.encode_plus(
             tokens, 
-            add_special_tokens=False,
-            is_split_into_words=True, 
+            is_pretokenized=True, 
+            add_special_tokens=True,
             padding='max_length',  
-            max_length=self.max_length)
+            max_length=self.max_length,
+            truncation=True)
         inputs = dict(zip(inputs.keys(), map(torch.tensor, inputs.values())))
         labels = example['labels'][0]
         labels = [self.label2id[label] for label in labels] 
-        labels = labels + (self.max_length - len(labels)) * [self.label_pad_id]
+        labels = [self.label2id['O']] + labels + [self.label2id['O']] + (self.max_length - len(labels)-2) * [self.label_pad_id]
         labels = torch.tensor(labels)
         assert len(labels) == self.max_length
         return {'inputs':[inputs], 'label_ids':[labels]}
@@ -61,7 +76,7 @@ class TokenClassificationDataModule(pl.LightningDataModule):
 
 
     def setup(self, stage):
-        data = load_from_disk(self.hparams.data_dir + self.hparams.data_name)
+        data = load_from_disk(self.hparams.data_dir + self.hparams.dataset)
         set_labels = sorted(set([label for labels in data['train']['labels'] for label in labels]))
         self.label2id = {label: i for i, label in enumerate(set_labels)}
         data.set_transform(transform=self.set_transform)
@@ -69,6 +84,7 @@ class TokenClassificationDataModule(pl.LightningDataModule):
         self.valid_dataset = data['validation']
         if 'test' in data:
             self.test_dataset = data['test']
+        self.tokenizer = BertTokenizer.from_pretrained(self.hparams.pretrained_dir +self.hparams.pretrained_model)
         
 
 
@@ -96,6 +112,7 @@ class TokenClassificationDataModule(pl.LightningDataModule):
                               shuffle=False,
                               pin_memory=self.hparams.pin_memory,
                               num_workers=self.hparams.num_workers)
+
 
 
 
