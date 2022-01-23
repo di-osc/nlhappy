@@ -47,7 +47,7 @@ class SpanClassificationDataModule(pl.LightningDataModule):
             os.remove(path=self.hparams.data_dir + self.file_name)
         if not os.path.exists(self.hparams.pretrained_dir + self.hparams.pretrained_model):
             self.storage.download(
-                file_name=self.pretrained_file,
+                filename=self.pretrained_file,
                 localfile=self.hparams.pretrained_dir + self.pretrained_file
             )
             with zipfile.ZipFile(file=self.hparams.pretrained_dir + self.pretrained_file, mode='r') as zf:
