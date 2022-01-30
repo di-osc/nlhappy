@@ -6,7 +6,7 @@
 experiment_mode: True
 
 # allows for custom naming of the experiment
-name: ???
+name: ${datamodule.dataset}
 
 hydra:
   # sets output paths for all file logs to `logs/experiment/name'

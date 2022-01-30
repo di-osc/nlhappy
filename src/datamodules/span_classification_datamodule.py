@@ -62,11 +62,13 @@ class SpanClassificationDataModule(pl.LightningDataModule):
             is_pretokenized=True,
             padding='max_length',  
             max_length=self.max_length,
+            add_special_tokens=True,
             truncation=True)
         inputs = dict(zip(inputs.keys(), map(torch.tensor, inputs.values())))
         spans = example['spans'][0]
         span_ids = torch.zeros(len(self.label2id), self.max_length, self.max_length)
         for span in spans :
+            # +1 是因为添加了 [CLS]
             span_ids[self.label2id[span[2]],  int(span[0])+1, int(span[1])+1] = 1
         return {'inputs':[inputs], 'span_ids':[span_ids]}
 

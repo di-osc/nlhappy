@@ -1,8 +1,0 @@
-_target_: src.datamodules.TNEWSDataModule
-data_dir: ${data_dir} 
-train_val_test_split: [0.8, 0.1, 0.1]
-batch_size: 64
-num_workers: 10
-pin_memory: True
-ptm_name: bert-base-chinese
-max_length: 145

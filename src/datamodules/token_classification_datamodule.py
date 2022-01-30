@@ -57,9 +57,10 @@ class TokenClassificationDataModule(pl.LightningDataModule):
     def set_transform(self, example):
         tokens = example['tokens'][0]
         text = ''.join(tokens)
-        tokens = fine_grade_tokenize(text, self.tokenizer)
+        new_tokens = fine_grade_tokenize(text, self.tokenizer)
+        assert len
         inputs = self.tokenizer.encode_plus(
-            tokens, 
+            new_tokens, 
             is_pretokenized=True, 
             add_special_tokens=True,
             padding='max_length',  
@@ -70,7 +71,6 @@ class TokenClassificationDataModule(pl.LightningDataModule):
         labels = [self.label2id[label] for label in labels] 
         labels = [self.label2id['O']] + labels + [self.label2id['O']] + (self.max_length - len(labels)-2) * [self.label_pad_id]
         labels = torch.tensor(labels)
-        assert len(labels) == self.max_length
         return {'inputs':[inputs], 'label_ids':[labels]}
 
 

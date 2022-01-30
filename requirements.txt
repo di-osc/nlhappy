@@ -18,7 +18,7 @@ hydra-optuna-sweeper==1.1.0
 # hydra-submitit-launcher
 
 #-----------spacy-----------#
-spacy
+spacy        # for building spacy pipeline
 
 # --------- loggers --------- #
 wandb
@@ -34,7 +34,6 @@ isort           # import sorting
 flake8          # code analysis
 
 # --------- storers --------- #
-bypy            # for downloading files from baidu cloud
 oss2            # for downloading files from aliyun oss
 
 
@@ -48,7 +47,6 @@ scikit-learn    # used in some callbacks
 seaborn         # used in some callbacks
 jupyterlab      # better jupyter notebooks
 pudb            # debugger
-pandas          # used in datamodules
 catalogue       # function registry
 srsly           # for parsing yaml json files
 

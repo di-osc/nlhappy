@@ -1,7 +1,6 @@
 _target_: src.datamodules.SpanClassificationDataModule
 
-data_dir: ${data_dir}
-pretrained_dir: ${pretrained_dir}
+
 dataset: clue_ner_span
 pretrained_model: chinese-roberta-wwm-ext
 max_length: 52
@@ -9,3 +8,5 @@ batch_size: 32
 pin_memory: True
 num_workers: 10
 storer: oss
+data_dir: ${data_dir}
+pretrained_dir: ${pretrained_dir}

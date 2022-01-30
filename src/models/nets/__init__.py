@@ -1,2 +1,0 @@
-from .sentence_pair_classification import BERTCrossEncoder, BERTBiEncoder
-from .sequence_classification import BERTSequenceClassificationNet

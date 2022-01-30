@@ -1,5 +1,6 @@
 import re
 import torch
+from typing import List
 
 
 FH_SPACE = FHS = ((u"　", u" "),)
@@ -117,7 +118,7 @@ def cut_sent(text, max_seq_len):
 
 
 
-def fine_grade_tokenize(raw_text:str, tokenizer):
+def fine_grade_tokenize(raw_text:str, tokenizer) -> List[str]:
     """
     - 全角转半角
     - 序列标注任务 BERT 分词器可能会导致标注偏移，
