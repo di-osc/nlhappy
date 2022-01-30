@@ -21,7 +21,7 @@ class SpanClassificationDataModule(pl.LightningDataModule):
         data_dir: str,
         pretrained_dir: str,
         storer: str = 'oss'
-    ) :
+        ) :
         super().__init__()
         self.save_hyperparameters()
 

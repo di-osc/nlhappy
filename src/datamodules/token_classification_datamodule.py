@@ -13,30 +13,33 @@ from ..utils.preprocessing import fine_grade_tokenize
 class TokenClassificationDataModule(pl.LightningDataModule):
     '''序列标注数据模块
     '''
-    def __init__(self,
-                dataset: str,
-                pretrained_model: str,
-                max_length: int,
-                batch_size: int,
-                pin_memory: bool,
-                num_workers: int,
-                pretrained_dir: str,
-                storer: str = 'oss',
-                data_dir: str = 'data/',
-                label_pad_id: int = -100):
+    def __init__(
+        self,
+        dataset: str,
+        pretrained_model: str,
+        max_length: int,
+        batch_size: int,
+        pin_memory: bool,
+        num_workers: int,
+        pretrained_dir: str,
+        storer: str = 'oss',
+        data_dir: str = 'data/',
+        label_pad_id: int = -100
+        ):
         super().__init__()
+        self.save_hyperparameters()
+
         self.pretrained_file = pretrained_model + '.zip'
         self.data_file = dataset + '.zip'
         self.storage = OSSStorer()
+        self.label_pad_id = label_pad_id
+        self.max_length = max_length
         self.tokenzier = None
         self.label2id = None
         self.train_dataset = None
         self.valid_dataset = None
         self.test_dataset = None
-        self.label_pad_id = label_pad_id
-        self.max_length = max_length
-
-        self.save_hyperparameters()
+        
         
     def prepare_data(self):
         '''下载数据集和预训练模型'''

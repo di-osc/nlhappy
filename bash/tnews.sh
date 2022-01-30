@@ -1,1 +1,0 @@
-python run.py datamodule=tnews_datamodule \

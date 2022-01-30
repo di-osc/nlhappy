@@ -16,31 +16,31 @@ class TextClassificationDataModule(pl.LightningDataModule):
     文本分类
     '''
     def __init__(
-            self,
-            dataset: str,
-            pretrained_model: str,
-            max_length: int ,
-            is_multi_label: bool,
-            batch_size: int ,
-            num_workers: int ,
-            pin_memory: bool ,
-            pretrained_dir: str,
-            data_dir: str 
-            ):  
+        self,
+        dataset: str,
+        pretrained_model: str,
+        max_length: int ,
+        is_multi_label: bool,
+        batch_size: int ,
+        num_workers: int ,
+        pin_memory: bool ,
+        pretrained_dir: str,
+        data_dir: str 
+        ):  
         super().__init__()
 
         # 这一行代码为了保存传入的参数可以当做self.hparams的属性
         self.save_hyperparameters(logger=False)
 
-        self.tokenizer = BertTokenizer.from_pretrained(self.hparams.pretrained_dir + self.hparams.pretrained_model)
-        self.label2id = None
         self.is_multi_label = is_multi_label
         self.max_length = max_length
         self.file_name = dataset+ '.zip'
+        self.pretrained_file = pretrained_model + '.zip'
         self.storage = OSSStorer()
         self.train_dataset = None
         self.valid_dataset = None
         self.test_dataset = None
+        self.label2id = None
         
         
 
@@ -103,6 +103,7 @@ class TextClassificationDataModule(pl.LightningDataModule):
         self.valid_dataset = data['validation']
         if 'test' in data:
             self.test_dataset = data['test']
+        self.tokenizer = BertTokenizer.from_pretrained(self.hparams.pretrained_dir + self.hparams.pretrained_model)
         
             
 
