@@ -27,7 +27,6 @@ class SentencePairDataModule(pl.LightningDataModule):
             sentence_max_length: int ,
             tokenizer_name: str ='bert-base-chinese',
             return_sentence_pair: bool = False,
-            train_val_test_split: List[float] = [0.8, 0.1, 0.1],
             batch_size: int = 64,
             num_workers: int = 2,
             pin_memory: bool =False,
