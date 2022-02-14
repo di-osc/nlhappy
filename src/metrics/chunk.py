@@ -104,7 +104,26 @@ def get_entities(seq):
 
 
 class ChunkF1(Metric):
-    pass 
+    def __init__(self, dist_sync_on_step=False):
+        super().__init__(dist_sync_on_step=dist_sync_on_step)
+        self.add_state('correct', default=torch.tensor(0.0), dist_reduce_fx='sum')
+        self.add_state('all_pred', default=torch.tensor(0.0), dist_reduce_fx='sum')
+        self.add_state('all_true', default=torch.tensor(0.0), dist_reduce_fx='sum')
+
+    def update(self, pred, true):
+        true_entities = set(get_entities(true))
+        pred_entities = set(get_entities(pred))
+        self.correct += len(true_entities & pred_entities)
+        self.all_pred += len(pred_entities)
+        self.all_true += len(true_entities)
+
+
+    def compute(self):
+        p = self.correct / self.all_pred if self.all_pred > 0 else 0
+        r = self.correct / self.all_true if self.all_true > 0 else 0
+        score = 2 * p * r / (p + r) if p + r > 0 else 0
+        return torch.tensor(score)
+        
 
 
 
@@ -145,23 +164,5 @@ def f1_score(y_true, y_pred, mode='dev'):
     score = 2 * p * r / (p + r) if p + r > 0 else 0
     if mode == 'dev':
         return torch.tensor(score)
-    else:
-        f_score = {}
-        for label in config.labels:
-            true_entities_label = set()
-            pred_entities_label = set()
-            for t in true_entities:
-                if t[0] == label:
-                    true_entities_label.add(t)
-            for p in pred_entities:
-                if p[0] == label:
-                    pred_entities_label.add(p)
-            nb_correct_label = len(true_entities_label & pred_entities_label)
-            nb_pred_label = len(pred_entities_label)
-            nb_true_label = len(true_entities_label)
-
-            p_label = nb_correct_label / nb_pred_label if nb_pred_label > 0 else 0
-            r_label = nb_correct_label / nb_true_label if nb_true_label > 0 else 0
-            score_label = 2 * p_label * r_label / (p_label + r_label) if p_label + r_label > 0 else 0
-            f_score[label] = score_label
+   
         return f_score, torch.tensor(score)

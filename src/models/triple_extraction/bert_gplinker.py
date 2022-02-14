@@ -29,8 +29,7 @@ class BertGPLinker(pl.LightningModule):
     ):
         super(BertGPLinker, self).__init__()
         self.save_hyperparameters()
-        self.lr = lr
-        self.weight_decay = weight_decay
+        
         self.label2id = data_params['label2id']
         self.id2label = {v: k for k, v in self.label2id.items()}
         self.bert = BertModel.from_pretrained(data_params['pretrained_dir'] + data_params['pretrained_model'])
@@ -42,9 +41,9 @@ class BertGPLinker(pl.LightningModule):
         # 主语 宾语 尾对齐
         self.tail_classifier = EfficientGlobalPointer(self.bert.config.hidden_size, hidden_size, len(data_params['label2id']), RoPE=False, tril_mask=False)
 
-        self.span_criterion = SparseMultiLabelCrossEntropy()
-        self.head_criterion = SparseMultiLabelCrossEntropy()
-        self.tail_criterion = SparseMultiLabelCrossEntropy()
+        self.span_criterion = MultiLabelCategoricalCrossEntropy()
+        self.head_criterion = MultiLabelCategoricalCrossEntropy()
+        self.tail_criterion = MultiLabelCategoricalCrossEntropy()
 
         self.train_f1 = TripleF1()
         self.val_f1 = TripleF1()
@@ -59,26 +58,24 @@ class BertGPLinker(pl.LightningModule):
 
 
     def shared_step(self, batch):
-        #inputs为bert常规输入
+        #inputs为bert常规输入, span_ids: [batch_size, 2, seq_len, seq_len],
+        #head_ids: [batch_size, len(label2id), seq_len, seq_len], tail_ids: [batch_size, len(label2id), seq_len, seq_len]
         inputs, span_true, head_true, tail_true = batch['inputs'], batch['span_ids'], batch['head_ids'], batch['tail_ids']
         span_logits, head_logits, tail_logits = self(inputs)
 
-        span_logits = span_logits.reshape(span_logits.shape[0], -1, torch.prod(torch.tensor(span_logits.shape[2:])))
-        span_true = span_true[..., 0] * span_true.shape[2] + span_true[..., 1]
-        span_loss = torch.mean(torch.sum(self.span_criterion(span_logits, span_true), dim=1))
+        span_logits_ = span_logits.reshape(span_logits.shape[0] * span_logits.shape[1], -1)
+        span_true_ = span_true.reshape(span_true.shape[0] * span_true.shape[1], -1)
+        span_loss = self.span_criterion(span_logits_, span_true_)
         
-        head_logits = head_logits.reshape(head_logits.shape[0], -1, torch.prod(torch.tensor(head_logits.shape[2:])))
-        head_true = head_true[..., 0] * head_true.shape[2] + head_true[..., 1]
-        head_loss = torch.mean(torch.sum(self.head_criterion(head_logits, head_true), dim=1))
+        head_logits_ = head_logits.reshape(head_logits.shape[0] * head_logits.shape[1], -1)
+        head_true_ = head_true.reshape(head_true.shape[0] * head_true.shape[1], -1)
+        head_loss = self.head_criterion(head_logits_, head_true_)
         
-        tail_logits = tail_logits.reshape(tail_logits.shape[0], -1, torch.prod(torch.tensor(tail_logits.shape[2:])))
-        tail_true = tail_true[..., 0] * tail_true.shape[2] + tail_true[..., 1]
-        tail_loss = torch.mean(torch.sum(self.tail_criterion(tail_logits, tail_true), dim=1))
+        tail_logits_ = tail_logits.reshape(tail_logits.shape[0] * tail_logits.shape[1], -1)
+        tail_true_ = tail_true.reshape(tail_true.shape[0] * tail_true.shape[1], -1)
+        tail_loss = self.tail_criterion(tail_logits_, tail_true_)
         
         loss = span_loss + head_loss + tail_loss
-
-        # batch_triples = self.extract_triple(span_logits, head_logits, tail_logits)
-        # batch_true_triples = self.extract_triple(span_true, head_true, tail_true)
         
         return loss, span_logits, head_logits, tail_logits
 
@@ -108,23 +105,23 @@ class BertGPLinker(pl.LightningModule):
         no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
         grouped_parameters = [
             {'params': [p for n, p in self.bert.named_parameters() if not any(nd in n for nd in no_decay)],
-            'weight_decay': self.weight_decay},
+            'weight_decay': self.hparams.weight_decay},
             {'params': [p for n, p in self.bert.named_parameters() if any(nd in n for nd in no_decay)],
             'weight_decay': 0.0},
             {'params': [p for n, p in self.span_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
-            'lr': self.lr * 100, 'weight_decay': self.weight_decay},
+            'lr': self.hparams.lr* 100, 'weight_decay': self.hparams.weight_decay},
             {'params': [p for n, p in self.span_classifier.named_parameters() if any(nd in n for nd in no_decay)],
-            'lr': self.lr * 100, 'weight_decay': 0.0},
+            'lr': self.hparams.lr* 100, 'weight_decay': 0.0},
             {'params': [p for n, p in self.head_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
-            'lr': self.lr * 100, 'weight_decay': self.weight_decay},
+            'lr': self.hparams.lr* 100, 'weight_decay': self.hparams.weight_decay},
             {'params': [p for n, p in self.head_classifier.named_parameters() if any(nd in n for nd in no_decay)],
-            'lr': self.lr * 100, 'weight_decay': 0.0},
+            'lr': self.hparams.lr* 100, 'weight_decay': 0.0},
             {'params': [p for n, p in self.tail_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
-            'lr': self.lr * 100, 'weight_decay': self.weight_decay},
+            'lr': self.hparams.lr* 100, 'weight_decay': self.hparams.weight_decay},
             {'params': [p for n, p in self.tail_classifier.named_parameters() if any(nd in n for nd in no_decay)],
-            'lr': self.lr * 100, 'weight_decay': 0.0}
+            'lr': self.hparams.lr* 100, 'weight_decay': 0.0}
         ]
-        self.optimizer = torch.optim.Adam(grouped_parameters, lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
+        self.optimizer = torch.optim.AdamW(grouped_parameters, lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
         self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lambda epoch: 1.0 / (epoch + 1.0))
         return [self.optimizer], [self.scheduler]
 
@@ -158,7 +155,6 @@ class BertGPLinker(pl.LightningModule):
                     objects.add((h, t))
             
             triples = set()
-            print(len(subjects), len(objects))
             for sh, st in subjects:
                 for oh, ot in objects:
                     p1s = torch.where(head_logits[i].squeeze(0)[:, sh, oh] > threshold)[0].tolist()

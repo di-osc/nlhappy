@@ -48,4 +48,4 @@ seed: null
 name: null
 
 # monitor of all callbacks
-monitor: val/best_f1
+monitor: val/f1

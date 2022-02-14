@@ -1,6 +1,6 @@
 import pytorch_lightning as pl
 from transformers import BertModel
-from ..layers.classifier import SimpleDense
+from ...layers.classifier import SimpleDense
 import torch.nn as nn
 
 class BertPRGC(pl.LightningModule):

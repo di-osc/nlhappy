@@ -1,7 +1,6 @@
 # ----------roberta val/best_f1 = 0.833----------------#
 python run.py \
 mode=exp \
-monitor=val/f1 \
 name=cblue_tc \
 trainer=ddp \
 trainer.max_epochs=25 \
