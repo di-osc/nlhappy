@@ -97,12 +97,6 @@ def get_entities(seq):
 
 
 
-
-
-
-
-
-
 class ChunkF1(Metric):
     def __init__(self, dist_sync_on_step=False):
         super().__init__(dist_sync_on_step=dist_sync_on_step)
@@ -133,36 +127,3 @@ class ChunkF1(Metric):
 
 
 
-
-
-def f1_score(y_true, y_pred, mode='dev'):
-    """Compute the F1 score.
-    The F1 score can be interpreted as a weighted average of the precision and
-    recall, where an F1 score reaches its best value at 1 and worst score at 0.
-    The relative contribution of precision and recall to the F1 score are
-    equal. The formula for the F1 score is::
-        F1 = 2 * (precision * recall) / (precision + recall)
-    Args:
-        y_true : 2d array. Ground truth (correct) target values.
-        y_pred : 2d array. Estimated targets as returned by a tagger.
-    Returns:
-        score : float.
-    Example:
-        y_true = [['O', 'O', 'O', 'B-MISC', 'I-MISC', 'I-MISC', 'O'], ['B-PER', 'I-PER', 'O']]
-        y_pred = [['O', 'O', 'B-MISC', 'I-MISC', 'I-MISC', 'I-MISC', 'O'], ['B-PER', 'I-PER', 'O']]
-        f1_score(y_true, y_pred)
-        0.50
-    """
-    true_entities = set(get_entities(y_true))
-    pred_entities = set(get_entities(y_pred))
-    nb_correct = len(true_entities & pred_entities)
-    nb_pred = len(pred_entities)
-    nb_true = len(true_entities)
-
-    p = nb_correct / nb_pred if nb_pred > 0 else 0
-    r = nb_correct / nb_true if nb_true > 0 else 0
-    score = 2 * p * r / (p + r) if p + r > 0 else 0
-    if mode == 'dev':
-        return torch.tensor(score)
-   
-        return f_score, torch.tensor(score)

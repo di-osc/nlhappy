@@ -80,9 +80,8 @@ class BertGPLinker(pl.LightningModule):
         return loss, span_logits, head_logits, tail_logits
 
     def training_step(self, batch, batch_idx):
+        # 训练阶段不进行解码, 会比较慢
         loss, span_logits, head_logits, tail_logits = self.shared_step(batch)
-        # self.train_f1(batch_triples, batch_true_triples)
-        # self.log('train/f1', self.train_f1, on_step=True, on_epoch=True, prog_bar=True)
         return {'loss': loss}
 
 
@@ -105,9 +104,9 @@ class BertGPLinker(pl.LightningModule):
         no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
         grouped_parameters = [
             {'params': [p for n, p in self.bert.named_parameters() if not any(nd in n for nd in no_decay)],
-            'weight_decay': self.hparams.weight_decay},
+            'lr': self.hparams.lr, 'weight_decay': self.hparams.weight_decay},
             {'params': [p for n, p in self.bert.named_parameters() if any(nd in n for nd in no_decay)],
-            'weight_decay': 0.0},
+            'lr': self.hparams.lr, 'weight_decay': 0.0},
             {'params': [p for n, p in self.span_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
             'lr': self.hparams.lr* 100, 'weight_decay': self.hparams.weight_decay},
             {'params': [p for n, p in self.span_classifier.named_parameters() if any(nd in n for nd in no_decay)],
@@ -121,7 +120,7 @@ class BertGPLinker(pl.LightningModule):
             {'params': [p for n, p in self.tail_classifier.named_parameters() if any(nd in n for nd in no_decay)],
             'lr': self.hparams.lr* 100, 'weight_decay': 0.0}
         ]
-        self.optimizer = torch.optim.AdamW(grouped_parameters, lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
+        self.optimizer = torch.optim.AdamW(grouped_parameters)
         self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lambda epoch: 1.0 / (epoch + 1.0))
         return [self.optimizer], [self.scheduler]
 

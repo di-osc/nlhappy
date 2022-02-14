@@ -28,9 +28,6 @@ class BertCRF(pl.LightningModule):
 
         self.crf = CRF(len(self.label2id))
 
-        self.tokenizer = BertTokenizer.from_pretrained(data_params['pretrained_dir'] + data_params['pretrained_model'])
-
-
         self.train_f1 = ChunkF1()
         self.val_f1 = ChunkF1()
         self.test_f1 = ChunkF1()
@@ -103,23 +100,23 @@ class BertCRF(pl.LightningModule):
              'lr': self.hparams.lr * 5, 'weight_decay': 0.0},
             {'params': self.crf.parameters(), 'lr': self.hparams.lr * 500, 'weight_decay': self.hparams.weight_decay}
         ]
-        self.optimizer = torch.optim.Adam(grouped_parameters, lr=self.hparams.lr)
+        self.optimizer = torch.optim.AdamW(grouped_parameters)
         self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lambda epoch: 1.0 / (epoch + 1.0))
         return [self.optimizer], [self.scheduler]
 
 
-    def predict(self, text: str):
-        tokens = fine_grade_tokenize(text, self.tokenizer)
-        inputs = self.tokenizer.encode_plus(
-            tokens,
-            is_pretokenized=True,
-            add_special_tokens=True,
-            return_tensors='pt')
-        outputs = self(inputs)
-        labels = [self.id2label[id] for id in outputs[0]]
-        ents = get_entities(seq=labels[1:-1])    #去掉cls sep 位置
-        new_ents = []
-        for ent in ents:
-            new_ents.append([ent[1], ent[2], ent[0], text[ent[1]:ent[2]+1]])
-        return new_ents
+    # def predict(self, text: str):
+    #     tokens = fine_grade_tokenize(text, self.tokenizer)
+    #     inputs = self.tokenizer.encode_plus(
+    #         tokens,
+    #         is_pretokenized=True,
+    #         add_special_tokens=True,
+    #         return_tensors='pt')
+    #     outputs = self(inputs)
+    #     labels = [self.id2label[id] for id in outputs[0]]
+    #     ents = get_entities(seq=labels[1:-1])    #去掉cls sep 位置
+    #     new_ents = []
+    #     for ent in ents:
+    #         new_ents.append([ent[1], ent[2], ent[0], text[ent[1]:ent[2]+1]])
+    #     return new_ents
         

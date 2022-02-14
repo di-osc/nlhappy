@@ -4,8 +4,7 @@ from datasets import load_metric
 import torch
 import torch.nn.functional as F
 import os
-from ...metrics.chunk import f1_score
-from torchmetrics import MaxMetric
+from ...metrics.chunk import ChunkF1
 from ...layers import SimpleDense
 
 
@@ -25,9 +24,10 @@ class BertTokenClassification(pl.LightningModule):
         self.bert = BertModel.from_pretrained(data_params['pretrained_dir'] + data_params['pretrained_model'])
         self.classifier = SimpleDense(self.bert.config.hidden_size, hidden_size, len(self.label2id))
         self.criterion = torch.nn.CrossEntropyLoss()
-        self.metric = f1_score
-        self.train_best_f1 = MaxMetric()
-        self.val_best_f1 = MaxMetric()
+        self.train_f1 = ChunkF1()
+        self.val_f1 = ChunkF1()
+        self.test_f1 = ChunkF1()
+
         
         
     
@@ -57,25 +57,23 @@ class BertTokenClassification(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         loss, labels, pred_labels = self.shared_step(batch)
-        f1 = self.metric(y_true=labels, y_pred=pred_labels)
-        return {'loss':loss, 'batch_f1':f1}
+        self.train_f1(true=labels, pred=pred_labels)
+        self.log('train/f1',self.train_f1, on_step=True, on_epoch=True, prog_bar=True)
+        return {'loss':loss}
 
-    def training_epoch_end(self, outputs):
-        avg_f1 = torch.stack([x['batch_f1'] for x in outputs]).mean()
-        self.train_best_f1.update(avg_f1)
-        self.log('train/f1', avg_f1, prog_bar=True)
-        self.log('train/best_f1', self.train_best_f1.compute(), prog_bar=True)
 
     def validation_step(self, batch, batch_idx):
         loss, labels, pred_labels = self.shared_step(batch)
-        f1 = self.metric(y_true=labels, y_pred=pred_labels)
-        return {'loss':loss, 'batch_f1':f1}
+        self.val_f1(true=labels, pred=pred_labels)
+        self.log('val/f1',self.val_f1, on_step=False, on_epoch=True, prog_bar=True)
+        return {'loss':loss}
 
-    def validation_epoch_end(self, outputs):
-        avg_f1 = torch.stack([x['batch_f1'] for x in outputs]).mean()
-        self.val_best_f1.update(avg_f1)
-        self.log('val/f1', avg_f1, prog_bar=True)
-        self.log('val/best_f1', self.val_best_f1.compute(), prog_bar=True)
+
+    def test_step(self, batch, batch_idx):
+        loss, labels, pred_labels = self.shared_step(batch)
+        self.test_f1(true=labels, pred=pred_labels)
+        self.log('test/f1',self.test_f1, on_step=False, on_epoch=True, prog_bar=True)
+        return {'loss':loss}
 
     def configure_optimizers(self):
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)

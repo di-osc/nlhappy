@@ -16,5 +16,5 @@ model=bert_crf \
 model.dropout=0.2 \
 model.lr=3e-5 \
 model.hidden_size=256 \
-model.weight_decay=0.0 \
+model.weight_decay=0.01 \
 seed=22
