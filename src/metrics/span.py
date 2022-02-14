@@ -1,4 +1,22 @@
 import torch
+from torchmetrics import Metric
+
+
+class SpanF1(Metric):
+    def __init__(self, dist_sync_on_step=False):
+        super().__init__(dist_sync_on_step=dist_sync_on_step)
+
+        self.add_state('span_correct', default=torch.tensor(0.0), dist_reduce_fx='sum')
+        self.add_state('span_all_pred', default=torch.tensor(0.0), dist_reduce_fx='sum')
+        self.add_state('span_all_true', default=torch.tensor(0.0), dist_reduce_fx='sum')
+        self.add_state('head_correct', default=torch.tensor(0.0), dist_reduce_fx='sum')
+        self.add_state('head_all_pred', default=torch.tensor(0.0), dist_reduce_fx='sum')
+        
+
+
+
+
+
 
 class SpanEvaluator(object):
     def __init__(self):

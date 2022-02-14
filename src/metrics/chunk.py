@@ -1,5 +1,6 @@
 import os
 import torch
+from torchmetrics import Metric
 
 def end_of_chunk(prev_tag, tag, prev_type, type_):
     """Checks if a chunk ended between the previous and current word.
@@ -93,6 +94,27 @@ def get_entities(seq):
         prev_type = type_
 
     return chunks
+
+
+
+
+
+
+
+
+
+class ChunkF1(Metric):
+    pass 
+
+
+
+
+
+
+
+
+
+
 
 def f1_score(y_true, y_pred, mode='dev'):
     """Compute the F1 score.

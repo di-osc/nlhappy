@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import os
 from ...metrics.chunk import f1_score
 from torchmetrics import MaxMetric
+from ...layers import SimpleDense
 
 
 class BertTokenClassification(pl.LightningModule):
@@ -22,13 +23,7 @@ class BertTokenClassification(pl.LightningModule):
         
 
         self.bert = BertModel.from_pretrained(data_params['pretrained_dir'] + data_params['pretrained_model'])
-        self.classifier = torch.nn.Sequential(
-            torch.nn.Linear(self.bert.config.hidden_size, hidden_size),
-            torch.nn.LayerNorm(hidden_size),
-            torch.nn.ReLU(),
-            torch.nn.Dropout(dropout),
-            torch.nn.Linear(hidden_size, len(self.label2id))
-        )
+        self.classifier = SimpleDense(self.bert.config.hidden_size, hidden_size, len(self.label2id))
         self.criterion = torch.nn.CrossEntropyLoss()
         self.metric = f1_score
         self.train_best_f1 = MaxMetric()
@@ -37,9 +32,9 @@ class BertTokenClassification(pl.LightningModule):
         
     
     def forward(self, inputs):
-        x = self.bert(**inputs).last_hidden_state
-        x = self.classifier(x)
-        return x
+        bert_hidden_state = self.bert(**inputs).last_hidden_state
+        logits = self.classifier(bert_hidden_state)
+        return logits
 
     def shared_step(self, batch):
         inputs = batch['inputs']

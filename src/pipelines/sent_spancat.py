@@ -42,3 +42,4 @@ class SentSpancat:
 @Chinese.factory('sent_spancat',assigns=['doc.sents'],default_config={'model_name':'bert_global_pointer', 'device':'cpu'})
 def make_sent_spancat(nlp, name, model_name, ckpt, device):
     return SentSpancat(nlp=nlp, name=name, model_name=model_name, ckpt=ckpt, device=device)
+

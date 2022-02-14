@@ -1,3 +1,4 @@
 from .token_classification import BertTokenClassification, BertCRF
 from .span_classification import BertGlobalPointer
 from .text_classification import BertTextClassification
+from .triple_extraction import BertGPLinker

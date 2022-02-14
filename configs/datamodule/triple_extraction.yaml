@@ -1,0 +1,10 @@
+_target_: src.datamodules.TripleExtractionDataModule
+
+dataset: du_ie_char
+pretrained_model: chinese-roberta-wwm-ext
+max_length: 300
+batch_size: 16
+pin_memory: True
+num_workers: 10
+data_dir: ${data_dir}
+pretrained_dir: ${pretrained_dir}

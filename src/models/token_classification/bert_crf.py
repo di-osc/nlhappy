@@ -1,5 +1,5 @@
 import pytorch_lightning as pl
-from ..layers import CRF
+from ...layers import CRF, SimpleDense
 import torch
 from ...metrics.chunk import f1_score, get_entities
 from transformers import BertModel, BertTokenizer
@@ -11,7 +11,6 @@ class BertCRF(pl.LightningModule):
     def __init__(self,
                  hidden_size: int,
                  lr: float,
-                 crf_lr: float,
                  weight_decay: float,
                  dropout: float,
                  **data_params):
@@ -20,16 +19,12 @@ class BertCRF(pl.LightningModule):
         self.label2id = data_params['label2id']
         self.id2label = {id: label for label, id in self.label2id.items()}
         self.lr = lr
-        self.crf_lr = crf_lr
         self.weight_decay = weight_decay
         self.bert = BertModel.from_pretrained(data_params['pretrained_dir'] + data_params['pretrained_model'])
-        self.classifier = torch.nn.Sequential(
-            nn.Linear(self.bert.config.hidden_size, hidden_size),
-            nn.LayerNorm(normalized_shape=hidden_size),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_size, len(self.label2id))
-        )
+        self.classifier = SimpleDense(
+            input_size=self.bert.config.hidden_size, 
+            hidden_size=hidden_size, 
+            output_size=len(self.label2id))
         self.crf = CRF(len(self.label2id))
         self.tokenizer = BertTokenizer.from_pretrained(data_params['pretrained_dir'] + data_params['pretrained_model'])
         self.metric = f1_score
@@ -38,8 +33,8 @@ class BertCRF(pl.LightningModule):
         
 
     def forward(self, inputs, label_ids=None):
-        x = self.bert(**inputs).last_hidden_state
-        emissions = self.classifier(x)
+        last_hidden_state = self.bert(**inputs).last_hidden_state
+        emissions = self.classifier(last_hidden_state)
         mask = inputs['attention_mask'].gt(0)
         if label_ids is not None :
             loss = self.crf(emissions, label_ids, mask=mask)
@@ -116,7 +111,7 @@ class BertCRF(pl.LightningModule):
              'lr': self.lr * 5, 'weight_decay': self.weight_decay},
             {'params': [p for n, p in self.classifier.named_parameters() if any(nd in n for nd in no_decay)],
              'lr': self.lr * 5, 'weight_decay': 0.0},
-            {'params': self.crf.parameters(), 'lr': self.crf_lr}
+            {'params': self.crf.parameters(), 'lr': self.lr * 100, 'weight_decay': self.weight_decay}
         ]
         self.optimizer = torch.optim.Adam(grouped_parameters, lr=self.lr)
         self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lambda epoch: 1.0 / (epoch + 1.0))

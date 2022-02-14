@@ -6,7 +6,7 @@ from ...metrics.span import SpanEvaluator
 from torchmetrics import MaxMetric
 from torch.utils.data import DataLoader
 from ...utils.preprocessing import fine_grade_tokenize
-from ..layers import GlobalPointer, MultiLabelCategoricalCrossEntropy, EfficientGlobalPointer
+from ...layers import GlobalPointer, MultiLabelCategoricalCrossEntropy, EfficientGlobalPointer
 
 class BertGlobalPointer(pl.LightningModule):
     def __init__(

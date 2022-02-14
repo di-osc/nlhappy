@@ -46,7 +46,6 @@ class BERTCrossEncoder(LightningModule):
         return logits
 
 
-
     def shared_step(self, batch):
         inputs = batch['inputs']
         labels = batch['label']

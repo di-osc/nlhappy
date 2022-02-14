@@ -4,7 +4,7 @@ from torchmetrics import F1Score
 from torchmetrics import MaxMetric
 from typing import List, Any
 from transformers import BertModel, BertTokenizer
-from ..layers.classifier import SimpleDense
+from ...layers.classifier import SimpleDense
 from ...utils.preprocessing import fine_grade_tokenize
 from typing import List, Dict
 from datasets import Dataset, concatenate_datasets
@@ -67,7 +67,7 @@ class BertTextClassification(LightningModule):
 
     def test_step(self, batch, batch_idx):
         loss, pred_ids, label_ids = self.shared_step(batch)
-        self.test_f1(preds, labels)
+        self.test_f1(pred_ids, label_ids)
         self.log('test/f1', self.test_f1, on_step=False, on_epoch=True, prog_bar=True)
         return {'loss': loss}
     

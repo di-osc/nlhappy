@@ -39,11 +39,13 @@ class GlobalPointer(Module):
         input_size: int, 
         hidden_size: int,
         output_size: int,  
-        RoPE=True):
+        RoPE: bool =True,
+        tril_mask: bool = True):
         super(GlobalPointer, self).__init__()
         self.output_size = output_size
         self.hidden_size = hidden_size
         self.RoPE = RoPE
+        self.tril_mask = tril_mask
         self.fc = nn.Linear(input_size, hidden_size * output_size * 2)
 
 #     def reset_params(self):
@@ -78,8 +80,9 @@ class GlobalPointer(Module):
         logits = logits*pad_mask - (1-pad_mask)*1e12
 
         # 排除下三角
-        mask = torch.tril(torch.ones_like(logits), -1) 
-        logits = logits - mask * 1e12
+        if self.tril_mask:
+            mask = torch.tril(torch.ones_like(logits), -1) 
+            logits = logits - mask * 1e12
 
         # scale返回
         return logits / self.hidden_size ** 0.5
@@ -96,11 +99,13 @@ class EfficientGlobalPointer(Module):
         input_size: int, 
         hidden_size: int,
         output_size: int,
-        RoPE=True):
+        RoPE: bool =True,
+        tril_mask: bool =True):
         super(EfficientGlobalPointer, self).__init__()
         self.output_size = output_size
         self.hidden_size = hidden_size
         self.RoPE = RoPE
+        self.tril_mask = tril_mask
         self.input_size = input_size
         self.linear_1 = nn.Linear(input_size, hidden_size * 2, bias=True)
         self.linear_2 = nn.Linear(hidden_size * 2, output_size * 2, bias=True)
@@ -129,9 +134,9 @@ class EfficientGlobalPointer(Module):
         pad_mask = mask.unsqueeze(1).unsqueeze(1).expand(batch_size, self.output_size, seq_len, seq_len)
         logits = logits*pad_mask - (1-pad_mask)*1e12
 
-        # 排除下三角
-        mask = torch.tril(torch.ones_like(logits), -1) 
-        logits = logits - mask * 1e12
+        # tril mask
+        if self.tril_mask:
+            mask = torch.tril(torch.ones_like(logits), -1) 
+            logits = logits - mask * 1e12
 
-        # scale返回
         return logits
