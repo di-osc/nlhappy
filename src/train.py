@@ -42,7 +42,7 @@ def train(config: DictConfig) -> Optional[float]:
     # Init lightning model
     if datamodule is not None:
         log.info(f"Instantiating model <{config.model._target_}>")
-        model: LightningModule = hydra.utils.instantiate(config.model, **datamodule.hparams,label2id=datamodule.label2id)
+        model: LightningModule = hydra.utils.instantiate(config.model, **datamodule.hparams)
     else: 
         log.info(f"Instantiating model <{config.model._target_}>")
         model = hydra.utils.instantiate(config.model)

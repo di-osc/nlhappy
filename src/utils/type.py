@@ -4,7 +4,7 @@ from typing import List, Tuple
 class Triple(tuple):
     """为了存放关系抽取三元组, 这样改写方便求交集"""
     
-    def __init__(self, triple: Tuple[int, int, int]):
+    def __init__(self, triple: Tuple[int]):
         super().__init__()
         self.triple = triple
         

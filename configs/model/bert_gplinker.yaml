@@ -3,4 +3,4 @@ _target_: src.models.BertGPLinker
 hidden_size: 64
 lr: 3e-5
 dropout: 0.2
-weight_decay: 0.0
+weight_decay: 0.01

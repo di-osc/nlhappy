@@ -2,11 +2,9 @@ import pytorch_lightning as pl
 from transformers import BertModel, BertTokenizer
 import torch.nn as nn
 import torch
-from ...metrics.span import SpanEvaluator
-from torchmetrics import MaxMetric
-from torch.utils.data import DataLoader
+from ...metrics.span import SpanF1
 from ...utils.preprocessing import fine_grade_tokenize
-from ...layers import GlobalPointer, MultiLabelCategoricalCrossEntropy, EfficientGlobalPointer
+from ...layers import MultiLabelCategoricalCrossEntropy, EfficientGlobalPointer
 
 class BertGlobalPointer(pl.LightningModule):
     def __init__(
@@ -32,15 +30,16 @@ class BertGlobalPointer(pl.LightningModule):
         self.classifier = EfficientGlobalPointer(
             input_size=self.bert.config.hidden_size, 
             hidden_size=hidden_size,
-            output_size=len(self.label2id))
+            output_size=len(self.label2id)
+            )
 
         self.tokenizer = BertTokenizer.from_pretrained(data_params['pretrained_dir'] + data_params['pretrained_model'])
         self.dropout = nn.Dropout(dropout)
         self.criterion = MultiLabelCategoricalCrossEntropy()
-        self.metric = SpanEvaluator()
-        self.train_best_f1 = MaxMetric()
-        self.val_best_f1 = MaxMetric()
 
+        self.train_f1 = SpanF1()
+        self.val_f1 = SpanF1()
+        self.test_f1 = SpanF1()
 
 
     def forward(self, inputs):
@@ -57,33 +56,29 @@ class BertGlobalPointer(pl.LightningModule):
         y_true = span_ids.reshape(batch_size*ent_type_size, -1)
         y_pred = logits.reshape(batch_size*ent_type_size, -1)
         loss = self.criterion(y_pred, y_true)
-        return logits, loss
+        return loss, logits, span_ids
 
     
     def training_step(self, batch, batch_idx):
-        logits, loss = self.shared_step(batch)
-        f1 = self.metric.get_sample_f1(logits, batch['span_ids'])
-        return {'loss': loss, 'batch_f1': f1}
-
-    def training_epoch_end(self, outputs):
-        avg_f1 = torch.stack([x['batch_f1'] for x in outputs]).mean()
-        self.train_best_f1.update(avg_f1)
-        self.log('train/f1', avg_f1, prog_bar=True)
-        self.log('train/best_f1', self.train_best_f1.compute(), prog_bar=True)
+        loss, pred, true = self.shared_step(batch)
+        self.train_f1(pred, true)
+        self.log('train/f1', self.train_f1, on_step=True, on_epoch=True, prog_bar=True)
+        return {'loss': loss}
 
     def validation_step(self, batch, batch_idx):
-        pred, loss = self.shared_step(batch)
-        f1 = self.metric.get_sample_f1(pred, batch['span_ids'])
-        return {'loss': loss, 'batch_f1': f1}
+        loss, pred, true = self.shared_step(batch)
+        self.val_f1(pred, true)
+        self.log('val/f1', self.val_f1, on_step=False, on_epoch=True, prog_bar=True)
+        return {'loss': loss}
 
-    def validation_epoch_end(self, outputs):
-        avg_f1 = torch.stack([x['batch_f1'] for x in outputs]).mean()
-        self.val_best_f1.update(avg_f1)
-        self.log('val/f1', avg_f1, prog_bar=True)
-        self.log('val/best_f1', self.val_best_f1.compute(), prog_bar=True)
+    def test_step(self, batch, batch_idx):
+        loss, pred, true = self.shared_step(batch)
+        self.test_f1(pred, true)
+        self.log('test/f1', self.test_f1, on_step=False, on_epoch=True, prog_bar=True)
+        return {'loss': loss}
 
     def configure_optimizers(self):
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
+        self.optimizer = torch.optim.AdamW(self.parameters(), lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
         self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lambda epoch: 1.0 / (epoch + 1.0))
         return [self.optimizer], [self.scheduler]
 

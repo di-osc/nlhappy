@@ -7,6 +7,7 @@ import torch
 from torch import Tensor
 from typing import List, Set
 from ...utils.type import Triple
+from ...utils.preprocessing import fine_grade_tokenize
 
 
 
@@ -32,8 +33,9 @@ class BertGPLinker(pl.LightningModule):
         
         self.label2id = data_params['label2id']
         self.id2label = {v: k for k, v in self.label2id.items()}
+        self.tokenizer = BertTokenizer.from_pretrained(data_params['pretrained_dir'] + data_params['pretrained_model'])
+        
         self.bert = BertModel.from_pretrained(data_params['pretrained_dir'] + data_params['pretrained_model'])
-
         # 主语 宾语分类器
         self.span_classifier = EfficientGlobalPointer(self.bert.config.hidden_size, hidden_size, 2)  # 0: suject  1: object
         # 主语 宾语 头对齐
@@ -94,11 +96,13 @@ class BertGPLinker(pl.LightningModule):
         self.log('val/f1', self.val_f1, on_step=False, on_epoch=True, prog_bar=True)
         return {'val_loss': loss}
 
+
     def test_step(self, batch, batch_idx):
         loss, batch_triples, batch_true_triples = self.shared_step(batch)
         self.test_f1(batch_triples, batch_true_triples)
         self.log('test/f1', self.test_f1, on_step=False, on_epoch=True, prog_bar=True)
         return {'test_loss': loss}
+
 
     def configure_optimizers(self):
         no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
@@ -108,21 +112,22 @@ class BertGPLinker(pl.LightningModule):
             {'params': [p for n, p in self.bert.named_parameters() if any(nd in n for nd in no_decay)],
             'lr': self.hparams.lr, 'weight_decay': 0.0},
             {'params': [p for n, p in self.span_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr* 100, 'weight_decay': self.hparams.weight_decay},
+            'lr': self.hparams.lr* 5, 'weight_decay': self.hparams.weight_decay},
             {'params': [p for n, p in self.span_classifier.named_parameters() if any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr* 100, 'weight_decay': 0.0},
+            'lr': self.hparams.lr* 5, 'weight_decay': 0.0},
             {'params': [p for n, p in self.head_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr* 100, 'weight_decay': self.hparams.weight_decay},
+            'lr': self.hparams.lr* 5, 'weight_decay': self.hparams.weight_decay},
             {'params': [p for n, p in self.head_classifier.named_parameters() if any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr* 100, 'weight_decay': 0.0},
+            'lr': self.hparams.lr* 5, 'weight_decay': 0.0},
             {'params': [p for n, p in self.tail_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr* 100, 'weight_decay': self.hparams.weight_decay},
+            'lr': self.hparams.lr* 5, 'weight_decay': self.hparams.weight_decay},
             {'params': [p for n, p in self.tail_classifier.named_parameters() if any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr* 100, 'weight_decay': 0.0}
+            'lr': self.hparams.lr* 5, 'weight_decay': 0.0}
         ]
         self.optimizer = torch.optim.AdamW(grouped_parameters)
         self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lambda epoch: 1.0 / (epoch + 1.0))
         return [self.optimizer], [self.scheduler]
+
 
     def extract_triple(
         self,
@@ -164,6 +169,10 @@ class BertGPLinker(pl.LightningModule):
                             triples.add(Triple(triple=(sh.item(), sh.item(), p, oh.item(), ot.item())))
             batch_triples.append(triples)
         return batch_triples
+
+
+        
+
     
 
 

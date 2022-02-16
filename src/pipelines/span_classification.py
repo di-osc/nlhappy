@@ -1,3 +1,4 @@
+import shutil
 from ..models import BertGlobalPointer
 from spacy.lang.zh import Chinese
 from ..models import BertGlobalPointer
@@ -32,14 +33,15 @@ class SentSpancat:
         doc.spans['all'] = all_spans
         return doc
 
-    def to_disk(self, path: str, exclude):
+    def to_disk(self, path:str, exclude):
         shutil.copy(self.ckpt, path)
         self.nlp.config['components'][self.pipe_name]['ckpt'] = path
 
-    def from_disk(self, path: str, exclude):
+    def from_disk(self, path:str, exclude):
         self.model = self.model_class.load_from_checkpoint(path)
 
-@Chinese.factory('sent_spancat',assigns=['doc.sents'],default_config={'model_name':'bert_global_pointer', 'device':'cpu'})
-def make_sent_spancat(nlp, name, model_name, ckpt, device):
+@Chinese.factory('sent_span_classification',assigns=['doc.spans'],default_config={'model_name':'bert_global_pointer', 'device':'cpu'})
+def make_sent_spancat(nlp, name:str, model_name:str, ckpt:str, device:str):
+    """句子级别的文本片段分类"""
     return SentSpancat(nlp=nlp, name=name, model_name=model_name, ckpt=ckpt, device=device)
 

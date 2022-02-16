@@ -55,13 +55,13 @@ class BertTextClassification(LightningModule):
 
     def training_step(self, batch, batch_idx):
         loss, pred_ids, label_ids = self.shared_step(batch)
-        f1 = self.train_f1(pred_ids, label_ids)
+        self.train_f1(pred_ids, label_ids)
         self.log('train/f1', self.train_f1, on_step=True, on_epoch=True, prog_bar=True)
         return {'loss': loss}
     
     def validation_step(self, batch, batch_idx):
         loss, pred_ids, label_ids = self.shared_step(batch)
-        f1 = self.val_f1(pred_ids, label_ids)
+        self.val_f1(pred_ids, label_ids)
         self.log('val/f1', self.val_f1, on_step=False, on_epoch=True, prog_bar=True)
         return {'loss': loss}
 

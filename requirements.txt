@@ -7,7 +7,7 @@ torchmetrics>=0.6.0
 # --------- huggingface --------- #
 transformers    # for building BERT, GPT-2, RoBERTa models
 datasets        # for building datasets
-tokenizers      # for building tokenizers
+# tokenizers      # for building tokenizers
 
 # --------- hydra --------- #
 hydra-core==1.1.0

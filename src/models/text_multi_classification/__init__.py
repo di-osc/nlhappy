@@ -1,0 +1,1 @@
+from .bert_text_multi_classification import BertTextMultiClassification

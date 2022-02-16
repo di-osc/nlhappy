@@ -1,4 +1,4 @@
-# ----------roberta val/best_f1 = 0.833----------------#
+# --------------------------#
 python run.py \
 mode=exp \
 monitor=val/f1 \

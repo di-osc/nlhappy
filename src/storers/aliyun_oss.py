@@ -1,4 +1,8 @@
+import os
 import oss2
+import zipfile
+import os
+from itertools import islice
 
 class OSSStorer:
     '''阿里云oss对象存储'''
@@ -7,11 +11,44 @@ class OSSStorer:
         access_key_id : str='LTAI5tPsMSE5G3srWxB8j3yw', 
         access_key_secret : str ='z5jPdkfNq4WPtV4c7YaAJwH5Sj45gT', 
         endpoint :str = 'https://oss-cn-beijing.aliyuncs.com', 
-        bucket_name : str = 'deepset'
+        data_bucket : str = 'deepset',
+        model_bucket : str = 'pretrained-model'
         ):
         super().__init__()
         self.auth = oss2.Auth(access_key_id, access_key_secret)
-        self.bucket = oss2.Bucket(self.auth, endpoint, bucket_name)
+        self.data_bucket = oss2.Bucket(self.auth, endpoint, data_bucket)
+        self.model_bucket = oss2.Bucket(self.auth, endpoint, model_bucket)
 
     def download(self, filename : str, localfile : str):
-        self.bucket.get_object_to_file(key=filename, filename=localfile)
+        self.data_bucket.get_object_to_file(key=filename, filename=localfile)
+
+
+    def get_all_data(self):
+        all_data = []
+        for obj in oss2.ObjectIterator(self.data_bucket):
+            data = obj.key.split('.')[0]
+            all_data.append(data)
+        return all_data
+
+
+    def download_dataset(self, dataset:str, localpath: str):
+        file = dataset + '.zip'
+        file_path = localpath + file
+        dataset_path = localpath + dataset
+        if not os.path.exists(dataset_path):
+            self.data_bucket.get_object_to_file(key=file, filename=file_path)
+            with zipfile.ZipFile(file=file_path, mode='r') as zf:
+                zf.extractall(path=localpath)
+        if os.path.exists(file_path):
+            os.remove(path=file_path)
+
+    def download_model(self, model:str, localpath: str):
+        file = model + '.zip'
+        file_path = localpath + file
+        model_path = localpath + model
+        if not os.path.exists(model_path):
+            self.model_bucket.get_object_to_file(key=file, filename=file_path)
+            with zipfile.ZipFile(file=file_path, mode='r') as zf:
+                zf.extractall(path=localpath)
+        if os.path.exists(file_path):
+            os.remove(path=file_path)

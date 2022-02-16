@@ -30,11 +30,6 @@ class SpanClassificationDataModule(pl.LightningDataModule):
         if storer == 'oss':
             self.storage = OSSStorer()
         self.max_length = max_length
-        self.tokenizer = None
-        self.label2id = None
-        self.train_dataset = None
-        self.valid_dataset = None
-        self.test_dataset = None
 
 
     def prepare_data(self) -> None:

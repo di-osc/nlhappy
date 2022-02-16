@@ -1,0 +1,6 @@
+_target_: src.models.BertTextMultiClassification
+
+hidden_size: 256
+lr: 3e-5
+dropout: 0.2
+weight_decay: 0.00

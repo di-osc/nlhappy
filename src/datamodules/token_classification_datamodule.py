@@ -34,11 +34,6 @@ class TokenClassificationDataModule(pl.LightningDataModule):
         self.storage = OSSStorer()
         self.label_pad_id = label_pad_id
         self.max_length = max_length
-        self.tokenzier = None
-        self.label2id = None
-        self.train_dataset = None
-        self.valid_dataset = None
-        self.test_dataset = None
         
         
     def prepare_data(self):
@@ -57,7 +52,7 @@ class TokenClassificationDataModule(pl.LightningDataModule):
                 zf.extractall(path=self.hparams.pretrained_dir)
             os.remove(path=self.hparams.pretrained_dir + self.pretrained_file)
 
-    def set_transform(self, example):
+    def transform(self, example):
         tokens = example['tokens'][0]
         text = ''.join(tokens)
         new_tokens = fine_grade_tokenize(text, self.tokenizer)
@@ -82,7 +77,7 @@ class TokenClassificationDataModule(pl.LightningDataModule):
         data = load_from_disk(self.hparams.data_dir + self.hparams.dataset)
         set_labels = sorted(set([label for labels in data['train']['labels'] for label in labels]))
         self.label2id = {label: i for i, label in enumerate(set_labels)}
-        data.set_transform(transform=self.set_transform)
+        data.set_transform(transform=self.transform)
         self.train_dataset = data['train']
         self.valid_dataset = data['validation']
         if 'test' in data:

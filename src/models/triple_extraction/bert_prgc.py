@@ -14,7 +14,7 @@ class BertPRGC(pl.LightningModule):
         hidden_size: int,
         lr: float,
         weight_decay: float,
-        dropout: float ,
+        dropout: float,
         **data_params
     ):
         super(BertPRGC, self).__init__()
