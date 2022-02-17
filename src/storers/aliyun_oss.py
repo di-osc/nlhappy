@@ -32,6 +32,10 @@ class OSSStorer:
 
 
     def download_dataset(self, dataset:str, localpath: str):
+        """下载数据集
+        - dataset: 数据集名称
+        - localpath: 下载到本地的路径
+        """
         file = dataset + '.zip'
         file_path = localpath + file
         dataset_path = localpath + dataset
@@ -43,6 +47,10 @@ class OSSStorer:
             os.remove(path=file_path)
 
     def download_model(self, model:str, localpath: str):
+        """下载预训练模型
+        - model: 模型名称
+        - localpath: 下载到本地的路径
+        """
         file = model + '.zip'
         file_path = localpath + file
         model_path = localpath + model

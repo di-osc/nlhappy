@@ -1,4 +1,4 @@
-# ----------roberta val/best_f1 = 0.66----------------#
+# ----------roberta val/best_f1 = 0.647----------------#
 python run.py \
 mode=exp \
 name=cblue_ee_charspan \
@@ -10,12 +10,13 @@ datamodule=span_classification \
 datamodule.dataset=cblue_ee_charspan \
 datamodule.batch_size=12 \
 datamodule.max_length=420 \
+datamodule.pin_memory=True \
 datamodule.pretrained_model=chinese-roberta-wwm-ext \
 model=bert_global_pointer \
 model.dropout=0.2 \
 model.lr=3e-5 \
 model.hidden_size=256 \
-model.weight_decay=0.0 \
+model.weight_decay=0.00 \
 seed=22
 
 

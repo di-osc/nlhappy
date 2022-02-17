@@ -13,12 +13,15 @@ class SpanF1(Metric):
         self.add_state('all_true', default=torch.tensor(0.0), dist_reduce_fx='sum')
 
     def update(self, pred: Tensor, true: Tensor):
-        self.correct += torch.sum(pred == true)
+        self.correct += torch.sum(pred[true==1])
         self.all_pred += torch.sum(pred != 0)
         self.all_true += torch.sum(true != 0)
 
     def compute(self):
-        return 2 * self.correct / (self.all_pred + self.all_true)
+        p = self.correct / self.all_pred if self.all_pred > 0 else 0
+        r = self.correct / self.all_true if self.all_true > 0 else 0
+        score = 2 * p * r / (p + r) if p + r > 0 else 0
+        return torch.tensor(score)
 
         
 

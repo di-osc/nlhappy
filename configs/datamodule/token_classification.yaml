@@ -6,7 +6,6 @@ max_length: 52
 batch_size: 32
 pin_memory: True
 num_workers: 10
-storer: oss
 label_pad_id: -100
 data_dir: ${data_dir}
 pretrained_dir: ${pretrained_dir}

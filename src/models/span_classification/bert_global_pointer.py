@@ -13,24 +13,19 @@ class BertGlobalPointer(pl.LightningModule):
         lr: float,
         weight_decay: float,
         dropout: float ,
+        threshold: float = 0.5,
         **data_params
     ) : 
         super().__init__()
         self.save_hyperparameters()
 
-        self.label2id = data_params['label2id']
-        self.id2label = {v:k for k,v in self.label2id.items()}
 
         self.bert = BertModel.from_pretrained(data_params['pretrained_dir'] + data_params['pretrained_model'])
-        # self.classifier = GlobalPointer(
-        #     input_size=self.bert.config.hidden_size, 
-        #     hidden_size=hidden_size, 
-        #     output_size=len(self.label2id))
         # 使用更加高效的GlobalPointer https://kexue.fm/archives/8877
         self.classifier = EfficientGlobalPointer(
             input_size=self.bert.config.hidden_size, 
             hidden_size=hidden_size,
-            output_size=len(self.label2id)
+            output_size=len(self.hparams.label2id)
             )
 
         self.tokenizer = BertTokenizer.from_pretrained(data_params['pretrained_dir'] + data_params['pretrained_model'])
@@ -52,11 +47,12 @@ class BertGlobalPointer(pl.LightningModule):
     def shared_step(self, batch):
         inputs, span_ids = batch['inputs'], batch['span_ids']
         logits = self(inputs)
+        pred = logits.ge(self.hparams.threshold).float()
         batch_size, ent_type_size = logits.shape[:2]
         y_true = span_ids.reshape(batch_size*ent_type_size, -1)
         y_pred = logits.reshape(batch_size*ent_type_size, -1)
         loss = self.criterion(y_pred, y_true)
-        return loss, logits, span_ids
+        return loss, pred, span_ids
 
     
     def training_step(self, batch, batch_idx):
@@ -78,7 +74,18 @@ class BertGlobalPointer(pl.LightningModule):
         return {'loss': loss}
 
     def configure_optimizers(self):
-        self.optimizer = torch.optim.AdamW(self.parameters(), lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
+        no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
+        grouped_parameters = [
+            {'params': [p for n, p in self.bert.named_parameters() if not any(nd in n for nd in no_decay)],
+             'lr': self.hparams.lr, 'weight_decay': self.hparams.weight_decay},
+            {'params': [p for n, p in self.bert.named_parameters() if any(nd in n for nd in no_decay)],
+             'lr': self.hparams.lr, 'weight_decay': 0.0},
+            {'params': [p for n, p in self.classifier.named_parameters() if not any(nd in n for nd in no_decay)],
+             'lr': self.hparams.lr * 5, 'weight_decay': self.hparams.weight_decay},
+            {'params': [p for n, p in self.classifier.named_parameters() if any(nd in n for nd in no_decay)],
+             'lr': self.hparams.lr * 5, 'weight_decay': 0.0}
+        ]
+        self.optimizer = torch.optim.AdamW(grouped_parameters)
         self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lambda epoch: 1.0 / (epoch + 1.0))
         return [self.optimizer], [self.scheduler]
 

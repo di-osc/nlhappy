@@ -26,7 +26,10 @@ class SentSpancat:
         self.model.eval()
         all_spans = []
         for sent in doc.sents:
-            spans = self.model.predict(sent.text)
+            text = ''
+            for token in sent:
+                text += token.norm_
+            spans = self.model.predict(text)
             for span in spans:
                 s = sent.char_span(span[0], span[1]+1, span[2])
                 all_spans.append(s)

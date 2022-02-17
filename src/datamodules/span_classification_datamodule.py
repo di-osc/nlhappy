@@ -19,35 +19,17 @@ class SpanClassificationDataModule(pl.LightningDataModule):
         pin_memory: bool,
         num_workers: int,
         data_dir: str,
-        pretrained_dir: str,
-        storer: str = 'oss'
+        pretrained_dir: str
         ) :
         super().__init__()
         self.save_hyperparameters()
 
-        self.file_name = dataset + '.zip'
-        self.pretrained_file = pretrained_model + '.zip'
-        if storer == 'oss':
-            self.storage = OSSStorer()
-        self.max_length = max_length
-
 
     def prepare_data(self) -> None:
         '下载数据集和预训练模型'
-        if not os.path.exists(self.hparams.data_dir + self.hparams.dataset):
-            self.storage.download(filename = self.file_name, 
-                                 localfile = self.hparams.data_dir + self.file_name)
-            with zipfile.ZipFile(file=self.hparams.data_dir + self.file_name, mode='r') as zf:
-                zf.extractall(path=self.hparams.data_dir)
-            os.remove(path=self.hparams.data_dir + self.file_name)
-        if not os.path.exists(self.hparams.pretrained_dir + self.hparams.pretrained_model):
-            self.storage.download(
-                filename=self.pretrained_file,
-                localfile=self.hparams.pretrained_dir + self.pretrained_file
-            )
-            with zipfile.ZipFile(file=self.hparams.pretrained_dir + self.pretrained_file, mode='r') as zf:
-                zf.extractall(path=self.hparams.pretrained_dir)
-            os.remove(path=self.hparams.pretrained_dir + self.pretrained_file)
+        oss = OSSStorer()
+        oss.download_dataset(self.hparams.dataset, self.hparams.data_dir)
+        oss.download_model(self.hparams.pretrained_model, self.hparams.pretrained_dir)
 
     def set_transform(self, example):
         text = example['text'][0]
@@ -56,21 +38,25 @@ class SpanClassificationDataModule(pl.LightningDataModule):
             tokens, 
             is_pretokenized=True,
             padding='max_length',  
-            max_length=self.max_length,
+            max_length=self.hparams.max_length,
             add_special_tokens=True,
             truncation=True)
         inputs = dict(zip(inputs.keys(), map(torch.tensor, inputs.values())))
         spans = example['spans'][0]
-        span_ids = torch.zeros(len(self.label2id), self.max_length, self.max_length)
+        span_ids = torch.zeros(len(self.hparams.label2id), self.hparams.max_length, self.hparams.max_length)
         for span in spans :
             # +1 是因为添加了 [CLS]
-            span_ids[self.label2id[span[2]],  int(span[0])+1, int(span[1])+1] = 1
+            span_ids[self.hparams.label2id[span[2]],  int(span[0])+1, int(span[1])+1] = 1
+
         return {'inputs':[inputs], 'span_ids':[span_ids]}
 
     def setup(self, stage: str) -> None:
         data = load_from_disk(self.hparams.data_dir + self.hparams.dataset)
         set_labels = sorted(set([span[2] for spans in data['train']['spans'] for span in spans]))
-        self.label2id = {label: i for i, label in enumerate(set_labels)}
+        label2id = {label: i for i, label in enumerate(set_labels)}
+        id2label = {i: label for label, i in label2id.items()}
+        self.hparams.label2id = label2id
+        self.hparams.id2label = id2label
         data.set_transform(transform=self.set_transform)
         self.train_dataset = data['train']
         self.valid_dataset = data['validation']
@@ -78,13 +64,25 @@ class SpanClassificationDataModule(pl.LightningDataModule):
             self.test_dataset = data['test']
         self.tokenizer = BertTokenizer.from_pretrained(self.hparams.pretrained_dir + self.hparams.pretrained_model)
 
+    def collate_fn(self, batch):
+        new = {'input_ids':[], 'token_type_ids':[], 'attention_mask':[], 'span_ids':[]}
+        for e in batch:
+            for k, v in e['inputs'].items():
+                new[k].append(v)
+            new['span_ids'].append(e['span_ids'])
+        new_ = dict(zip(new.keys(), map(torch.stack, new.values())))
+        res = (new_['input_ids'], new_['token_type_ids'], new_['attention_mask']), new_['span_ids']
+        return res
+
 
     def train_dataloader(self):
         return DataLoader(dataset=self.train_dataset, 
                           batch_size=self.hparams.batch_size, 
                           shuffle=True,
                           pin_memory=self.hparams.pin_memory,
-                          num_workers=self.hparams.num_workers)
+                          num_workers=self.hparams.num_workers,
+                          collate_fn=self.collate_fn)
+                          
 
 
     def val_dataloader(self):
@@ -92,7 +90,8 @@ class SpanClassificationDataModule(pl.LightningDataModule):
                           batch_size=self.hparams.batch_size,
                           shuffle=False,
                           pin_memory=self.hparams.pin_memory,
-                          num_workers=self.hparams.num_workers)        
+                          num_workers=self.hparams.num_workers,
+                          collate_fn=self.collate_fn)
 
 
 
@@ -102,4 +101,6 @@ class SpanClassificationDataModule(pl.LightningDataModule):
                               batch_size=self.hparams.batch_size,
                               shuffle=False,
                               pin_memory=self.hparams.pin_memory,
-                              num_workers=self.hparams.num_workers)
+                              num_workers=self.hparams.num_workers,
+                              collate_fn=self.collate_fn
+                              )
