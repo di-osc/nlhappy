@@ -18,8 +18,8 @@ class SpanClassificationDataModule(pl.LightningDataModule):
         batch_size: int,
         pin_memory: bool,
         num_workers: int,
-        data_dir: str,
-        pretrained_dir: str
+        data_dir: str = './data/',
+        pretrained_dir: str = './pretrained_models'
         ) :
         super().__init__()
         self.save_hyperparameters()
@@ -64,15 +64,15 @@ class SpanClassificationDataModule(pl.LightningDataModule):
             self.test_dataset = data['test']
         self.tokenizer = BertTokenizer.from_pretrained(self.hparams.pretrained_dir + self.hparams.pretrained_model)
 
-    def collate_fn(self, batch):
-        new = {'input_ids':[], 'token_type_ids':[], 'attention_mask':[], 'span_ids':[]}
-        for e in batch:
-            for k, v in e['inputs'].items():
-                new[k].append(v)
-            new['span_ids'].append(e['span_ids'])
-        new_ = dict(zip(new.keys(), map(torch.stack, new.values())))
-        res = (new_['input_ids'], new_['token_type_ids'], new_['attention_mask']), new_['span_ids']
-        return res
+    # def collate_fn(self, batch):
+    #     new = {'input_ids':[], 'token_type_ids':[], 'attention_mask':[], 'span_ids':[]}
+    #     for e in batch:
+    #         for k, v in e['inputs'].items():
+    #             new[k].append(v)
+    #         new['span_ids'].append(e['span_ids'])
+    #     new_ = dict(zip(new.keys(), map(torch.stack, new.values())))
+    #     res = (new_['input_ids'], new_['token_type_ids'], new_['attention_mask']), new_['span_ids'].to_sparse()
+    #     return res
 
 
     def train_dataloader(self):
@@ -80,8 +80,7 @@ class SpanClassificationDataModule(pl.LightningDataModule):
                           batch_size=self.hparams.batch_size, 
                           shuffle=True,
                           pin_memory=self.hparams.pin_memory,
-                          num_workers=self.hparams.num_workers,
-                          collate_fn=self.collate_fn)
+                          num_workers=self.hparams.num_workers)
                           
 
 
@@ -90,8 +89,7 @@ class SpanClassificationDataModule(pl.LightningDataModule):
                           batch_size=self.hparams.batch_size,
                           shuffle=False,
                           pin_memory=self.hparams.pin_memory,
-                          num_workers=self.hparams.num_workers,
-                          collate_fn=self.collate_fn)
+                          num_workers=self.hparams.num_workers)
 
 
 
@@ -101,6 +99,5 @@ class SpanClassificationDataModule(pl.LightningDataModule):
                               batch_size=self.hparams.batch_size,
                               shuffle=False,
                               pin_memory=self.hparams.pin_memory,
-                              num_workers=self.hparams.num_workers,
-                              collate_fn=self.collate_fn
+                              num_workers=self.hparams.num_workers
                               )

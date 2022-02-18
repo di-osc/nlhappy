@@ -11,7 +11,7 @@ from pytorch_lightning import (
 )
 from pytorch_lightning.loggers import LightningLoggerBase
 
-from src.utils import utils
+from d_lab.utils import utils
 
 log = utils.get_logger(__name__)
 
@@ -116,3 +116,6 @@ def train(config: DictConfig) -> Optional[float]:
 
     # Return metric score for hyperparameter optimization
     return score
+
+
+

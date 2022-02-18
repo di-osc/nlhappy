@@ -1,4 +1,4 @@
-_target_: src.datamodules.TokenClassificationDataModule
+_target_: d_lab.datamodules.TokenClassificationDataModule
 
 dataset: clue_ner_chartoken
 pretrained_model: chinese-roberta-wwm-ext

@@ -1,10 +1,11 @@
-_target_: src.datamodules.sentence_pair_datamodule.SentencePairDataModule
+_target_: d_lab.datamodules.sentence_pair_datamodule.SentencePairDataModule
 
 data_dir: ${data_dir} # data_dir is specified in config.yaml
-data_name: lcqmc
+pretrained_dir: ${pretrained_dir}
+dataset: lcqmc
+pretrained_model: bert-base-chinese
 batch_size: 32
-tokenizer_name: bert-base-chinese
 num_workers: 20
 pin_memory: True
-sentence_max_length: 64
+max_length: 64
 return_sentence_pair: False

@@ -1,4 +1,4 @@
-_target_: src.models.BERTCrossEncoder
+_target_: d_lab.models.BERTCrossEncoder
 
 bert_name: bert-base-chinese       # bert名称或者路径
 mid_size: 256                     # pooler线性层的大小

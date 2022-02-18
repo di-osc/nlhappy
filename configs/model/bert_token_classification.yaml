@@ -1,4 +1,4 @@
-_target_: src.models.token_classification.BertTokenClassification
+_target_: d_lab.models.token_classification.BertTokenClassification
 
 hidden_size: 256
 lr: 5e-5 

@@ -1,4 +1,4 @@
-_target_: src.datamodules.TripleExtractionDataModule
+_target_: d_lab.datamodules.TripleExtractionDataModule
 
 dataset: du_ie_char
 pretrained_model: chinese-roberta-wwm-ext

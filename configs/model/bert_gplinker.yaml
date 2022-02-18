@@ -1,4 +1,4 @@
-_target_: src.models.BertGPLinker
+_target_: d_lab.models.BertGPLinker
 
 hidden_size: 64
 lr: 3e-5

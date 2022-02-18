@@ -21,36 +21,20 @@ class TokenClassificationDataModule(pl.LightningDataModule):
         batch_size: int,
         pin_memory: bool,
         num_workers: int,
-        pretrained_dir: str,
-        storer: str = 'oss',
+        pretrained_dir: str = 'pretrained_models/',
         data_dir: str = 'data/',
         label_pad_id: int = -100
         ):
         super().__init__()
         self.save_hyperparameters()
 
-        self.pretrained_file = pretrained_model + '.zip'
-        self.data_file = dataset + '.zip'
-        self.storage = OSSStorer()
-        self.label_pad_id = label_pad_id
-        self.max_length = max_length
         
         
     def prepare_data(self):
         '''下载数据集和预训练模型'''
-        if not os.path.exists(self.hparams.data_dir + self.hparams.dataset):
-            self.storage.download(filename = self.data_file, 
-                                localfile = self.hparams.data_dir + self.data_file)
-            with zipfile.ZipFile(file=self.hparams.data_dir + self.data_file, mode='r') as zf:
-                zf.extractall(path=self.hparams.data_dir)
-            os.remove(path=self.hparams.data_dir + self.data_file)
-
-        if not os.path.exists(self.hparams.pretrained_dir + self.hparams.pretrained_model):
-            self.storage.download(filename = self.pretrained_file, 
-                                localfile = self.hparams.pretrained_dir + self.pretrained_file)
-            with zipfile.ZipFile(file=self.hparams.pretrained_dir + self.pretrained_file, mode='r') as zf:
-                zf.extractall(path=self.hparams.pretrained_dir)
-            os.remove(path=self.hparams.pretrained_dir + self.pretrained_file)
+        oss = OSSStorer()
+        oss.download_dataset(self.hparams.dataset, self.hparams.data_dir)
+        oss.download_model(self.hparams.pretrained_model, self.hparams.pretrained_dir)
 
     def transform(self, example):
         tokens = example['tokens'][0]

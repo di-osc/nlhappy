@@ -1,4 +1,4 @@
-_target_: src.models.BertGlobalPointer
+_target_: d_lab.models.BertGlobalPointer
 
 hidden_size: 64           
 dropout: 0.2

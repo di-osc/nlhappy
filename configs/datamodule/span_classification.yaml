@@ -1,4 +1,4 @@
-_target_: src.datamodules.SpanClassificationDataModule
+_target_: d_lab.datamodules.SpanClassificationDataModule
 
 
 dataset: clue_ner_span
