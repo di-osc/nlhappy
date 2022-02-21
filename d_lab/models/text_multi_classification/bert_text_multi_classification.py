@@ -31,8 +31,8 @@ class BertTextMultiClassification(pl.LightningModule):
 
         self.tokenizer = BertTokenizer.from_pretrained(data_params['pretrained_dir'] + data_params['pretrained_model'])
 
-    def forward(self, inputs):
-        pooled = self.bert(**inputs).pooler_output
+    def forward(self, input_ids, token_type_ids, attention_mask):
+        pooled = self.bert(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask).pooler_output
         pooled = self.dropout(pooled)
         logits = self.classifier(pooled)
         return logits
@@ -40,7 +40,7 @@ class BertTextMultiClassification(pl.LightningModule):
 
     def shared_step(self, batch):
         inputs, label_ids = batch['inputs'], batch['label_ids']
-        logits = self(inputs)
+        logits = self(**inputs)
         loss = self.criterion(logits, label_ids)
         pred_ids = logits.sigmoid().ge(self.hparams.threshold).long()
         return loss,  pred_ids, label_ids

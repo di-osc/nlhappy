@@ -5,22 +5,23 @@ description = "深度学习实验室"
 authors = ["good-as-water <790990241@qq.com>"]
 
 [tool.poetry.dependencies]
-python = "^3.8"
+torch = "^1.10.2"
 pytorch-lightning = "^1.5.10"
 transformers = "^4.16.2"
 datasets = "^1.18.3"
 oss2 = "^2.15.0"
 spacy = "^3.2.2"
-rich = "^11.2.0"
-torch = "^1.10.2"
 hydra-core = "^1.1.1"
 hydra-colorlog = "^1.1.0"
-python-dotenv = "^0.19.2"
 hydra-optuna-sweeper = "^1.1.2"
+python-dotenv = "^0.19.2"
 scikit-learn = "^1.0.2"
-jupyterlab = "^3.2.9"
 
 [tool.poetry.dev-dependencies]
+
+[tool.poetry.plugins."spacy_factories"]
+"sent_spancat" = "d_lab.pipelines:make_sent_spancat"
+
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

@@ -19,7 +19,7 @@ class SpanClassificationDataModule(pl.LightningDataModule):
         pin_memory: bool,
         num_workers: int,
         data_dir: str = './data/',
-        pretrained_dir: str = './pretrained_models'
+        pretrained_dir: str = './pretrained_models/'
         ) :
         super().__init__()
         self.save_hyperparameters()
@@ -62,6 +62,7 @@ class SpanClassificationDataModule(pl.LightningDataModule):
         self.valid_dataset = data['validation']
         if 'test' in data:
             self.test_dataset = data['test']
+        else: self.test_dataset = None
         self.tokenizer = BertTokenizer.from_pretrained(self.hparams.pretrained_dir + self.hparams.pretrained_model)
 
     # def collate_fn(self, batch):

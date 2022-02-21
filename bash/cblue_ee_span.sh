@@ -1,4 +1,4 @@
-# ----------roberta val/best_f1 = 0.647----------------#
+# ----------roberta val/best_f1 = 0.652----------------#
 python run.py \
 mode=exp \
 name=cblue_ee_charspan \

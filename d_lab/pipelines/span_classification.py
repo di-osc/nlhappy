@@ -11,13 +11,12 @@ class SentSpancat:
     '''句子级别span分类spacy pipeline
     - ckpt: 模型保存路径
     '''
-    def __init__(self, nlp, name, model_name: str, ckpt: str, device: str):
+    def __init__(self, nlp, name:str, model:str, ckpt:str, device:str):
         self.nlp = nlp
         self.pipe_name = name
-        self.model_class = models[model_name]
         self.ckpt = ckpt
         self.device = torch.device(device)
-        self.model = models[model_name].load_from_checkpoint(ckpt)
+        self.model = models[model].load_from_checkpoint(ckpt)
         
         
     def __call__(self, doc: Doc) -> Doc:
@@ -26,10 +25,7 @@ class SentSpancat:
         self.model.eval()
         all_spans = []
         for sent in doc.sents:
-            text = ''
-            for token in sent:
-                text += token.norm_
-            spans = self.model.predict(text)
+            spans = self.model.predict(sent.text, device=self.device)
             for span in spans:
                 s = sent.char_span(span[0], span[1]+1, span[2])
                 all_spans.append(s)
@@ -43,8 +39,8 @@ class SentSpancat:
     def from_disk(self, path:str, exclude):
         self.model = self.model_class.load_from_checkpoint(path)
 
-@Chinese.factory('sent_span_classification',assigns=['doc.spans'],default_config={'model_name':'bert_global_pointer', 'device':'cpu'})
-def make_sent_spancat(nlp, name:str, model_name:str, ckpt:str, device:str):
+@Chinese.factory('sent_spancat',assigns=['doc.spans'],default_config={'model':'bert_global_pointer', 'device':'cpu'})
+def make_sent_spancat(nlp, name:str, model:str, ckpt:str, device:str):
     """句子级别的文本片段分类"""
-    return SentSpancat(nlp=nlp, name=name, model_name=model_name, ckpt=ckpt, device=device)
+    return SentSpancat(nlp=nlp, name=name, model=model, ckpt=ckpt, device=device)
 

@@ -41,14 +41,14 @@ class BertTextClassification(LightningModule):
         self.test_f1 = F1Score(num_classes=len(self.label2id), average='macro')
 
 
-    def forward(self, inputs):
-        x = self.encoder(**inputs).pooler_output
+    def forward(self, input_ids, token_type_ids, attention_mask):
+        x = self.encoder(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask).pooler_output
         logits = self.classifier(x)  # (batch_size, output_size)
         return logits
         
     def shared_step(self, batch):
         inputs, label_ids = batch['inputs'], batch['label_ids']
-        logits = self(inputs)
+        logits = self(**inputs)
         loss = self.criterion(logits, label_ids)
         pred_ids = torch.argmax(logits, dim=-1)
         return loss, pred_ids, label_ids
@@ -77,7 +77,7 @@ class BertTextClassification(LightningModule):
         return [self.optimizer], [self.scheduler]
 
 
-    def predict(self, text: str) -> Dict[str, float]:
+    def predict(self, text: str, device: str) -> Dict[str, float]:
         tokens = fine_grade_tokenize(text, self.tokenizer)
         inputs = self.tokenizer.encode_plus(
                 tokens,
@@ -85,7 +85,7 @@ class BertTextClassification(LightningModule):
                 max_length=self.hparams.max_length,
                 return_tensors='pt',
                 truncation=True)
-        inputs.to(self.device)
+        inputs.to(device)
         logits = self(inputs)
         scores = torch.nn.functional.softmax(logits, dim=-1).tolist()
         cats = {}

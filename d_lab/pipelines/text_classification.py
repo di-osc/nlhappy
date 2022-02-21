@@ -7,7 +7,7 @@ from spacy.tokens import Doc
 models = {'bert_text_classification': BertTextClassification}
 
 class TextClassification:
-    '''spacy 文本分类pipeline'''
+    '''spacy 文本分类管道'''
     def __init__(self, nlp, name:str, model_name: str, ckpt: str, device: str):
         super().__init__()
         self.nlp = nlp

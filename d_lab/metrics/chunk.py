@@ -113,10 +113,7 @@ class ChunkF1(Metric):
 
 
     def compute(self):
-        p = self.correct / self.all_pred if self.all_pred > 0 else 0
-        r = self.correct / self.all_true if self.all_true > 0 else 0
-        score = 2 * p * r / (p + r) if p + r > 0 else 0
-        return torch.tensor(score)
+        return 2 * self.correct / (self.all_pred + self.all_true)
         
 
 
