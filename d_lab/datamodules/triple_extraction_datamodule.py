@@ -44,21 +44,21 @@ class TripleExtractionDataModule(pl.LightningDataModule):
             tokens, 
             is_pretokenized=True,
             padding='max_length',  
-            max_length=self.hparam.max_length,
+            max_length=self.hparams.max_length,
             add_special_tokens=True,
             truncation=True)
         inputs = dict(zip(inputs.keys(), map(torch.tensor, inputs.values())))
 
         triples = example['triples'][0]
-        span_ids = torch.zeros(2, self.hparams.max_length, self.hparam.max_length)
-        head_ids = torch.zeros(len(self.hparams.label2id), self.hparam.max_length, self.hparam.max_length)
-        tail_ids = torch.zeros(len(self.hparams.label2id), self.hparam.max_length, self.hparam.max_length)
+        span_ids = torch.zeros(2, self.hparams.max_length, self.hparams.max_length)
+        head_ids = torch.zeros(len(self.hparams.label2id), self.hparams.max_length, self.hparams.max_length)
+        tail_ids = torch.zeros(len(self.hparams.label2id), self.hparams.max_length, self.hparams.max_length)
         for triple in triples:
             #加1是因为有cls
             span_ids[0][triple['subject_index'][0]+1][triple['subject_index'][1]+1] = 1
             span_ids[1][triple['object_index'][0]+1][triple['object_index'][1]+1] = 1
-            head_ids[self.label2id[triple['predicate']]][triple['subject_index'][0]+1][triple['object_index'][0]+1] = 1
-            tail_ids[self.label2id[triple['predicate']]][triple['subject_index'][1]+1][triple['object_index'][1]+1] = 1
+            head_ids[self.hparams.label2id[triple['predicate']]][triple['subject_index'][0]+1][triple['object_index'][0]+1] = 1
+            tail_ids[self.hparams.label2id[triple['predicate']]][triple['subject_index'][1]+1][triple['object_index'][1]+1] = 1
 
         return {'inputs': [inputs], 'span_ids': [span_ids], 'head_ids': [head_ids], 'tail_ids': [tail_ids]} 
 

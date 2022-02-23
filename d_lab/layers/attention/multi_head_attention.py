@@ -8,10 +8,11 @@ import math
 def scaled_mul_self_attention(query, key, value, mask=None):
     """
     # 为什么scaled(也就是除以sqrt(d_k))？: 
-    - softmax梯度在数量级别较大的时候会造成梯度消失
-    - 假设q, k的各个分量是互相独立的随机分布,均值为0,方差为1,那么q点积k的均值为0,方差为d_k,
-    - 所以除以sqrt(d_k)为了缓解softmax的梯度消失
+    - 1. 维度升高使得乘性注意力机制的方差变大
+    - 2. 进而出现极大值使得softmax梯度消失
+    - 3. 通过scale控制方差,进而稳定梯度流, 防止梯度爆炸
     - https://www.zhihu.com/question/339723385
+    - notebooks/transformers/attention.ipynb
     """
     d_scale = query.size(-1)
     logits = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_scale)

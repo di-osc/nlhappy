@@ -1,5 +1,5 @@
 # ----------roberta val/best_f1 = 0.652----------------#
-python run.py \
+d-lab \
 mode=exp \
 name=cblue_ee_charspan \
 trainer=ddp \

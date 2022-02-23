@@ -64,7 +64,7 @@ class SpanClassificationDataModule(pl.LightningDataModule):
             self.test_dataset = data['test']
         else: self.test_dataset = None
         self.tokenizer = BertTokenizer.from_pretrained(self.hparams.pretrained_dir + self.hparams.pretrained_model)
-
+        self.hparams.token2id = dict(self.tokenizer.vocab)
     # def collate_fn(self, batch):
     #     new = {'input_ids':[], 'token_type_ids':[], 'attention_mask':[], 'span_ids':[]}
     #     for e in batch:

@@ -52,6 +52,8 @@ class OSSStorer:
         - dataset: 数据集名称
         - localpath: 下载到本地的路径 默认为./data/
         """
+        if not os.path.exists(localpath):
+            os.makedirs(localpath)
         file = dataset + '.zip'
         file_path = localpath + file
         dataset_path = localpath + dataset
@@ -67,6 +69,8 @@ class OSSStorer:
         - model: 模型名称
         - localpath: 下载到本地的路径 默认为./pretrained_models/
         """
+        if not os.path.exists(localpath):
+            os.makedirs(localpath)
         file = model + '.zip'
         file_path = localpath + file
         model_path = localpath + model

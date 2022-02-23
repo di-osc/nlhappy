@@ -1,5 +1,5 @@
-# --------------------------#
-python run.py \
+# ------------val/f1 = 0.748--------------#
+d-lab \
 mode=exp \
 monitor=val/f1 \
 name=du_ie_char \

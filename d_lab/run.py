@@ -16,6 +16,10 @@ from d_lab.utils import utils
 log = utils.get_logger(__name__)
 
 
+    
+
+    
+@hydra.main(config_path="configs/", config_name="config.yaml")
 def train(config: DictConfig) -> Optional[float]:
     """Contains training pipeline.
     Instantiates all PyTorch Lightning objects from config.
@@ -26,6 +30,10 @@ def train(config: DictConfig) -> Optional[float]:
     Returns:
         Optional[float]: Metric score for hyperparameter optimization.
     """
+    
+    utils.extras(config)
+    if config.get("print_config"):
+        utils.print_config(config, resolve=True)
 
     # Set seed for random number generators in pytorch, numpy and python.random
     if config.get("seed"):
@@ -119,3 +127,5 @@ def train(config: DictConfig) -> Optional[float]:
 
 
 
+    
+    

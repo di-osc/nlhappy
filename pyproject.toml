@@ -5,6 +5,7 @@ description = "深度学习实验室"
 authors = ["good-as-water <790990241@qq.com>"]
 
 [tool.poetry.dependencies]
+python = "^3.8"
 torch = "^1.10.2"
 pytorch-lightning = "^1.5.10"
 transformers = "^4.16.2"
@@ -14,13 +15,17 @@ spacy = "^3.2.2"
 hydra-core = "^1.1.1"
 hydra-colorlog = "^1.1.0"
 hydra-optuna-sweeper = "^1.1.2"
-python-dotenv = "^0.19.2"
 scikit-learn = "^1.0.2"
+rich = "^11.2.0"
+jieba = "^0.42.1"
 
 [tool.poetry.dev-dependencies]
 
 [tool.poetry.plugins."spacy_factories"]
 "sent_spancat" = "d_lab.pipelines:make_sent_spancat"
+
+[tool.poetry.scripts]
+d-lab = "d_lab.run:train"
 
 
 [build-system]

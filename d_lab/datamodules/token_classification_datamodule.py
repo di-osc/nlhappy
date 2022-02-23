@@ -60,13 +60,17 @@ class TokenClassificationDataModule(pl.LightningDataModule):
     def setup(self, stage):
         data = load_from_disk(self.hparams.data_dir + self.hparams.dataset)
         set_labels = sorted(set([label for labels in data['train']['labels'] for label in labels]))
-        self.label2id = {label: i for i, label in enumerate(set_labels)}
+        label2id = {label: i for i, label in enumerate(set_labels)}
+        id2label = {i: label for label, i in label2id.items()}
+        self.hparams.label2id = label2id
+        self.hparams.id2label = id2label
         data.set_transform(transform=self.transform)
         self.train_dataset = data['train']
         self.valid_dataset = data['validation']
         if 'test' in data:
             self.test_dataset = data['test']
         self.tokenizer = BertTokenizer.from_pretrained(self.hparams.pretrained_dir +self.hparams.pretrained_model)
+        self.hprams.token2id = dict(self.tokenizer.vocab)
         
 
 
