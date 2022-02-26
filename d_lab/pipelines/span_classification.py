@@ -4,10 +4,12 @@ from spacy.lang.zh import Chinese
 from ..models import BertGlobalPointer
 import torch
 from spacy.tokens import Doc
+from thinc.api import Config
+import os
 
 models = {'bert_global_pointer': BertGlobalPointer}
 
-class SentSpancat:
+class SentSpanClassification:
     '''句子级别span分类spacy pipeline
     - ckpt: 模型保存路径
     '''
@@ -16,13 +18,14 @@ class SentSpancat:
         self.pipe_name = name
         self.ckpt = ckpt
         self.device = torch.device(device)
+        self.model_name = model
+        self.model_class = models[model]
         self.model = models[model].load_from_checkpoint(ckpt)
+        self.model.to(self.device)
+        self.model.freeze()
         
         
     def __call__(self, doc: Doc) -> Doc:
-        self.model.to(self.device)
-        self.model.freeze()
-        self.model.eval()
         all_spans = []
         for sent in doc.sents:
             spans = self.model.predict(sent.text, device=self.device)
@@ -33,14 +36,20 @@ class SentSpancat:
         return doc
 
     def to_disk(self, path:str, exclude):
+        # 复制原来模型参数到新的路径
         shutil.copy(self.ckpt, path)
-        self.nlp.config['components'][self.pipe_name]['ckpt'] = path
+        # 重写NLP配置文件config.cfg 改变pipeline的ckpt路径
+        nlp_path = str(path).split('/')[0]
+        config_path = os.path.join(nlp_path, 'config.cfg')
+        config = Config().from_disk(config_path)
+        config['components'][self.pipe_name]['ckpt'] = str(path)
+        config.to_disk(config_path)
 
     def from_disk(self, path:str, exclude):
         self.model = self.model_class.load_from_checkpoint(path)
 
-@Chinese.factory('sent_spancat',assigns=['doc.spans'],default_config={'model':'bert_global_pointer', 'device':'cpu'})
+@Chinese.factory('spancat_sentence',assigns=['doc.spans'],default_config={'model':'bert_global_pointer', 'device':'cpu'})
 def make_sent_spancat(nlp, name:str, model:str, ckpt:str, device:str):
     """句子级别的文本片段分类"""
-    return SentSpancat(nlp=nlp, name=name, model=model, ckpt=ckpt, device=device)
+    return SentSpanClassification(nlp=nlp, name=name, model=model, ckpt=ckpt, device=device)
 

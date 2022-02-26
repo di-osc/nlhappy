@@ -1,7 +1,7 @@
 import pytorch_lightning as pl
 from typing import Optional,  Tuple, List, Dict
 from transformers import BertTokenizer
-from ..storers import OSSStorer
+from ..utils.storer import OSSStorer
 import pandas as pd
 from ..utils import utils
 from torch.utils.data import DataLoader

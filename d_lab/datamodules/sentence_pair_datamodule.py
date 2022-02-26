@@ -1,7 +1,7 @@
 import pytorch_lightning as pl
 from typing import Optional,  Tuple, List
 from transformers import BertTokenizer
-from ..storers import OSSStorer
+from ..utils.storer import OSSStorer
 from ..utils import utils
 from torch.utils.data import DataLoader
 import torch

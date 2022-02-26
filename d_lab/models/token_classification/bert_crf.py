@@ -1,5 +1,6 @@
 import importlib_metadata
 import pytorch_lightning as pl
+from zmq import device
 from ...layers import CRF, SimpleDense
 import torch
 from ...metrics.chunk import ChunkF1, get_entities
@@ -18,8 +19,9 @@ class BertCRF(pl.LightningModule):
         self.save_hyperparameters()
         self.label2id = data_params['label2id']
         self.id2label = {id: label for label, id in self.label2id.items()}
+        self.tokenizer = self._init_tokenizer()
 
-        self.bert = BertModel.from_pretrained(data_params['pretrained_dir'] + data_params['pretrained_model'])
+        self.bert = BertModel(data_params['bert_config'])
 
         self.classifier = SimpleDense(
             input_size=self.bert.config.hidden_size, 
@@ -34,10 +36,10 @@ class BertCRF(pl.LightningModule):
 
         
 
-    def forward(self, inputs, label_ids=None):
-        last_hidden_state = self.bert(**inputs).last_hidden_state
+    def forward(self, input_ids, token_type_ids, attention_mask, label_ids=None):
+        last_hidden_state = self.bert(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask).last_hidden_state
         emissions = self.classifier(last_hidden_state)
-        mask = inputs['attention_mask'].gt(0)
+        mask = attention_mask.gt(0)
         if label_ids is not None :
             loss = self.crf(emissions, label_ids, mask=mask) * (-1)
             pred_ids= self.crf.decode(emissions, mask=mask)
@@ -51,7 +53,7 @@ class BertCRF(pl.LightningModule):
         label_ids = batch['label_ids']
         #将label padding部分改为-1 
         label_ids[label_ids==self.hparams.label_pad_id] = -1
-        loss, pred_ids = self(inputs, label_ids=label_ids)
+        loss, pred_ids = self(**inputs, label_ids=label_ids)
         pred_labels = []
         for ids in pred_ids:
             pred_labels.append([self.id2label[id] for id in ids])
@@ -62,6 +64,12 @@ class BertCRF(pl.LightningModule):
             ids = label_ids[i][indice].tolist()
             true_labels.append([self.id2label[id] for id in ids])
         return loss, pred_labels, true_labels
+
+    
+    def on_train_start(self) -> None:
+        state_dict = torch.load(self.hparams.pretrained_dir + self.hparams.pretrained_model + '/pytorch_model.bin')
+        self.bert.load_state_dict(state_dict)
+        self.print(f'{self.hparams.pretrained_dir + self.hparams.pretrained_model} loaded')
         
 
     
@@ -105,18 +113,32 @@ class BertCRF(pl.LightningModule):
         return [self.optimizer], [self.scheduler]
 
 
-    # def predict(self, text: str):
-    #     tokens = fine_grade_tokenize(text, self.tokenizer)
-    #     inputs = self.tokenizer.encode_plus(
-    #         tokens,
-    #         is_pretokenized=True,
-    #         add_special_tokens=True,
-    #         return_tensors='pt')
-    #     outputs = self(inputs)
-    #     labels = [self.id2label[id] for id in outputs[0]]
-    #     ents = get_entities(seq=labels[1:-1])    #去掉cls sep 位置
-    #     new_ents = []
-    #     for ent in ents:
-    #         new_ents.append([ent[1], ent[2], ent[0], text[ent[1]:ent[2]+1]])
-    #     return new_ents
+    def predict(self, text: str, device):
+        tokens = fine_grade_tokenize(text, self.tokenizer)
+        inputs = self.tokenizer.encode_plus(
+            tokens,
+            is_pretokenized=True,
+            add_special_tokens=True,
+            return_tensors='pt')
+        inputs.to(device)
+        outputs = self(**inputs)
+        labels = [self.id2label[id] for id in outputs[0]]
+        ents = get_entities(seq=labels[1:-1])    #去掉cls sep 位置
+        new_ents = []
+        for ent in ents:
+            new_ents.append([ent[1], ent[2], ent[0], text[ent[1]:ent[2]+1]])
+        return new_ents
+
+        
+
+    def _init_tokenizer(self):
+        import os
+        with open('./vocab.txt', 'w') as f:
+            for k in self.hparams.token2id.keys():
+                f.writelines(k + '\n')
+        self.hparams.bert_config.to_json_file('./config.json')
+        tokenizer = BertTokenizer.from_pretrained('./')
+        os.remove('./vocab.txt')
+        os.remove('./config.json')
+        return tokenizer
         

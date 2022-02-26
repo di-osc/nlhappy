@@ -1,9 +1,9 @@
 import pytorch_lightning as pl
 import os
-from ..storers import OSSStorer
+from ..utils.storer import OSSStorer
 import zipfile
 from datasets import load_from_disk
-from transformers import BertTokenizer
+from transformers import BertTokenizer, BertConfig
 import srsly
 from torch.utils.data import DataLoader
 import torch
@@ -46,12 +46,12 @@ class TokenClassificationDataModule(pl.LightningDataModule):
             is_pretokenized=True, 
             add_special_tokens=True,
             padding='max_length',  
-            max_length=self.max_length,
+            max_length=self.hparams.max_length,
             truncation=True)
         inputs = dict(zip(inputs.keys(), map(torch.tensor, inputs.values())))
         labels = example['labels'][0]
-        labels = [self.label2id[label] for label in labels] 
-        labels = [self.label2id['O']] + labels + [self.label2id['O']] + (self.max_length - len(labels)-2) * [self.label_pad_id]
+        labels = [self.hparams.label2id[label] for label in labels] 
+        labels = [self.hparams.label2id['O']] + labels + [self.hparams.label2id['O']] + (self.hparams.max_length - len(labels)-2) * [self.hparams.label_pad_id]
         labels = torch.tensor(labels)
         return {'inputs':[inputs], 'label_ids':[labels]}
 
@@ -70,7 +70,9 @@ class TokenClassificationDataModule(pl.LightningDataModule):
         if 'test' in data:
             self.test_dataset = data['test']
         self.tokenizer = BertTokenizer.from_pretrained(self.hparams.pretrained_dir +self.hparams.pretrained_model)
-        self.hprams.token2id = dict(self.tokenizer.vocab)
+        self.hparams.token2id = dict(self.tokenizer.vocab)
+        bert_config = BertConfig.from_pretrained(self.hparams.pretrained_dir + self.hparams.pretrained_model)
+        self.hparams.bert_config = bert_config
         
 
 

@@ -47,7 +47,7 @@ def convert_FH(text, *maps, **ops):
     """
     if "skip" in ops:
         skip = ops["skip"]
-        if isinstance(skip, basestring):
+        if isinstance(skip, str):
             skip = tuple(skip)
         def replace(text, fr, to):
             return text if fr in skip else text.replace(fr, to)
@@ -68,7 +68,7 @@ def cut_sentences_v1(sent):
     """
     the first rank of sentence cut
     """
-    sent = re.sub('([。！？\?])([^”’])', r"\1\n\2", sent)  # 单字符断句符
+    sent = re.sub('([。？！\?])([^”’])', r"\1\n\2", sent)  # 单字符断句符
     sent = re.sub('(\.{6})([^”’])', r"\1\n\2", sent)  # 英文省略号
     sent = re.sub('(\…{2})([^”’])', r"\1\n\2", sent)  # 中文省略号
     sent = re.sub('([。！？\?][”’])([^，。！？\?])', r"\1\n\2", sent)

@@ -19,10 +19,8 @@ class TextClassification:
 
         
     def __call__(self, doc: Doc) -> Doc:
-        self.model.to(self.device)
-        self.model.freeze()
-        self.model.eval()
-        doc.cats = self.model.predict(doc.text)
+        with torch.no_grad():
+            doc.cats = self.model.predict(doc.text, device=self.device)
         return doc
 
     def to_disk(self, path: str, exclude):

@@ -126,6 +126,7 @@ def train(config: DictConfig) -> Optional[float]:
     return score
 
 
-
+if __name__ == "__main__":
+    train()
     
     

@@ -1,9 +1,9 @@
 import pytorch_lightning as pl
-from ..storers import OSSStorer
+from ..utils.storer import OSSStorer
 import os
 import torch
 from datasets import load_from_disk
-from transformers import BertTokenizer
+from transformers import BertTokenizer, BertConfig
 from torch.utils.data import DataLoader
 from ..utils.preprocessing import fine_grade_tokenize
 import zipfile
@@ -65,6 +65,8 @@ class SpanClassificationDataModule(pl.LightningDataModule):
         else: self.test_dataset = None
         self.tokenizer = BertTokenizer.from_pretrained(self.hparams.pretrained_dir + self.hparams.pretrained_model)
         self.hparams.token2id = dict(self.tokenizer.vocab)
+        bert_config = BertConfig.from_pretrained(self.hparams.pretrained_dir + self.hparams.pretrained_model)
+        self.hparams.bert_config = bert_config
     # def collate_fn(self, batch):
     #     new = {'input_ids':[], 'token_type_ids':[], 'attention_mask':[], 'span_ids':[]}
     #     for e in batch:
@@ -100,5 +102,4 @@ class SpanClassificationDataModule(pl.LightningDataModule):
                               batch_size=self.hparams.batch_size,
                               shuffle=False,
                               pin_memory=self.hparams.pin_memory,
-                              num_workers=self.hparams.num_workers
-                              )
+                              num_workers=self.hparams.num_workers)

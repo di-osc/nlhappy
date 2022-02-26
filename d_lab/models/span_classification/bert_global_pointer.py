@@ -2,9 +2,11 @@ import pytorch_lightning as pl
 from transformers import BertModel, BertTokenizer
 import torch.nn as nn
 import torch
+import os
 from ...metrics.span import SpanF1
 from ...utils.preprocessing import fine_grade_tokenize
 from ...layers import MultiLabelCategoricalCrossEntropy, EfficientGlobalPointer
+import srsly
 
 class BertGlobalPointer(pl.LightningModule):
     def __init__(
@@ -20,15 +22,13 @@ class BertGlobalPointer(pl.LightningModule):
         self.save_hyperparameters()
 
 
-        self.bert = BertModel.from_pretrained(data_params['pretrained_dir'] + data_params['pretrained_model'])
+        self.bert = BertModel(data_params['bert_config'])
         # 使用更加高效的GlobalPointer https://kexue.fm/archives/8877
         self.classifier = EfficientGlobalPointer(
             input_size=self.bert.config.hidden_size, 
             hidden_size=hidden_size,
-            output_size=len(self.hparams.label2id)
-            )
+            output_size=len(self.hparams.label2id))
 
-        self.tokenizer = BertTokenizer.from_pretrained(data_params['pretrained_dir'] + data_params['pretrained_model'])
         self.dropout = nn.Dropout(dropout)
         self.criterion = MultiLabelCategoricalCrossEntropy()
 
@@ -36,12 +36,20 @@ class BertGlobalPointer(pl.LightningModule):
         self.val_f1 = SpanF1()
         self.test_f1 = SpanF1()
 
+        self.tokenizer = self._init_tokenizer()
+
 
     def forward(self, input_ids, token_type_ids, attention_mask=None):
         x = self.bert(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask).last_hidden_state
         x = self.dropout(x)
         logits = self.classifier(x, mask=attention_mask)
         return logits
+
+
+    def on_train_start(self) -> None:
+        state_dict = torch.load(self.hparams.pretrained_dir + self.hparams.pretrained_model + '/pytorch_model.bin')
+        self.bert.load_state_dict(state_dict)
+        self.print(f'{self.hparams.pretrained_dir + self.hparams.pretrained_model} loaded')
 
 
     def shared_step(self, batch):
@@ -54,12 +62,13 @@ class BertGlobalPointer(pl.LightningModule):
         loss = self.criterion(y_pred, y_true)
         return loss, pred, span_ids
 
-    
+
     def training_step(self, batch, batch_idx):
         loss, pred, true = self.shared_step(batch)
         self.train_f1(pred, true)
         self.log('train/f1', self.train_f1, on_step=True, on_epoch=True, prog_bar=True)
         return {'loss': loss}
+
 
     def validation_step(self, batch, batch_idx):
         loss, pred, true = self.shared_step(batch)
@@ -67,11 +76,13 @@ class BertGlobalPointer(pl.LightningModule):
         self.log('val/f1', self.val_f1, on_step=False, on_epoch=True, prog_bar=True)
         return {'loss': loss}
 
+
     def test_step(self, batch, batch_idx):
         loss, pred, true = self.shared_step(batch)
         self.test_f1(pred, true)
         self.log('test/f1', self.test_f1, on_step=False, on_epoch=True, prog_bar=True)
         return {'loss': loss}
+
 
     def configure_optimizers(self):
         no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
@@ -89,7 +100,15 @@ class BertGlobalPointer(pl.LightningModule):
         self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lambda epoch: 1.0 / (epoch + 1.0))
         return [self.optimizer], [self.scheduler]
 
-
+    def _init_tokenizer(self):
+        with open('./vocab.txt', 'w') as f:
+            for k in self.hparams.token2id.keys():
+                f.writelines(k + '\n')
+        self.hparams.bert_config.to_json_file('./config.json')
+        tokenizer = BertTokenizer.from_pretrained('./')
+        os.remove('./vocab.txt')
+        os.remove('./config.json')
+        return tokenizer
 
 
     def predict(self, text: str, device: str):
@@ -100,7 +119,7 @@ class BertGlobalPointer(pl.LightningModule):
             add_special_tokens=True,
             return_tensors='pt')
         inputs.to(device)
-        logits = self(inputs)
+        logits = self(**inputs)
         spans_ls = torch.nonzero(logits>self.hparams.threshold).tolist()
         spans = []
         for span in spans_ls :

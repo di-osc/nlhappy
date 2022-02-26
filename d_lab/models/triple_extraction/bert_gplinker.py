@@ -33,9 +33,10 @@ class BertGPLinker(pl.LightningModule):
         
         self.label2id = data_params['label2id']
         self.id2label = {v: k for k, v in self.label2id.items()}
-        self.tokenizer = BertTokenizer.from_pretrained(data_params['pretrained_dir'] + data_params['pretrained_model'])
+        # self.tokenizer = BertTokenizer.from_pretrained(data_params['pretrained_dir'] + data_params['pretrained_model'])
         
-        self.bert = BertModel.from_pretrained(data_params['pretrained_dir'] + data_params['pretrained_model'])
+        self.bert = BertModel(data_params['bert_config'])
+        # self.bert = BertModel.from_pretrained(data_params['pretrained_dir'] + data_params['pretrained_model'])
         # 主语 宾语分类器
         self.span_classifier = EfficientGlobalPointer(self.bert.config.hidden_size, hidden_size, 2)  # 0: suject  1: object
         # 主语 宾语 头对齐
@@ -50,6 +51,8 @@ class BertGPLinker(pl.LightningModule):
         self.train_f1 = TripleF1()
         self.val_f1 = TripleF1()
         self.test_f1 = TripleF1()
+
+    
 
     def forward(self, inputs):
         hidden_state = self.bert(**inputs).last_hidden_state
@@ -81,6 +84,11 @@ class BertGPLinker(pl.LightningModule):
         
         return loss, span_logits, head_logits, tail_logits
 
+    def on_train_start(self) -> None:
+        state_dict = torch.load(self.hparams.pretrained_dir + self.hparams.pretrained_model + '/pytorch_model.bin')
+        self.bert.load_state_dict(state_dict)
+        # self.bert.from_pretrained(self.hparams.pretrained_dir + self.hparams.pretrained_model)
+        
     def training_step(self, batch, batch_idx):
         # 训练阶段不进行解码, 会比较慢
         loss, span_logits, head_logits, tail_logits = self.shared_step(batch)
@@ -169,6 +177,9 @@ class BertGPLinker(pl.LightningModule):
                             triples.add(Triple(triple=(sh.item(), sh.item(), p, oh.item(), ot.item())))
             batch_triples.append(triples)
         return batch_triples
+
+
+    
 
 
         
