@@ -1,10 +1,10 @@
 _target_: d_lab.datamodules.TextClassificationDataModule
 
-dataset: cblue_tc_single
+dataset: 
+max_length: 
+batch_size: 
 pretrained_model: chinese-roberta-wwm-ext
-max_length: 350
 is_multi_label: False
-batch_size: 16
 num_workers: 10
 pin_memory: True
 data_dir: ${data_dir} 

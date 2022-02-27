@@ -21,7 +21,7 @@ class BertTokenClassification(pl.LightningModule):
         self.id2label = {id: label for label, id in self.label2id.items()}
         
 
-        self.bert = BertModel.from_pretrained(data_params['pretrained_dir'] + data_params['pretrained_model'])
+        self.bert = BertModel(data_params['bert_config'])
         self.classifier = SimpleDense(self.bert.config.hidden_size, hidden_size, len(self.label2id))
         self.criterion = torch.nn.CrossEntropyLoss()
         self.train_f1 = ChunkF1()
@@ -31,15 +31,15 @@ class BertTokenClassification(pl.LightningModule):
         
         
     
-    def forward(self, inputs):
-        bert_hidden_state = self.bert(**inputs).last_hidden_state
+    def forward(self, input_ids, token_type_ids, attention_mask):
+        bert_hidden_state = self.bert(input_ids, token_type_ids, attention_mask).last_hidden_state
         logits = self.classifier(bert_hidden_state)
         return logits
 
     def shared_step(self, batch):
         inputs = batch['inputs']
         label_ids = batch['label_ids']
-        logits = self(inputs)
+        logits = self(**inputs)
         mask = torch.gt(label_ids, -1)
         loss = self.criterion(logits.view(-1, len(self.label2id))[mask.view(-1)], label_ids.view(-1)[mask.view(-1)])
         pred_ids = torch.argmax(logits, dim=-1)
@@ -53,6 +53,11 @@ class BertTokenClassification(pl.LightningModule):
             pred_labels.append([self.id2label[id] for id in pred])
         return loss, labels, pred_labels
 
+
+    def on_train_start(self) -> None:
+        state_dict = torch.load(self.hparams.pretrained_dir + self.hparams.pretrained_model + '/pytorch_model.bin')
+        self.bert.load_state_dict(state_dict)
+        self.print(f'{self.hparams.pretrained_dir + self.hparams.pretrained_model} loaded')
 
 
     def training_step(self, batch, batch_idx):

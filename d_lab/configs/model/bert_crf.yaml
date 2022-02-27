@@ -1,6 +1,6 @@
 _target_: d_lab.models.token_classification.BertCRF
 
-hidden_size: 256
 lr: 3e-5
-weight_decay: 0.0001
-dropout: 0.5
+dropout: 0.2
+hidden_size: 256
+weight_decay: 0.0

@@ -5,7 +5,10 @@ from thinc.api import Config
 import os
 import torch
 
-models = {'bert_crf': BertCRF, 'bert_token_classification': BertTokenClassification}
+models = {
+    'bert_crf': BertCRF, 
+    'bert_token_classification': BertTokenClassification
+    }
 
 class SentTokencat:
     '''句子级别token分类spacy pipeline

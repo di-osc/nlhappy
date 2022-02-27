@@ -1,7 +1,7 @@
 _target_: d_lab.models.BertGlobalPointer
 
-hidden_size: 64           
+lr:        
 dropout: 0.2
-lr: 5e-5
+hidden_size: 256 
 weight_decay: 0.0
 

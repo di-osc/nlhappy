@@ -29,8 +29,6 @@ class BERTBiEncoder(LightningModule):
         self.val_acc = Accuracy()
         self.test_acc = Accuracy()
         self.val_acc_best = MaxMetric()
-        self.optimizer = None
-        self.scheduler = None
 
     def forward(self, inputs_a, inputs_b):
         encoded_a = self.bert(**inputs_a).pooler_output

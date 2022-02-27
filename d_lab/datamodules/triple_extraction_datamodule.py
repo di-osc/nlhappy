@@ -33,17 +33,13 @@ class TripleExtractionDataModule(pl.LightningDataModule):
     
     def setup(self, stage: str) -> None:
         """读取数据集, 对数据设置转换"""
-        dataset = load_from_disk(self.hparams.data_dir + self.hparams.dataset)
-        set_labels = sorted(set([triple['predicate'] for triples in dataset['train']['triples'] for triple in triples]))
+        self.dataset = load_from_disk(self.hparams.data_dir + self.hparams.dataset)
+        self.dataset.set_transform(transform=self.transform)
+        set_labels = sorted(set([triple['predicate'] for triples in self.dataset['train']['triples'] for triple in triples]))
         label2id = {label: i for i, label in enumerate(set_labels)}
         id2label = {i: label for label, i in label2id.items()}
         self.hparams['label2id'] = label2id
         self.hparams['id2label'] = id2label
-        dataset.set_transform(transform=self.transform)
-        self.train_dataset = dataset['train']
-        self.valid_dataset = dataset['validation']
-        if 'test' in dataset:
-            self.test_dataset = dataset['test']
         self.tokenizer = BertTokenizer.from_pretrained(self.hparams.pretrained_dir + self.hparams.pretrained_model)
         self.bert_config = BertConfig.from_pretrained(self.hparams.pretrained_dir + self.hparams.pretrained_model)
         self.hparams['bert_config'] = self.bert_config
@@ -74,7 +70,7 @@ class TripleExtractionDataModule(pl.LightningDataModule):
 
 
     def train_dataloader(self):
-        return DataLoader(dataset=self.train_dataset, 
+        return DataLoader(dataset=self.dataset['train'], 
                           batch_size=self.hparams.batch_size, 
                           shuffle=True,
                           pin_memory=self.hparams.pin_memory,
@@ -82,7 +78,7 @@ class TripleExtractionDataModule(pl.LightningDataModule):
 
 
     def val_dataloader(self):
-        return DataLoader(dataset=self.valid_dataset,
+        return DataLoader(dataset=self.dataset['validation'],
                           batch_size=self.hparams.batch_size,
                           shuffle=False,
                           pin_memory=self.hparams.pin_memory,
@@ -90,9 +86,8 @@ class TripleExtractionDataModule(pl.LightningDataModule):
 
 
     def test_dataloader(self):
-        if self.test_dataset is not None:
-            return DataLoader(dataset=self.test_dataset,
-                              batch_size=self.hparams.batch_size,
-                              shuffle=False,
-                              pin_memory=self.hparams.pin_memory,
-                              num_workers=self.hparams.num_workers)
+        return DataLoader(dataset=self.dataset['test'],
+                            batch_size=self.hparams.batch_size,
+                            shuffle=False,
+                            pin_memory=self.hparams.pin_memory,
+                            num_workers=self.hparams.num_workers)

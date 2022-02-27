@@ -1,10 +1,10 @@
 _target_: d_lab.datamodules.SpanClassificationDataModule
 
 
-dataset: clue_ner_charspan
-pretrained_model: chinese-roberta-wwm-ext
-max_length: 256
-batch_size: 16
+dataset: 
+max_length: 
+batch_size:
+pretrained_model: chinese-roberta-wwm-ext 
 pin_memory: True
 num_workers: 10
 data_dir: ${data_dir}

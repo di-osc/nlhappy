@@ -1,12 +1,12 @@
 _target_: pytorch_lightning.Trainer
 
 gpus: 1
-precision: 32
+precision: 16
 
 min_epochs: 2
 max_epochs: 20
 
-
+profiler: "simple"
 progress_bar_refresh_rate: 5
 resume_from_checkpoint: null
 weights_summary: "full"
