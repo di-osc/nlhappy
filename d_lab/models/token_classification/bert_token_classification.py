@@ -13,7 +13,7 @@ class BertTokenClassification(pl.LightningModule):
                  hidden_size: int,
                  lr: float,
                  weight_decay: float,
-                 dropout:float =0.5,
+                 dropout:float ,
                  **data_params):
         super().__init__()
         self.save_hyperparameters()

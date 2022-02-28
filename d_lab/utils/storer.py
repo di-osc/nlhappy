@@ -1,7 +1,6 @@
 import os
 import oss2
 import zipfile
-from itertools import islice
 
 default_access_key_id = 'LTAI5tPsMSE5G3srWxB8j3yw'
 default_access_key_secret = 'z5jPdkfNq4WPtV4c7YaAJwH5Sj45gT'
