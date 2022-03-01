@@ -50,5 +50,5 @@ class TripleExtractor(object):
 
 @Chinese.factory('triple_extractor',assigns=['doc._.triples'],default_config={'model':'bert_gplinker', 'device':'cpu'})
 def make_triple_extractor(nlp, name:str, model:str, ckpt:str, device:str):
-    """句子级别的文本片段分类"""
+    """三元组抽取组件"""
     return TripleExtractor(nlp=nlp, name=name, model=model, ckpt=ckpt, device=device)
