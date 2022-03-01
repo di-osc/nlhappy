@@ -6,20 +6,19 @@ from datasets import load_from_disk
 from transformers import BertTokenizer, BertConfig
 from torch.utils.data import DataLoader
 from ..utils.preprocessing import fine_grade_tokenize
-import zipfile
 
 
 class SpanClassificationDataModule(pl.LightningDataModule):
     def __init__(
         self,
         dataset: str,
-        pretrained_model: str,
+        plm: str,
         max_length: int,
         batch_size: int,
         pin_memory: bool,
         num_workers: int,
-        data_dir: str = './data/',
-        pretrained_dir: str = './pretrained_models/'
+        data_dir: str ,
+        pretrained_dir: str
         ) :
         super().__init__()
         self.save_hyperparameters()
@@ -29,7 +28,7 @@ class SpanClassificationDataModule(pl.LightningDataModule):
         '下载数据集和预训练模型'
         oss = OSSStorer()
         oss.download_dataset(self.hparams.dataset, self.hparams.data_dir)
-        oss.download_model(self.hparams.pretrained_model, self.hparams.pretrained_dir)
+        oss.download_plm(self.hparams.plm, self.hparams.pretrained_dir)
 
     def set_transform(self, example):
         text = example['text'][0]
@@ -55,8 +54,8 @@ class SpanClassificationDataModule(pl.LightningDataModule):
         set_labels = sorted(set([span[2] for spans in data['train']['spans'] for span in spans]))
         label2id = {label: i for i, label in enumerate(set_labels)}
         id2label = {i: label for label, i in label2id.items()}
-        self.hparams.label2id = label2id
-        self.hparams.id2label = id2label
+        self.hparams['label2id'] = label2id
+        self.hparams['id2label'] = id2label
         data.set_transform(transform=self.set_transform)
         self.train_dataset = data['train']
         self.valid_dataset = data['validation']
@@ -64,18 +63,10 @@ class SpanClassificationDataModule(pl.LightningDataModule):
             self.test_dataset = data['test']
         else: self.test_dataset = None
         self.tokenizer = BertTokenizer.from_pretrained(self.hparams.pretrained_dir + self.hparams.pretrained_model)
-        self.hparams.token2id = dict(self.tokenizer.vocab)
+        self.hparams['token2id'] = dict(self.tokenizer.vocab)
         bert_config = BertConfig.from_pretrained(self.hparams.pretrained_dir + self.hparams.pretrained_model)
-        self.hparams.bert_config = bert_config
-    # def collate_fn(self, batch):
-    #     new = {'input_ids':[], 'token_type_ids':[], 'attention_mask':[], 'span_ids':[]}
-    #     for e in batch:
-    #         for k, v in e['inputs'].items():
-    #             new[k].append(v)
-    #         new['span_ids'].append(e['span_ids'])
-    #     new_ = dict(zip(new.keys(), map(torch.stack, new.values())))
-    #     res = (new_['input_ids'], new_['token_type_ids'], new_['attention_mask']), new_['span_ids'].to_sparse()
-    #     return res
+        self.hparams['bert_config'] = bert_config
+    
 
 
     def train_dataloader(self):

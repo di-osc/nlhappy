@@ -4,7 +4,7 @@ _target_: d_lab.datamodules.SpanClassificationDataModule
 dataset: 
 max_length: 
 batch_size:
-pretrained_model: chinese-roberta-wwm-ext 
+plm: chinese-macbert-base 
 pin_memory: True
 num_workers: 10
 data_dir: ${data_dir}

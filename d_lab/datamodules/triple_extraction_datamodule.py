@@ -11,13 +11,13 @@ class TripleExtractionDataModule(pl.LightningDataModule):
     def __init__(
         self,
         dataset: str,
-        pretrained_model: str,
+        plm: str,
         max_length: int ,
         batch_size: int ,
         num_workers: int ,
-        pin_memory: bool =True,
-        data_dir: str ='./data/',
-        pretrained_dir: str  = './pretrained_models/'
+        pin_memory: bool,
+        data_dir: str ,
+        pretrained_dir: str 
         ):  
         super().__init__()
 
@@ -28,7 +28,7 @@ class TripleExtractionDataModule(pl.LightningDataModule):
         '''下载数据集和预训练模型.'''
         oss = OSSStorer()
         oss.download_dataset(self.hparams.dataset, localpath=self.hparams.data_dir)
-        oss.download_model(self.hparams.pretrained_model, localpath=self.hparams.pretrained_dir)
+        oss.download_plm(self.hparams.plm, localpath=self.hparams.pretrained_dir)
 
     
     def setup(self, stage: str) -> None:
@@ -42,6 +42,7 @@ class TripleExtractionDataModule(pl.LightningDataModule):
         self.tokenizer = BertTokenizer.from_pretrained(self.hparams.pretrained_dir + self.hparams.pretrained_model)
         self.bert_config = BertConfig.from_pretrained(self.hparams.pretrained_dir + self.hparams.pretrained_model)
         self.hparams['bert_config'] = self.bert_config
+        self.hparams['token2id'] = dict(self.tokenizer.vocab)
         data.set_transform(transform=self.transform)
         self.train_dataset = data['train']
         self.valid_dataset = data['validation']

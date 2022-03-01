@@ -24,9 +24,9 @@ class TextClassificationDataModule(pl.LightningDataModule):
         batch_size: int ,
         num_workers: int ,
         pin_memory: bool ,
-        pretrained_dir: str = './pretrained_models',
-        data_dir: str = './data',
-        label_pad_id: int = -100, 
+        pretrained_dir: str ,
+        data_dir: str ,
+        label_pad_id: int , 
         ):  
         super().__init__()
 

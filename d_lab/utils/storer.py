@@ -26,11 +26,23 @@ class OSSStorer:
         self.model_bucket = oss2.Bucket(self.auth, endpoint, model_bucket)
         self.assets_bucket = oss2.Bucket(self.auth, endpoint, asset_bucket)
 
-    def download(self, filename : str, localfile : str):
+    def download(
+        self, 
+        filename : str, 
+        localfile : str
+        ):
         self.data_bucket.get_object_to_file(key=filename, filename=localfile)
 
+    def list_all_assets(self):
+        """获取数据名称"""
+        all_asset = []
+        for obj in oss2.ObjectIterator(self.assets_bucket):
+            asset = obj.key.split('.')[0]
+            all_asset.append(asset)
+        return all_asset
 
-    def get_all_data(self):
+
+    def list_all_datasets(self):
         """获取所有数据集名称"""
         all_data = []
         for obj in oss2.ObjectIterator(self.data_bucket):
@@ -38,8 +50,8 @@ class OSSStorer:
             all_data.append(data)
         return all_data
     
-    def get_all_model(self):
-        """获取所有模型名称"""
+    def list_all_plms(self):
+        """获取所有预模型名称"""
         all_model = []
         for obj in oss2.ObjectIterator(self.model_bucket):
             model = obj.key.split('.')[0]
@@ -47,10 +59,13 @@ class OSSStorer:
         return all_model
 
 
-    def download_dataset(self, dataset:str, localpath: str='./data/'):
+    def download_dataset(
+        self, 
+        dataset:str, 
+        localpath: str='./datasets/'):
         """下载数据集
         - dataset: 数据集名称
-        - localpath: 下载到本地的路径 默认为./data/
+        - localpath: 下载到本地的路径 默认为./datasets/
         """
         if not os.path.exists(localpath):
             os.makedirs(localpath)
@@ -64,10 +79,13 @@ class OSSStorer:
         if os.path.exists(file_path):
             os.remove(path=file_path)
 
-    def download_model(self, model:str, localpath: str = './pretrained_models/'):
+    def download_plm(
+        self, 
+        model:str, 
+        localpath: str = './plms/'):
         """下载预训练模型
         - model: 模型名称
-        - localpath: 下载到本地的路径 默认为./pretrained_models/
+        - localpath: 下载到本地的路径 默认为./plms/
         """
         if not os.path.exists(localpath):
             os.makedirs(localpath)
@@ -82,7 +100,10 @@ class OSSStorer:
             os.remove(path=file_path)
 
 
-    def download_asset(self, asset:str, localpath: str = './assets/'):
+    def download_asset(
+        self, 
+        asset:str, 
+        localpath: str = './assets/'):
         """下载assets
         - asset: 资产名称
         - localpath: 下载到本地的路径 默认为./assets/
@@ -101,10 +122,13 @@ class OSSStorer:
         
         
 
-    def upload_dataset(self, dataset:str, localpath: str = 'data/'):
+    def upload_dataset(
+        self, 
+        dataset:str, 
+        localpath: str = 'datasets/'):
         """上传数据集
         - dataset: 数据集名称
-        - localpath: 数据集路径, 默认为data/
+        - localpath: 数据集路径, 默认为datasets/
         """
         file = dataset + '.zip'
         file_path = localpath + file
@@ -118,3 +142,31 @@ class OSSStorer:
         self.data_bucket.put_object_from_file(key=file, filename=file_path)
         if os.path.exists(file_path):
             os.remove(path=file_path)
+
+    def upload_pretrained(
+        self, 
+        model, 
+        localpath: str = 'plms/'):
+        """上传预训练模型
+        - model: 模型名称
+        - localpath: 预训练模型路径, 默认为plms/
+        """
+        file = model + '.zip'
+        file_path = localpath + file
+        model_path = localpath + model
+        z = zipfile.ZipFile(file=file_path, mode='w')
+        for root, dirs, files in os.walk(model_path):
+            for f in files:
+                z.write(os.path.join(root, f))
+        self.model_bucket.put_object_from_file(key=file, filename=file_path)
+        if os.path.exists(file_path):
+            os.remove(path=file_path)
+
+
+    
+if __name__ == '__main__':
+    oss = OSSStorer()
+    assets = oss.list_all_assets()
+    datasets = oss.list_all_datasets()
+    print(assets)
+    print(datasets)

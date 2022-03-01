@@ -4,7 +4,7 @@ dataset:
 max_length: 
 batch_size: 
 label_pad_id: -100
-pretrained_model: chinese-roberta-wwm-ext
+pretrained_model: chinese-macbert-base
 pin_memory: True
 num_workers: 10
 data_dir: ${data_dir}

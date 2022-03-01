@@ -21,11 +21,12 @@ class TokenClassificationDataModule(pl.LightningDataModule):
         batch_size: int,
         pin_memory: bool,
         num_workers: int,
-        pretrained_dir: str = 'pretrained_models/',
-        data_dir: str = 'data/',
+        pretrained_dir: str ,
+        data_dir: str ,
         label_pad_id: int = -100
         ):
         super().__init__()
+
         self.save_hyperparameters()
 
         
@@ -34,7 +35,7 @@ class TokenClassificationDataModule(pl.LightningDataModule):
         '''下载数据集和预训练模型'''
         oss = OSSStorer()
         oss.download_dataset(self.hparams.dataset, self.hparams.data_dir)
-        oss.download_model(self.hparams.pretrained_model, self.hparams.pretrained_dir)
+        oss.download_plm(self.hparams.pretrained_model, self.hparams.pretrained_dir)
 
     def transform(self, example):
         tokens = example['tokens'][0]

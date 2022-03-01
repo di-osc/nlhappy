@@ -8,6 +8,7 @@ from torch import Tensor
 from typing import List, Set
 from ...utils.type import Triple
 from ...utils.preprocessing import fine_grade_tokenize
+import os
 
 
 
@@ -25,7 +26,7 @@ class BertGPLinker(pl.LightningModule):
         lr: float,
         dropout: float,
         weight_decay: float,
-        threshold: float =0.0,
+        threshold: float,
         **data_params
     ):
         super(BertGPLinker, self).__init__()
@@ -33,10 +34,10 @@ class BertGPLinker(pl.LightningModule):
         
         self.label2id = data_params['label2id']
         self.id2label = {v: k for k, v in self.label2id.items()}
-        # self.tokenizer = BertTokenizer.from_pretrained(data_params['pretrained_dir'] + data_params['pretrained_model'])
+        self.tokenizer = self._init_tokenizer()
         
         self.bert = BertModel(data_params['bert_config'])
-        # self.bert = BertModel.from_pretrained(data_params['pretrained_dir'] + data_params['pretrained_model'])
+        
         # 主语 宾语分类器
         self.span_classifier = EfficientGlobalPointer(self.bert.config.hidden_size, hidden_size, 2)  # 0: suject  1: object
         # 主语 宾语 头对齐
@@ -85,34 +86,37 @@ class BertGPLinker(pl.LightningModule):
         return loss, span_logits, head_logits, tail_logits
 
     def on_train_start(self) -> None:
-        state_dict = torch.load(self.hparams.pretrained_dir + self.hparams.pretrained_model + '/pytorch_model.bin')
+        state_dict = torch.load(self.hparams.pretrained_dir + self.hparams.plm + '/pytorch_model.bin')
         self.bert.load_state_dict(state_dict)
-        # self.bert.from_pretrained(self.hparams.pretrained_dir + self.hparams.pretrained_model)
+
         
-    def training_step(self, batch, batch_idx):
+    def training_step(self, batch, batch_idx) -> dict:
         # 训练阶段不进行解码, 会比较慢
         loss, span_logits, head_logits, tail_logits = self.shared_step(batch)
         return {'loss': loss}
 
 
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch, batch_idx) -> dict:
         inputs, span_true, head_true, tail_true = batch['inputs'], batch['span_ids'], batch['head_ids'], batch['tail_ids']
         loss, span_logits, head_logits, tail_logits = self.shared_step(batch)
-        batch_triples = self.extract_triple(span_logits, head_logits, tail_logits)
-        batch_true_triples = self.extract_triple(span_true, head_true, tail_true)
+        batch_triples = self.extract_triple(span_logits, head_logits, tail_logits, threshold=self.hparams.threshold)
+        batch_true_triples = self.extract_triple(span_true, head_true, tail_true, threshold=self.hparams.threshold)
         self.val_f1(batch_triples, batch_true_triples)
         self.log('val/f1', self.val_f1, on_step=False, on_epoch=True, prog_bar=True)
         return {'val_loss': loss}
 
 
-    def test_step(self, batch, batch_idx):
-        loss, batch_triples, batch_true_triples = self.shared_step(batch)
+    def test_step(self, batch, batch_idx) -> dict:
+        inputs, span_true, head_true, tail_true = batch['inputs'], batch['span_ids'], batch['head_ids'], batch['tail_ids']
+        loss, span_logits, head_logits, tail_logits = self.shared_step(batch)
+        batch_triples = self.extract_triple(span_logits, head_logits, tail_logits, threshold=self.hparams.threshold)
+        batch_true_triples = self.extract_triple(span_true, head_true, tail_true, threshold=self.hparams.threshold)
         self.test_f1(batch_triples, batch_true_triples)
         self.log('test/f1', self.test_f1, on_step=False, on_epoch=True, prog_bar=True)
         return {'test_loss': loss}
 
 
-    def configure_optimizers(self):
+    def configure_optimizers(self)  :
         no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
         grouped_parameters = [
             {'params': [p for n, p in self.bert.named_parameters() if not any(nd in n for nd in no_decay)],
@@ -142,7 +146,7 @@ class BertGPLinker(pl.LightningModule):
         span_logits: Tensor, 
         head_logits: Tensor, 
         tail_logtis: Tensor, 
-        threshold: float=0.0
+        threshold: float
         ) -> List[Set[Triple]]:
         """
         将三个globalpointer预测的结果进行合并，得到三元组的预测结果
@@ -177,6 +181,39 @@ class BertGPLinker(pl.LightningModule):
                             triples.add(Triple(triple=(sh.item(), sh.item(), p, oh.item(), ot.item())))
             batch_triples.append(triples)
         return batch_triples
+
+    
+    def _init_tokenizer(self):
+        with open('./vocab.txt', 'w') as f:
+            for k in self.hparams.token2id.keys():
+                f.writelines(k + '\n')
+        self.hparams.bert_config.to_json_file('./config.json')
+        tokenizer = BertTokenizer.from_pretrained('./')
+        os.remove('./vocab.txt')
+        os.remove('./config.json')
+        return tokenizer
+
+
+    def predict(self, text, device):
+        """模型预测
+        参数:
+        - text: 文本
+        返回
+        """
+        tokens = fine_grade_tokenize(text, self.tokenizer)
+        inputs = self.tokenizer.encode_plus(
+            tokens,
+            add_special_tokens=True,
+            max_length=self.hparams.max_length,
+            return_tensors='pt'
+        )
+        inputs.to(torch.device(device))
+        span_logits, head_logits, tail_logits = self(**inputs)
+        batch_triples = self.extract_triple(span_logits, head_logits, tail_logits, threshold=self.hparams.threshold)
+        return batch_triples
+
+
+        
 
 
     
