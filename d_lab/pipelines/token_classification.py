@@ -48,7 +48,7 @@ class SentTokencat:
     def from_disk(self, path:str, exclude):
         self.model = self.model_class.load_from_checkpoint(path)
 
-@Chinese.factory('tokencat_sentence',assigns=['doc.ents'],default_config={'model':'bert_crf', 'device':'cpu'})
+@Chinese.factory('senttoken_classifier',assigns=['doc.ents'],default_config={'model':'bert_crf', 'device':'cpu'})
 def make_sent_tokencat(nlp, name, ckpt, model, device):
     return SentTokencat(nlp, name, ckpt, model, device)
 
@@ -92,6 +92,6 @@ class Tokencat:
     def from_disk(self, path:str, exclude):
         self.model = self.model_class.load_from_checkpoint(path)
 
-@Chinese.factory('tokencat',assigns=['doc.ents'],default_config={'model':'bert_crf', 'device':'cpu'})
+@Chinese.factory('token_classifier',assigns=['doc.ents'],default_config={'model':'bert_crf', 'device':'cpu'})
 def make_tokencat(nlp, name, ckpt, model, device):
     return Tokencat(nlp, name, ckpt, model, device)

@@ -48,7 +48,7 @@ class SentSpanClassification:
     def from_disk(self, path:str, exclude):
         self.model = self.model_class.load_from_checkpoint(path)
 
-@Chinese.factory('spancat_sentence',assigns=['doc.spans'],default_config={'model':'bert_global_pointer', 'device':'cpu'})
+@Chinese.factory('sentspan_classifier',assigns=['doc.spans'],default_config={'model':'bert_global_pointer', 'device':'cpu'})
 def make_sent_spancat(nlp, name:str, model:str, ckpt:str, device:str):
     """句子级别的文本片段分类"""
     return SentSpanClassification(nlp=nlp, name=name, model=model, ckpt=ckpt, device=device)

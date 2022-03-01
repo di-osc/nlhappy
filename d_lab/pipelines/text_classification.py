@@ -31,7 +31,7 @@ class TextClassification:
         self.model = self.model_class.load_from_checkpoint(path)
 
 
-@Chinese.factory('text_classification', default_config={'model_name':'bert_text_classification'})
+@Chinese.factory('text_classifier', default_config={'model_name':'bert_text_classification'})
 def make_text_classification(nlp, name:str, model_name: str, ckpt: str, device: str):
     return TextClassification(nlp, name, model_name, ckpt, device)
 
