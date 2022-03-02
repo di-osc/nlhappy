@@ -7,5 +7,5 @@ pretrained_model:
 max_length: 
 batch_size: 
 return_sentence_pair: False
-num_workers: 10
+num_workers: 2
 pin_memory: True

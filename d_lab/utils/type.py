@@ -13,3 +13,12 @@ class Triple(tuple):
 
     def __eq__(self, triple):
         return self.triple == triple.triple
+
+    def __repr__(self) -> str:
+        return str(self.triple)
+
+    def __len__(self) -> int:
+        return len(self.triple)
+
+    def __getitem__(self, index):
+        return self.triple[index]

@@ -62,9 +62,9 @@ class SpanClassificationDataModule(pl.LightningDataModule):
         if 'test' in data:
             self.test_dataset = data['test']
         else: self.test_dataset = None
-        self.tokenizer = BertTokenizer.from_pretrained(self.hparams.pretrained_dir + self.hparams.pretrained_model)
+        self.tokenizer = BertTokenizer.from_pretrained(self.hparams.pretrained_dir + self.hparams.plm)
         self.hparams['token2id'] = dict(self.tokenizer.vocab)
-        bert_config = BertConfig.from_pretrained(self.hparams.pretrained_dir + self.hparams.pretrained_model)
+        bert_config = BertConfig.from_pretrained(self.hparams.pretrained_dir + self.hparams.plm)
         self.hparams['bert_config'] = bert_config
     
 

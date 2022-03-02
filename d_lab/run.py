@@ -88,6 +88,7 @@ def train(config: DictConfig) -> Optional[float]:
         logger=logger,
     )
 
+
     # Train the model
     log.info("Starting training!")
     trainer.fit(model=model, datamodule=datamodule)

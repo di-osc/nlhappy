@@ -39,8 +39,8 @@ class TripleExtractionDataModule(pl.LightningDataModule):
         id2label = {i: label for label, i in label2id.items()}
         self.hparams['label2id'] = label2id
         self.hparams['id2label'] = id2label
-        self.tokenizer = BertTokenizer.from_pretrained(self.hparams.pretrained_dir + self.hparams.pretrained_model)
-        self.bert_config = BertConfig.from_pretrained(self.hparams.pretrained_dir + self.hparams.pretrained_model)
+        self.tokenizer = BertTokenizer.from_pretrained(self.hparams.pretrained_dir + self.hparams.plm)
+        self.bert_config = BertConfig.from_pretrained(self.hparams.pretrained_dir + self.hparams.plm)
         self.hparams['bert_config'] = self.bert_config
         self.hparams['token2id'] = dict(self.tokenizer.vocab)
         data.set_transform(transform=self.transform)

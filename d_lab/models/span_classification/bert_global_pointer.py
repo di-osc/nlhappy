@@ -117,6 +117,8 @@ class BertGlobalPointer(pl.LightningModule):
             tokens,
             is_pretokenized=True,
             add_special_tokens=True,
+            max_length=self.hparams.max_length,
+            truncation=True,
             return_tensors='pt')
         inputs.to(device)
         logits = self(**inputs)

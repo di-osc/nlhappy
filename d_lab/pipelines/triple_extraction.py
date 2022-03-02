@@ -8,7 +8,7 @@ from thinc.api import Config
 import os
 
 models = {'bert_gplinker': BertGPLinker}
-Doc.set_extension('triples', default=[])
+Doc.set_extension('triples', default=set())
 
 class TripleExtractor(object):
     '''spacy组件 三元组抽取
@@ -18,10 +18,11 @@ class TripleExtractor(object):
     - model: pl模型名称
     - device: 设备
     '''
-    def __init__(self, nlp, name:str, model:str, ckpt:str, device:str):
+    def __init__(self, nlp, name:str, model:str, ckpt:str, device:str, threshold:float):
         self.nlp = nlp
         self.pipe_name = name
         self.ckpt = ckpt
+        self.threshold = threshold
         self.device = torch.device(device)
         self.model_name = model
         self.model_class = models[model]
@@ -31,8 +32,8 @@ class TripleExtractor(object):
         
         
     def __call__(self, doc):
-        triples = self.model.predict(doc.text, self.device)
-        doc._.triples.extend(triples)
+        triples = self.model.predict(doc.text, self.device, threshold=self.threshold)
+        doc._.triples = triples
         return doc
     
     def to_disk(self, path:str, exclude):
@@ -48,7 +49,7 @@ class TripleExtractor(object):
     def from_disk(self, path:str, exclude):
         self.model = self.model_class.load_from_checkpoint(path)
 
-@Chinese.factory('triple_extractor',assigns=['doc._.triples'],default_config={'model':'bert_gplinker', 'device':'cpu'})
-def make_triple_extractor(nlp, name:str, model:str, ckpt:str, device:str):
+@Chinese.factory('triple_extractor',assigns=['doc._.triples'],default_config={'model':'bert_gplinker', 'device':'cpu', 'threshold':None})
+def make_triple_extractor(nlp, name:str, model:str, ckpt:str, device:str, threshold):
     """三元组抽取组件"""
-    return TripleExtractor(nlp=nlp, name=name, model=model, ckpt=ckpt, device=device)
+    return TripleExtractor(nlp=nlp, name=name, model=model, ckpt=ckpt, device=device, threshold=threshold)

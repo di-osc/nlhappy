@@ -55,11 +55,11 @@ class BertGPLinker(pl.LightningModule):
 
     
 
-    def forward(self, inputs):
-        hidden_state = self.bert(**inputs).last_hidden_state
-        span_logits = self.span_classifier(hidden_state, mask=inputs['attention_mask'])
-        head_logits = self.head_classifier(hidden_state, mask=inputs['attention_mask'])
-        tail_logits = self.tail_classifier(hidden_state, mask=inputs['attention_mask'])
+    def forward(self, input_ids, token_type_ids=None, attention_mask=None):
+        hidden_state = self.bert(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask).last_hidden_state
+        span_logits = self.span_classifier(hidden_state, mask=attention_mask)
+        head_logits = self.head_classifier(hidden_state, mask=attention_mask)
+        tail_logits = self.tail_classifier(hidden_state, mask=attention_mask)
         return span_logits, head_logits, tail_logits
 
 
@@ -67,7 +67,7 @@ class BertGPLinker(pl.LightningModule):
         #inputs为bert常规输入, span_ids: [batch_size, 2, seq_len, seq_len],
         #head_ids: [batch_size, len(label2id), seq_len, seq_len], tail_ids: [batch_size, len(label2id), seq_len, seq_len]
         inputs, span_true, head_true, tail_true = batch['inputs'], batch['span_ids'], batch['head_ids'], batch['tail_ids']
-        span_logits, head_logits, tail_logits = self(inputs)
+        span_logits, head_logits, tail_logits = self(**inputs)
 
         span_logits_ = span_logits.reshape(span_logits.shape[0] * span_logits.shape[1], -1)
         span_true_ = span_true.reshape(span_true.shape[0] * span_true.shape[1], -1)
@@ -178,7 +178,7 @@ class BertGPLinker(pl.LightningModule):
                     ps = set(p1s) & set(p2s)
                     if len(ps) > 0:
                         for p in ps:
-                            triples.add(Triple(triple=(sh.item(), sh.item(), p, oh.item(), ot.item())))
+                            triples.add(Triple(triple=(sh.item(), st.item(), self.id2label[p], oh.item(), ot.item())))
             batch_triples.append(triples)
         return batch_triples
 
@@ -194,23 +194,30 @@ class BertGPLinker(pl.LightningModule):
         return tokenizer
 
 
-    def predict(self, text, device):
+    def predict(self, text, device, threshold = None) -> Set[Triple]:
         """模型预测
         参数:
-        - text: 文本
+        - text: 要预测的单条文本
+        - device: 设备
+        - threshold: 三元组抽取阈值, 如果为None, 则为模型训练时的阈值
         返回
+        - 预测的三元组
         """
         tokens = fine_grade_tokenize(text, self.tokenizer)
         inputs = self.tokenizer.encode_plus(
             tokens,
             add_special_tokens=True,
             max_length=self.hparams.max_length,
+            truncation=True,
             return_tensors='pt'
         )
         inputs.to(torch.device(device))
         span_logits, head_logits, tail_logits = self(**inputs)
-        batch_triples = self.extract_triple(span_logits, head_logits, tail_logits, threshold=self.hparams.threshold)
-        return batch_triples
+        if threshold == None:
+            batch_triples = self.extract_triple(span_logits, head_logits, tail_logits, threshold=self.hparams.threshold)
+        else:
+            batch_triples = self.extract_triple(span_logits, head_logits, tail_logits, threshold=threshold)
+        return batch_triples[0]
 
 
         

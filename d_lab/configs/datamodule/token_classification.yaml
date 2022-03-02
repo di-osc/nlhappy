@@ -6,6 +6,6 @@ batch_size:
 label_pad_id: -100
 pretrained_model: chinese-macbert-base
 pin_memory: True
-num_workers: 10
+num_workers: 2
 data_dir: ${data_dir}
 pretrained_dir: ${pretrained_dir}
