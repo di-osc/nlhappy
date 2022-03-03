@@ -194,7 +194,7 @@ class BertGPLinker(pl.LightningModule):
         return tokenizer
 
 
-    def predict(self, text, device, threshold = None) -> Set[Triple]:
+    def predict(self, text: str, device:str, threshold = None) -> Set[Triple]:
         """模型预测
         参数:
         - text: 要预测的单条文本
@@ -217,7 +217,7 @@ class BertGPLinker(pl.LightningModule):
             batch_triples = self.extract_triple(span_logits, head_logits, tail_logits, threshold=self.hparams.threshold)
         else:
             batch_triples = self.extract_triple(span_logits, head_logits, tail_logits, threshold=threshold)
-        return batch_triples[0]
+        return [(triple[0]-1, triple[1], triple[2], triple[3]-1, triple[4])  for triple in batch_triples[0]]
 
 
         

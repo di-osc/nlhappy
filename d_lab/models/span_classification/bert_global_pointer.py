@@ -6,7 +6,9 @@ import os
 from ...metrics.span import SpanF1
 from ...utils.preprocessing import fine_grade_tokenize
 from ...layers import MultiLabelCategoricalCrossEntropy, EfficientGlobalPointer
-import srsly
+from torch.optim import Optimizer
+from ...tricks.adversarial_training import FGM
+
 
 class BertGlobalPointer(pl.LightningModule):
     def __init__(
@@ -23,11 +25,11 @@ class BertGlobalPointer(pl.LightningModule):
 
 
         self.bert = BertModel(data_params['bert_config'])
-        # 使用更加高效的GlobalPointer https://kexue.fm/archives/8877
         self.classifier = EfficientGlobalPointer(
-            input_size=self.bert.config.hidden_size, 
-            hidden_size=hidden_size,
-            output_size=len(self.hparams.label2id))
+                        input_size=self.bert.config.hidden_size, 
+                        hidden_size=hidden_size,
+                        output_size=len(self.hparams.label2id)
+                        )
 
         self.dropout = nn.Dropout(dropout)
         self.criterion = MultiLabelCategoricalCrossEntropy()
@@ -49,7 +51,6 @@ class BertGlobalPointer(pl.LightningModule):
     def on_train_start(self) -> None:
         state_dict = torch.load(self.hparams.pretrained_dir + self.hparams.plm + '/pytorch_model.bin')
         self.bert.load_state_dict(state_dict)
-        self.print(f'{self.hparams.pretrained_dir + self.hparams.plm} loaded')
 
 
     def shared_step(self, batch):
@@ -99,6 +100,7 @@ class BertGlobalPointer(pl.LightningModule):
         self.optimizer = torch.optim.AdamW(grouped_parameters)
         self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lambda epoch: 1.0 / (epoch + 1.0))
         return [self.optimizer], [self.scheduler]
+
 
     def _init_tokenizer(self):
         with open('./vocab.txt', 'w') as f:
