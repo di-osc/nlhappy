@@ -25,114 +25,23 @@ class Triple(tuple):
         return self.triple[index]
 
     @property
-    def subject(self):
-        if len(self.triple) == 5:
-            return self.triple[0:2]
-        elif len(self.triple) == 3 :
-            return self.triple[0]
+    def sub_idx(self):
+        """返回subject的下标, 左闭右开"""
+        return (self.triple[0], self.triple[1]+1)
+       
     @property
     def predicate(self):
-        if len(self.triple) == 5:
-            return self.triple[2]
-        elif len(self.triple) == 3:
-            return self.triple[1]
-    
-    @property
-    def object(self):
-        if len(self.triple) == 5:
-            return self.triple[3:5]
-        elif len(self.triple) == 3:
-            return self.triple[2]
-
-
-class SO:
-    """subject和object类"""
-    def __init__(
-        self, 
-        doc: Doc, 
-        start: int, 
-        end: int
-    ) -> None:
-        super().__init__()
-        self.doc = doc
-        self.span = doc[start: end]
-        self.text = self.span.text
-    
-    @property
-    def ents(self):
-        return self.span.ents
-
-    @property   
-    def type_(self):
-        """查找subject或者object的类型"""
-        if len(self.ents) == 1 and len(self.ents[0]) == len(self.span):
-            return self.ents[0].label_
-        elif len(self.doc.spans) > 0:
-            for span in self.doc.spans['all']:
-                if span.start_char == self.span.start_char and span.end_char == self.span.end_char:
-                    return span.label_
-        else: return None
-
-
-    @property
-    def ents(self):
-        return self.span.ents
-
-    @property
-    def sent(self):
-        return self.span.sent
-
-    @property
-    def sents(self):
-        return self.span.sents
-
-    def __repr__(self) -> str:
-        return f'{self.span}'
-
-    def __hash__(self):
-        return self.span.__hash__()
-
-    def __eq__(self, so):
-        return self.span.start_char == so.span.start_char and self.span.end_char == so.span.end_char
-    
-    def __len__(self):
-        return len(self.span)
-
-    def __getitem__(self, index):
-        return self.span[index]
-
-
-
-class SPO(tuple):
-    """主谓宾三元组"""
-    
-    def __init__(self, spo: Tuple[SO, str]):
-        super().__init__()
-        self.spo = spo
+        return self.triple[2]
         
-    def __hash__(self):
-        return self.spo.__hash__()
-
-    def __eq__(self, spo):
-        return self.spo == spo.spo
-
-    def __repr__(self) -> str:
-        return str(self.spo)
-
-    def __len__(self) -> int:
-        return len(self.spo)
-
-    def __getitem__(self, index):
-        return self.spo[index]
-
-    @property
-    def subject(self):
-        return self.spo[0]
-
-    @property
-    def predicate(self):
-        return self.spo[1]
     
     @property
-    def object(self):
-        return self.spo[2]
+    def obj_idx(self):
+        """返回object的下标, 左闭右开"""
+        return (self.triple[3], self.triple[4]+1)
+        
+
+if __name__ == "__main__":
+    t = Triple((1,2,3,4,5))
+    print(t.sub_idx)
+    print(t.predicate)
+    print(t.obj_idx)

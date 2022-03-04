@@ -6,7 +6,7 @@ from ...metrics.triple import TripleF1
 import torch
 from torch import Tensor
 from typing import List, Set
-from ...utils.type import Triple
+from d_lab.utils.type import Triple
 from ...utils.preprocessing import fine_grade_tokenize
 import os
 

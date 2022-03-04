@@ -1,6 +1,6 @@
-from .span_classification import make_sent_spancat
-from .token_classification import make_sent_tokencat, make_tokencat
-from .text_classification import make_text_classification
+from .span_classifier import make_sent_spancat
+from .token_classifier import make_sent_tokencat, make_tokencat
+from .text_classifier import make_text_classification
 from .sentence_segmenter import make_sentence_segmenter
-from .triple_extraction import make_triple_extractor
+from .triple_extractor import make_triple_extractor
 

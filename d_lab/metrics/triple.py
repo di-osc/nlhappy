@@ -1,7 +1,7 @@
 from torchmetrics import Metric
 import torch
 from typing import Tuple, Set, List
-from ..utils.type import Triple
+from d_lab.utils.type import Triple
 
 class TripleF1(Metric):
     """三元组抽取的F1

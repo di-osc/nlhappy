@@ -1,10 +1,8 @@
-from operator import imod
 from spacy.pipeline import Sentencizer
 from spacy.lang.zh import Chinese
 from spacy.language import Language
 from typing import List, Optional, Tuple, Callable
 from spacy.pipeline import Pipe
-from spacy.pipeline.senter import senter_score
 import spacy
 
 
