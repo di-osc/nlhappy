@@ -118,7 +118,7 @@ def cut_sent(text, max_seq_len):
 
 
 
-def fine_grade_tokenize(raw_text:str, tokenizer) -> List[str]:
+def fine_grade_tokenize(raw_text:str, tokenizer, convert_fh:bool =False) -> List[str]:
     """
     - 全角转半角
     - 序列标注任务 BERT 分词器可能会导致标注偏移，
@@ -127,7 +127,8 @@ def fine_grade_tokenize(raw_text:str, tokenizer) -> List[str]:
     """
     tokens = []
     # 进行全角转半角预处理
-    raw_text = convert_FH(raw_text, FH_ASCII)  
+    if convert_fh:
+        raw_text = convert_FH(raw_text, FH_ASCII)  
 
     for _ch in raw_text:
         if _ch in [' ', '\t', '\n']:

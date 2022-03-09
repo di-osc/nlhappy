@@ -9,6 +9,8 @@ from ..utils.preprocessing import fine_grade_tokenize
 
 
 class SpanClassificationDataModule(pl.LightningDataModule):
+    """span分类的数据模块 数据集必须有text, spans两个字段
+    """
     def __init__(
         self,
         dataset: str,
@@ -31,37 +33,39 @@ class SpanClassificationDataModule(pl.LightningDataModule):
         oss.download_plm(self.hparams.plm, self.hparams.pretrained_dir)
 
     def set_transform(self, example):
-        text = example['text'][0]
-        tokens = fine_grade_tokenize(text, self.tokenizer)
-        inputs = self.tokenizer.encode_plus(
-            tokens, 
-            is_pretokenized=True,
-            padding='max_length',  
-            max_length=self.hparams.max_length,
-            add_special_tokens=True,
-            truncation=True)
-        inputs = dict(zip(inputs.keys(), map(torch.tensor, inputs.values())))
-        spans = example['spans'][0]
-        span_ids = torch.zeros(len(self.hparams.label2id), self.hparams.max_length, self.hparams.max_length)
-        for span in spans :
-            # +1 是因为添加了 [CLS]
-            span_ids[self.hparams.label2id[span[2]],  int(span[0])+1, int(span[1])+1] = 1
-
-        return {'inputs':[inputs], 'span_ids':[span_ids]}
+        batch_text = example['text']
+        batch_spans = example['spans']
+        max_length = self.hparams.max_length
+        batch_inputs = {'input_ids':[],'token_type_ids':[],'attention_mask':[], 'span_ids':[]}
+        for i, text in enumerate(batch_text):
+            tokens = fine_grade_tokenize(text, self.tokenizer)
+            inputs = self.tokenizer.encode_plus(
+                tokens, 
+                padding='max_length',  
+                max_length=max_length,
+                add_special_tokens=True,
+                truncation=True)
+            spans = batch_spans[i]
+            span_ids = torch.zeros(len(self.hparams.label2id), max_length, max_length)
+            for span in spans :
+                # +1 是因为添加了 [CLS]
+                span_ids[self.hparams.label2id[span[2]],  int(span[0])+1, int(span[1])+1] = 1
+            batch_inputs['input_ids'].append(inputs['input_ids'])
+            batch_inputs['token_type_ids'].append(inputs['token_type_ids'])
+            batch_inputs['attention_mask'].append(inputs['attention_mask'])
+            batch_inputs['span_ids'].append(span_ids)
+        batch_inputs['span_ids'] = torch.stack(batch_inputs['span_ids'], dim=0)
+        batch = dict(zip(batch_inputs.keys(), map(torch.tensor, batch_inputs.values())))
+        return batch
 
     def setup(self, stage: str) -> None:
-        data = load_from_disk(self.hparams.data_dir + self.hparams.dataset)
-        set_labels = sorted(set([span[2] for spans in data['train']['spans'] for span in spans]))
+        self.dataset = load_from_disk(self.hparams.data_dir + self.hparams.dataset)
+        set_labels = sorted(set([span[2] for spans in self.dataset['train']['spans'] for span in spans]))
         label2id = {label: i for i, label in enumerate(set_labels)}
         id2label = {i: label for label, i in label2id.items()}
         self.hparams['label2id'] = label2id
         self.hparams['id2label'] = id2label
-        data.set_transform(transform=self.set_transform)
-        self.train_dataset = data['train']
-        self.valid_dataset = data['validation']
-        if 'test' in data:
-            self.test_dataset = data['test']
-        else: self.test_dataset = None
+        self.dataset.set_transform(transform=self.set_transform)
         self.tokenizer = BertTokenizer.from_pretrained(self.hparams.pretrained_dir + self.hparams.plm)
         self.hparams['token2id'] = dict(self.tokenizer.vocab)
         bert_config = BertConfig.from_pretrained(self.hparams.pretrained_dir + self.hparams.plm)
@@ -70,7 +74,7 @@ class SpanClassificationDataModule(pl.LightningDataModule):
 
 
     def train_dataloader(self):
-        return DataLoader(dataset=self.train_dataset, 
+        return DataLoader(dataset=self.dataset['train'], 
                           batch_size=self.hparams.batch_size, 
                           shuffle=True,
                           pin_memory=self.hparams.pin_memory,
@@ -79,7 +83,7 @@ class SpanClassificationDataModule(pl.LightningDataModule):
 
 
     def val_dataloader(self):
-        return DataLoader(dataset=self.valid_dataset,
+        return DataLoader(dataset=self.dataset['validation'],
                           batch_size=self.hparams.batch_size,
                           shuffle=False,
                           pin_memory=self.hparams.pin_memory,
@@ -88,9 +92,8 @@ class SpanClassificationDataModule(pl.LightningDataModule):
 
 
     def test_dataloader(self):
-        if self.test_dataset is not None:
-            return DataLoader(dataset=self.test_dataset,
-                              batch_size=self.hparams.batch_size,
-                              shuffle=False,
-                              pin_memory=self.hparams.pin_memory,
-                              num_workers=self.hparams.num_workers)
+        return DataLoader(dataset=self.dataset['test'],
+                            batch_size=self.hparams.batch_size,
+                            shuffle=False,
+                            pin_memory=self.hparams.pin_memory,
+                            num_workers=self.hparams.num_workers)

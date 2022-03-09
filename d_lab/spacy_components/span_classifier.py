@@ -30,7 +30,7 @@ class SentSpanClassification:
         for sent in doc.sents:
             spans = self.model.predict(sent.text, device=self.device)
             for span in spans:
-                s = sent.char_span(span[0], span[1]+1, span[2])
+                s = sent.char_span(span[0], span[1], span[2])
                 all_spans.append(s)
         doc.spans['all'] = all_spans
         return doc

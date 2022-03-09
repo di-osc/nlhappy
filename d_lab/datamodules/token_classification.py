@@ -12,11 +12,14 @@ from ..utils.preprocessing import fine_grade_tokenize
 
 class TokenClassificationDataModule(pl.LightningDataModule):
     '''序列标注数据模块
+    数据集字段:
+    - tokens: list[str], 例如: ['我', '是', '一', '中', '国', '人', '。']
+    - labels: list[str], 例如: ['O', 'O', 'O', 'B-LOC', 'I-LOC', 'O', 'O']
     '''
     def __init__(
         self,
         dataset: str,
-        pretrained_model: str,
+        plm: str,
         max_length: int,
         batch_size: int,
         pin_memory: bool,
@@ -41,7 +44,6 @@ class TokenClassificationDataModule(pl.LightningDataModule):
         tokens = example['tokens'][0]
         text = ''.join(tokens)
         new_tokens = fine_grade_tokenize(text, self.tokenizer)
-        assert len
         inputs = self.tokenizer.encode_plus(
             new_tokens, 
             is_pretokenized=True, 
@@ -91,7 +93,6 @@ class TokenClassificationDataModule(pl.LightningDataModule):
                           shuffle=False,
                           pin_memory=self.hparams.pin_memory,
                           num_workers=self.hparams.num_workers)        
-
 
 
     def test_dataloader(self):

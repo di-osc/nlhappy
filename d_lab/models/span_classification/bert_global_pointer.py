@@ -54,8 +54,8 @@ class BertGlobalPointer(pl.LightningModule):
 
 
     def shared_step(self, batch):
-        inputs, span_ids = batch['inputs'], batch['span_ids']
-        logits = self(**inputs)
+        span_ids = batch['span_ids']
+        logits = self(input_ids=batch['input_ids'], token_type_ids=batch['token_type_ids'], attention_mask=batch['attention_mask'])
         pred = logits.ge(self.hparams.threshold).float()
         batch_size, ent_type_size = logits.shape[:2]
         y_true = span_ids.reshape(batch_size*ent_type_size, -1)
@@ -113,7 +113,9 @@ class BertGlobalPointer(pl.LightningModule):
         return tokenizer
 
 
-    def predict(self, text: str, device: str):
+    def predict(self, text: str, device: str, threshold = None):
+        if threshold is None:
+            threshold = self.hparams.threshold
         tokens = fine_grade_tokenize(text, self.tokenizer)
         inputs = self.tokenizer.encode_plus(
             tokens,
@@ -124,12 +126,12 @@ class BertGlobalPointer(pl.LightningModule):
             return_tensors='pt')
         inputs.to(device)
         logits = self(**inputs)
-        spans_ls = torch.nonzero(logits>self.hparams.threshold).tolist()
+        spans_ls = torch.nonzero(logits>threshold).tolist()
         spans = []
         for span in spans_ls :
             start = span[2]
             end = span[3]
-            spans.append([start-1, end-1, self.hparams.id2label[span[1]], text[start-1:end]])
+            spans.append([start-1, end, self.hparams.id2label[span[1]], text[start-1:end]])
         return spans
 
 

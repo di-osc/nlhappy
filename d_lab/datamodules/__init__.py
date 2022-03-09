@@ -1,8 +1,8 @@
-from .text_classification_datamodule import TextClassificationDataModule
-from .sentence_pair_datamodule import SentencePairDataModule
-from .token_classification_datamodule import TokenClassificationDataModule
-from .span_classification_datamodule import SpanClassificationDataModule
-from .triple_extraction_datamodule import TripleExtractionDataModule
+from .text_classification import TextClassificationDataModule
+from .sentence_pair import SentencePairDataModule
+from .token_classification import TokenClassificationDataModule
+from .span_classification import SpanClassificationDataModule
+from .triple_extraction import TripleExtractionDataModule
 
 
 __all__ = [

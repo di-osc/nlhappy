@@ -6,6 +6,9 @@ from spacy.tokens import Doc
 
 models = {'bert_text_classification': BertTextClassification}
 
+Doc.set_extension('label', default=None)
+Doc.set_extension('labels', default=[])
+
 class TextClassification:
     '''spacy 文本分类管道'''
     def __init__(self, nlp, name:str, model_name: str, ckpt: str, device: str):

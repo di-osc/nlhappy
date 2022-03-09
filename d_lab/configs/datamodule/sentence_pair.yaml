@@ -1,4 +1,4 @@
-_target_: d_lab.datamodules.sentence_pair_datamodule.SentencePairDataModule
+_target_: d_lab.datamodules.SentencePairDataModule
 
 data_dir: ${data_dir} # data_dir is specified in config.yaml
 pretrained_dir: ${pretrained_dir}
