@@ -1,12 +1,12 @@
 import pytorch_lightning as pl
 from transformers import BertModel, BertTokenizer
+from transformers.optimization import get_cosine_schedule_with_warmup, get_constant_schedule
 import torch.nn as nn
 import torch
 import os
 from ...metrics.span import SpanF1
 from ...utils.preprocessing import fine_grade_tokenize
 from ...layers import MultiLabelCategoricalCrossEntropy, EfficientGlobalPointer
-from torch.optim import Optimizer
 from ...tricks.adversarial_training import FGM
 
 
@@ -97,9 +97,17 @@ class BertGlobalPointer(pl.LightningModule):
             {'params': [p for n, p in self.classifier.named_parameters() if any(nd in n for nd in no_decay)],
              'lr': self.hparams.lr * 5, 'weight_decay': 0.0}
         ]
-        self.optimizer = torch.optim.AdamW(grouped_parameters)
-        self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lambda epoch: 1.0 / (epoch + 1.0))
-        return [self.optimizer], [self.scheduler]
+        optimizer = torch.optim.AdamW(grouped_parameters)
+        # epoch_steps = len(self.trainer.datamodule.train_dataloader()) / self.trainer.gpus
+        # all_steps = epoch_steps * self.trainer.max_epochs
+        # warm_steps = int(epoch_steps)
+        # last_epoch = self.trainer.max_epochs
+        # self.print("all_steps:", all_steps)
+        # self.print('warm_steps:', warm_steps)
+        # scheduler = get_constant_schedule(optimizer)
+        # scheduler = get_cosine_schedule_with_warmup(optimizer, num_warmup_steps=warm_steps, num_training_steps=all_steps)
+        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 1.0 / (epoch + 1.0))
+        return [optimizer], [scheduler]
 
 
     def _init_tokenizer(self):

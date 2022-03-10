@@ -27,7 +27,7 @@ def convert_docs_to_dataset(docs: List[Doc]) -> Dataset:
         for token in doc:
             bio = token.ent_iob_ + '-' + token.ent_type_ if token.ent_iob_ != 'O' else token.ent_iob_
             tokens.append({'offset': (token.idx, token.idx+1), 'label': bio, 'text': token.text})
-        d['tokens'] .append(tokens)
+        d['tokens'].append(tokens)
     ds = Dataset
     ds.features = dataset_features
     ds = ds.from_dict(d)
