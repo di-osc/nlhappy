@@ -51,27 +51,39 @@ class TripleExtractionDataModule(pl.LightningDataModule):
 
 
     def transform(self, example) -> Dict:
-        text = example['text'][0]
-        tokens = fine_grade_tokenize(text, self.tokenizer)
-        inputs = self.tokenizer.encode_plus(
-            tokens, 
-            is_pretokenized=True,
-            padding='max_length',  
-            max_length=self.hparams.max_length,
-            add_special_tokens=True,
-            truncation=True)
-        inputs = dict(zip(inputs.keys(), map(torch.tensor, inputs.values())))
-        triples = example['triples'][0]
-        span_ids = torch.zeros(2, self.hparams.max_length, self.hparams.max_length)
-        head_ids = torch.zeros(len(self.hparams.label2id), self.hparams.max_length, self.hparams.max_length)
-        tail_ids = torch.zeros(len(self.hparams.label2id), self.hparams.max_length, self.hparams.max_length)
-        for triple in triples:
-            #加1是因为有cls
-            span_ids[0][triple['subject_index'][0]+1][triple['subject_index'][1]+1] = 1
-            span_ids[1][triple['object_index'][0]+1][triple['object_index'][1]+1] = 1
-            head_ids[self.hparams.label2id[triple['predicate']]][triple['subject_index'][0]+1][triple['object_index'][0]+1] = 1
-            tail_ids[self.hparams.label2id[triple['predicate']]][triple['subject_index'][1]+1][triple['object_index'][1]+1] = 1
-        return {'inputs': [inputs], 'span_ids': [span_ids], 'head_ids': [head_ids], 'tail_ids': [tail_ids]}
+        batch_text = example['text']
+        batch_triples = example['triples']
+        batch_inputs = {'input_ids': [], 'attention_mask': [], 'token_type_ids': [], 'span_ids': [], 'head_ids': [], 'tail_ids': []}
+        for i, text in enumerate(batch_text):
+            tokens = fine_grade_tokenize(text, self.tokenizer)
+            inputs = self.tokenizer.encode_plus(
+                tokens, 
+                is_pretokenized=True,
+                padding='max_length',  
+                max_length=self.hparams.max_length,
+                add_special_tokens=True,
+                truncation=True)
+            batch_inputs['input_ids'].append(inputs['input_ids'])
+            batch_inputs['attention_mask'].append(inputs['attention_mask'])
+            batch_inputs['token_type_ids'].append(inputs['token_type_ids'])
+            triples = batch_triples[i]
+            span_ids = torch.zeros(2, self.hparams.max_length, self.hparams.max_length)
+            head_ids = torch.zeros(len(self.hparams.label2id), self.hparams.max_length, self.hparams.max_length)
+            tail_ids = torch.zeros(len(self.hparams.label2id), self.hparams.max_length, self.hparams.max_length)
+            for triple in triples:
+                #加1是因为有cls
+                span_ids[0][triple['subject_index'][0]+1][triple['subject_index'][1]+1] = 1
+                span_ids[1][triple['object_index'][0]+1][triple['object_index'][1]+1] = 1
+                head_ids[self.hparams.label2id[triple['predicate']]][triple['subject_index'][0]+1][triple['object_index'][0]+1] = 1
+                tail_ids[self.hparams.label2id[triple['predicate']]][triple['subject_index'][1]+1][triple['object_index'][1]+1] = 1
+            batch_inputs['span_ids'].append(span_ids)
+            batch_inputs['head_ids'].append(head_ids)
+            batch_inputs['tail_ids'].append(tail_ids)
+        batch_inputs['span_ids'] = torch.stack(batch_inputs['span_ids'], dim=0)
+        batch_inputs['head_ids'] = torch.stack(batch_inputs['head_ids'], dim=0)
+        batch_inputs['tail_ids'] = torch.stack(batch_inputs['tail_ids'], dim=0)
+        batch = dict(zip(batch_inputs.keys(), map(torch.tensor, batch_inputs.values())))
+        return batch
 
 
     def train_dataloader(self):

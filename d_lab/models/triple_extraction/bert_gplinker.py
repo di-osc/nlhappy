@@ -6,7 +6,7 @@ from ...metrics.triple import TripleF1
 import torch
 from torch import Tensor
 from typing import List, Set
-from d_lab.utils.type import Triple
+from ...utils.data import Triple
 from ...utils.preprocessing import fine_grade_tokenize
 import os
 
@@ -49,9 +49,9 @@ class BertGPLinker(pl.LightningModule):
         self.head_criterion = MultiLabelCategoricalCrossEntropy()
         self.tail_criterion = MultiLabelCategoricalCrossEntropy()
 
-        self.train_f1 = TripleF1()
-        self.val_f1 = TripleF1()
-        self.test_f1 = TripleF1()
+        self.train_metric = TripleF1()
+        self.val_metric = TripleF1()
+        self.test_metric = TripleF1()
 
     
 
@@ -66,8 +66,9 @@ class BertGPLinker(pl.LightningModule):
     def shared_step(self, batch):
         #inputs为bert常规输入, span_ids: [batch_size, 2, seq_len, seq_len],
         #head_ids: [batch_size, len(label2id), seq_len, seq_len], tail_ids: [batch_size, len(label2id), seq_len, seq_len]
-        inputs, span_true, head_true, tail_true = batch['inputs'], batch['span_ids'], batch['head_ids'], batch['tail_ids']
-        span_logits, head_logits, tail_logits = self(**inputs)
+        input_ids, token_type_ids, attention_mask = batch['input_ids'], batch['token_type_ids'], batch['attention_mask']
+        span_true, head_true, tail_true = batch['span_ids'], batch['head_ids'], batch['tail_ids']
+        span_logits, head_logits, tail_logits = self(input_ids, token_type_ids, attention_mask)
 
         span_logits_ = span_logits.reshape(span_logits.shape[0] * span_logits.shape[1], -1)
         span_true_ = span_true.reshape(span_true.shape[0] * span_true.shape[1], -1)
@@ -97,22 +98,22 @@ class BertGPLinker(pl.LightningModule):
 
 
     def validation_step(self, batch, batch_idx) -> dict:
-        inputs, span_true, head_true, tail_true = batch['inputs'], batch['span_ids'], batch['head_ids'], batch['tail_ids']
+        span_true, head_true, tail_true = batch['span_ids'], batch['head_ids'], batch['tail_ids']
         loss, span_logits, head_logits, tail_logits = self.shared_step(batch)
         batch_triples = self.extract_triple(span_logits, head_logits, tail_logits, threshold=self.hparams.threshold)
         batch_true_triples = self.extract_triple(span_true, head_true, tail_true, threshold=self.hparams.threshold)
-        self.val_f1(batch_triples, batch_true_triples)
-        self.log('val/f1', self.val_f1, on_step=False, on_epoch=True, prog_bar=True)
+        self.val_metric(batch_triples, batch_true_triples)
+        self.log('val/f1', self.val_metric, on_step=False, on_epoch=True, prog_bar=True)
         return {'val_loss': loss}
 
 
     def test_step(self, batch, batch_idx) -> dict:
-        inputs, span_true, head_true, tail_true = batch['inputs'], batch['span_ids'], batch['head_ids'], batch['tail_ids']
+        span_true, head_true, tail_true = batch['span_ids'], batch['head_ids'], batch['tail_ids']
         loss, span_logits, head_logits, tail_logits = self.shared_step(batch)
         batch_triples = self.extract_triple(span_logits, head_logits, tail_logits, threshold=self.hparams.threshold)
         batch_true_triples = self.extract_triple(span_true, head_true, tail_true, threshold=self.hparams.threshold)
-        self.test_f1(batch_triples, batch_true_triples)
-        self.log('test/f1', self.test_f1, on_step=False, on_epoch=True, prog_bar=True)
+        self.test_metric(batch_triples, batch_true_triples)
+        self.log('test/f1', self.test_metric, on_step=False, on_epoch=True, prog_bar=True)
         return {'test_loss': loss}
 
 

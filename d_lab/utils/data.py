@@ -25,7 +25,7 @@ class Triple(tuple):
         return self.triple[index]
 
     @property
-    def sub_idx(self):
+    def subject(self):
         """返回subject的下标, 左闭右开"""
         return (self.triple[0], self.triple[1]+1)
        
@@ -35,13 +35,13 @@ class Triple(tuple):
         
     
     @property
-    def obj_idx(self):
+    def object(self):
         """返回object的下标, 左闭右开"""
         return (self.triple[3], self.triple[4]+1)
         
 
 if __name__ == "__main__":
     t = Triple((1,2,3,4,5))
-    print(t.sub_idx)
+    print(t.subject)
     print(t.predicate)
-    print(t.obj_idx)
+    print(t.object)

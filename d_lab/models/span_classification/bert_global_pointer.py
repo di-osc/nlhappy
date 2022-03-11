@@ -18,10 +18,14 @@ class BertGlobalPointer(pl.LightningModule):
         weight_decay: float,
         dropout: float ,
         threshold: float = 0.5,
+        use_adversarial: bool = False,
         **data_params
     ) : 
         super().__init__()
         self.save_hyperparameters()
+
+        ## 手动optimizer 可参考https://pytorch-lightning.readthedocs.io/en/stable/common/optimizers.html#manual-optimization
+        self.automatic_optimization = False    
 
 
         self.bert = BertModel(data_params['bert_config'])
@@ -34,11 +38,14 @@ class BertGlobalPointer(pl.LightningModule):
         self.dropout = nn.Dropout(dropout)
         self.criterion = MultiLabelCategoricalCrossEntropy()
 
-        self.train_f1 = SpanF1()
-        self.val_f1 = SpanF1()
-        self.test_f1 = SpanF1()
+        self.train_metric = SpanF1()
+        self.val_metric = SpanF1()
+        self.test_metric = SpanF1()
 
         self.tokenizer = self._init_tokenizer()
+
+        if use_adversarial:
+            self.fgm = FGM(self.bert)
 
 
     def forward(self, input_ids, token_type_ids, attention_mask=None):
@@ -65,23 +72,36 @@ class BertGlobalPointer(pl.LightningModule):
 
 
     def training_step(self, batch, batch_idx):
+        optimizer = self.optimizers()
+        optimizer.zero_grad()
+        scheduler = self.lr_schedulers()
         loss, pred, true = self.shared_step(batch)
-        self.train_f1(pred, true)
-        self.log('train/f1', self.train_f1, on_step=True, on_epoch=True, prog_bar=True)
+        self.manual_backward(loss)
+        if self.hparams.use_adversarial:
+            self.fgm.attack()
+            loss_adv, pred, true = self.shared_step(batch)
+            self.manual_backward(loss_adv)
+            self.fgm.restore()
+            self.log_dict({'train_loss': loss, 'adv_loss': loss_adv}, prog_bar=True)
+        optimizer.step()
+        if self.trainer.is_last_batch:
+            scheduler.step()
+        self.train_metric(pred, true)
+        self.log('train/f1', self.train_metric, on_step=True, on_epoch=True, prog_bar=True)
         return {'loss': loss}
 
 
     def validation_step(self, batch, batch_idx):
         loss, pred, true = self.shared_step(batch)
-        self.val_f1(pred, true)
-        self.log('val/f1', self.val_f1, on_step=False, on_epoch=True, prog_bar=True)
+        self.val_metric(pred, true)
+        self.log('val/f1', self.val_metric, on_step=False, on_epoch=True, prog_bar=True)
         return {'loss': loss}
 
 
     def test_step(self, batch, batch_idx):
         loss, pred, true = self.shared_step(batch)
-        self.test_f1(pred, true)
-        self.log('test/f1', self.test_f1, on_step=False, on_epoch=True, prog_bar=True)
+        self.test_metric(pred, true)
+        self.log('test/f1', self.test_metric, on_step=False, on_epoch=True, prog_bar=True)
         return {'loss': loss}
 
 

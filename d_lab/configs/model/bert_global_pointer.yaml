@@ -4,4 +4,5 @@ lr:
 dropout: 0.2
 hidden_size: 256 
 weight_decay: 0.0
+use_adversarial: False
 
