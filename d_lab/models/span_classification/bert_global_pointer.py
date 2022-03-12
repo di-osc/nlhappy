@@ -18,7 +18,7 @@ class BertGlobalPointer(pl.LightningModule):
         weight_decay: float,
         dropout: float ,
         threshold: float = 0.5,
-        use_adversarial: bool = False,
+        use_adv: bool = False,
         **data_params
     ) : 
         super().__init__()
@@ -44,7 +44,7 @@ class BertGlobalPointer(pl.LightningModule):
 
         self.tokenizer = self._init_tokenizer()
 
-        if use_adversarial:
+        if use_adv:
             self.fgm = FGM(self.bert)
 
 
@@ -77,9 +77,9 @@ class BertGlobalPointer(pl.LightningModule):
         scheduler = self.lr_schedulers()
         loss, pred, true = self.shared_step(batch)
         self.manual_backward(loss)
-        if self.hparams.use_adversarial:
+        if self.hparams.use_adv:
             self.fgm.attack()
-            loss_adv, pred, true = self.shared_step(batch)
+            loss_adv,  _,  _ = self.shared_step(batch)
             self.manual_backward(loss_adv)
             self.fgm.restore()
             self.log_dict({'train_loss': loss, 'adv_loss': loss_adv}, prog_bar=True)

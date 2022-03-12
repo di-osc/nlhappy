@@ -49,7 +49,10 @@ class SpanClassificationDataModule(pl.LightningDataModule):
             span_ids = torch.zeros(len(self.hparams.label2id), max_length, max_length)
             for span in spans :
                 # +1 是因为添加了 [CLS]
-                span_ids[self.hparams.label2id[span[2]],  int(span[0])+1, int(span[1])+1] = 1
+                start = span['offset'][0] + 1
+                end = span['offset'][1] 
+                label_id = self.hparams.label2id[span['label']]
+                span_ids[label_id,  start, end] = 1
             batch_inputs['input_ids'].append(inputs['input_ids'])
             batch_inputs['token_type_ids'].append(inputs['token_type_ids'])
             batch_inputs['attention_mask'].append(inputs['attention_mask'])
@@ -60,7 +63,7 @@ class SpanClassificationDataModule(pl.LightningDataModule):
 
     def setup(self, stage: str) -> None:
         self.dataset = load_from_disk(self.hparams.data_dir + self.hparams.dataset)
-        set_labels = sorted(set([span[2] for spans in self.dataset['train']['spans'] for span in spans]))
+        set_labels = sorted(set([span['label'] for spans in self.dataset['train']['spans'] for span in spans]))
         label2id = {label: i for i, label in enumerate(set_labels)}
         id2label = {i: label for label, i in label2id.items()}
         self.hparams['label2id'] = label2id

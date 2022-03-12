@@ -27,7 +27,7 @@ class Triple(tuple):
     @property
     def subject(self):
         """返回subject的下标, 左闭右开"""
-        return (self.triple[0], self.triple[1]+1)
+        return (self.triple[0], self.triple[1])
        
     @property
     def predicate(self):
@@ -37,7 +37,7 @@ class Triple(tuple):
     @property
     def object(self):
         """返回object的下标, 左闭右开"""
-        return (self.triple[3], self.triple[4]+1)
+        return (self.triple[3], self.triple[4])
         
 
 if __name__ == "__main__":

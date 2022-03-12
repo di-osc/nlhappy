@@ -23,7 +23,11 @@ class SO:
     
     @property
     def span(self) -> Span:
-        return self.doc[self.start_char:self.end_char]
+        return self.doc.char_span(self.start_char, self.end_char)
+
+    @property
+    def text(self) -> str:
+        return self.span.text
     
 
     @property   
