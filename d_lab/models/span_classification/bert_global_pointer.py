@@ -88,6 +88,7 @@ class BertGlobalPointer(pl.LightningModule):
             scheduler.step()
         self.train_metric(pred, true)
         self.log('train/f1', self.train_metric, on_step=True, on_epoch=True, prog_bar=True)
+        self.log_dict({'train_loss': loss}, prog_bar=True)
         return {'loss': loss}
 
 
