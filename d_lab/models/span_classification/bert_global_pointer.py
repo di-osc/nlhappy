@@ -159,7 +159,8 @@ class BertGlobalPointer(pl.LightningModule):
         for span in spans_ls :
             start = span[2]
             end = span[3]
-            spans.append([start-1, end, self.hparams.id2label[span[1]], text[start-1:end]])
+            span_text = text[start-1:end]
+            spans.append([start-1, end, self.hparams.id2label[span[1]], span_text])
         return spans
 
 
