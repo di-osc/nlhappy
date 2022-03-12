@@ -7,6 +7,7 @@ import rich.syntax
 import rich.tree
 from omegaconf import DictConfig, OmegaConf
 from pytorch_lightning.utilities import rank_zero_only
+import os
 
 
 def get_logger(name=__name__) -> logging.Logger:
@@ -170,3 +171,20 @@ def finish(
 
             wandb.finish()
 
+
+def zip_all_files(dir,zipFile,pre_dir):
+    """递归压缩文件夹下的所有文件
+    参数:
+    - dir: 压缩的文件夹路径
+    - zipFile: zipfile对象
+    - pre_dir: 压缩文件根目录
+    """
+    for f in os.listdir(dir):
+        absFile=os.path.join(dir,f) #子文件的绝对路径
+        pre_d = os.path.join(pre_dir,f)
+        if os.path.isdir(absFile): #判断是文件夹，继续深度读取。
+            zipFile.write(absFile, pre_d) #在zip文件中创建文件夹
+            zip_all_files(absFile,zipFile, pre_dir=pre_d) #递归操作
+        else: #判断是普通文件，直接写到zip文件中。
+            zipFile.write(absFile, pre_d)
+    return 

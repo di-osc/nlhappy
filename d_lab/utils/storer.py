@@ -1,6 +1,7 @@
 import os
 import oss2
 import zipfile
+from .utils import zip_all_files
 
 default_access_key_id = 'LTAI5tPsMSE5G3srWxB8j3yw'
 default_access_key_secret = 'z5jPdkfNq4WPtV4c7YaAJwH5Sj45gT'
@@ -133,12 +134,8 @@ class OSSStorer:
         file = dataset + '.zip'
         file_path = localpath + file
         dataset_path = localpath + dataset
-        z = zipfile.ZipFile(file=file_path, mode='w')
-        
-        for root, dirs, files in os.walk(dataset_path):
-            for f in files:
-                z.write(os.path.join(root, f))
-        
+        with zipfile.ZipFile(file=file_path, mode='w') as z:
+            zip_all_files(dataset_path, z, pre_dir=dataset)
         self.data_bucket.put_object_from_file(key=file, filename=file_path)
         if os.path.exists(file_path):
             os.remove(path=file_path)
@@ -154,10 +151,8 @@ class OSSStorer:
         file = model + '.zip'
         file_path = localpath + file
         model_path = localpath + model
-        z = zipfile.ZipFile(file=file_path, mode='w')
-        for root, dirs, files in os.walk(model_path):
-            for f in files:
-                z.write(os.path.join(root, f))
+        with zipfile.ZipFile(file=file_path, mode='w') as z:
+            zip_all_files(model_path, z, model)
         self.model_bucket.put_object_from_file(key=file, filename=file_path)
         if os.path.exists(file_path):
             os.remove(path=file_path)
