@@ -31,7 +31,7 @@ class SO:
     
 
     @property   
-    def type_(self):
+    def label_(self):
         """查找subject或者object的类型"""
         if len(self.ents) == 1 and len(self.ents[0]) == len(self.span):
             return self.ents[0].label_

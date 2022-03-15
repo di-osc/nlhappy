@@ -175,7 +175,7 @@ def finish(
 def zip_all_files(dir,zipFile,pre_dir):
     """递归压缩文件夹下的所有文件
     参数:
-    - dir: 压缩的文件夹路径
+    - dir: 要压缩的文件夹路径
     - zipFile: zipfile对象
     - pre_dir: 压缩文件根目录
     """

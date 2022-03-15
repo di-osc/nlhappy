@@ -41,7 +41,9 @@ class Triple(tuple):
         
 
 if __name__ == "__main__":
-    t = Triple((1,2,3,4,5))
+    t = Triple((1,2,3,'啊',5,6,7))
+    t1 = Triple((1,2,3,'的',5,6,7))
+    print(t==t1)
     print(t.subject)
     print(t.predicate)
     print(t.object)

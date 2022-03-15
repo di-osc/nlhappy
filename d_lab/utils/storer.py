@@ -151,6 +151,7 @@ class OSSStorer:
         file = model + '.zip'
         file_path = localpath + file
         model_path = localpath + model
+        # 注意如果不用with 语法, 如果没有关闭zip文件则解压会报错
         with zipfile.ZipFile(file=file_path, mode='w') as z:
             zip_all_files(model_path, z, model)
         self.model_bucket.put_object_from_file(key=file, filename=file_path)
