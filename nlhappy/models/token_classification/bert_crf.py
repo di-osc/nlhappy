@@ -1,4 +1,3 @@
-import importlib_metadata
 import pytorch_lightning as pl
 from ...layers import CRF, SimpleDense
 import torch
