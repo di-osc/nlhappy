@@ -23,7 +23,7 @@ wandb = "^0.12.10"
 [tool.poetry.dev-dependencies]
 
 [tool.poetry.plugins."spacy_factories"]
-"sent_spancat" = "d_lab.spacy_components:make_sent_spancat"
+"sent_spancat" = "d_lab.spacy_components:make_spancat"
 
 [tool.poetry.scripts]
 d-lab = "d_lab.run:train"

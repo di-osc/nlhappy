@@ -10,14 +10,15 @@ import os
 
 models = {'bert_global_pointer': BertGlobalPointer}
 
-class SentSpanClassification:
+class SpanClassification:
     '''句子级别span分类spacy pipeline
     - ckpt: 模型保存路径
     '''
-    def __init__(self, nlp, name:str, model:str, ckpt:str, device:str):
+    def __init__(self, nlp, name:str, model:str, ckpt:str, device:str, sentence_level:bool):
         self.nlp = nlp
         self.pipe_name = name
         self.ckpt = ckpt
+        self.sentence_level = sentence_level
         self.device = torch.device(device)
         self.model_name = model
         self.model_class = models[model]
@@ -28,12 +29,19 @@ class SentSpanClassification:
         
     def __call__(self, doc: Doc) -> Doc:
         all_spans = []
-        for sent in doc.sents:
-            spans = self.model.predict(sent.text, device=self.device)
+        if self.sentence_level:
+            for sent in doc.sents:
+                spans = self.model.predict(sent.text, device=self.device)
+                for span in spans:
+                    s = sent.char_span(span[0], span[1], span[2])
+                    all_spans.append(s)
+            doc.spans['all'] = all_spans
+        else:
+            spans = self.model.predict(doc.text, device=self.device)
             for span in spans:
-                s = sent.char_span(span[0], span[1], span[2])
+                s = doc.char_span(span[0], span[1], span[2])
                 all_spans.append(s)
-        doc.spans['all'] = all_spans
+            doc.spans['all'] = all_spans
         return doc
 
     def to_disk(self, path:str, exclude):
@@ -49,8 +57,8 @@ class SentSpanClassification:
     def from_disk(self, path:str, exclude):
         self.model = self.model_class.load_from_checkpoint(path)
 
-@Chinese.factory('sentspan_classifier',assigns=['doc.spans'],default_config={'model':'bert_global_pointer', 'device':'cpu'})
-def make_sent_spancat(nlp, name:str, model:str, ckpt:str, device:str):
+@Chinese.factory('span_classifier',assigns=['doc.spans'],default_config={'model':'bert_global_pointer', 'device':'cpu', 'sentence_level':False})
+def make_spancat(nlp, name:str, model:str, ckpt:str, device:str, sentence_level:bool):
     """句子级别的文本片段分类"""
-    return SentSpanClassification(nlp=nlp, name=name, model=model, ckpt=ckpt, device=device)
+    return SpanClassification(nlp=nlp, name=name, model=model, ckpt=ckpt, device=device, sentence_level=sentence_level)
 
