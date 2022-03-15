@@ -2,7 +2,7 @@ from datasets.features import Features
 from datasets import Sequence, Value, Dataset 
 from typing import List, Type
 from spacy.tokens import Doc
-from d_lab.utils.data import Triple
+from .data import Triple
 from tqdm import tqdm
 import warnings
 

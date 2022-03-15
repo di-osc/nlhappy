@@ -1,6 +1,5 @@
 import importlib_metadata
 import pytorch_lightning as pl
-from zmq import device
 from ...layers import CRF, SimpleDense
 import torch
 from ...metrics.chunk import ChunkF1, get_entities
