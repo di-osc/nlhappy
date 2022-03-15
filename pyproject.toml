@@ -1,8 +1,8 @@
 [tool.poetry]
-name = "d_lab"
-version = "0.1.0"
-description = "深度学习实验室"
-authors = ["good-as-water <790990241@qq.com>"]
+name = "nlhappy"
+version = "0.1.1"
+description = "一款端到端的中文自然语言处理库"
+authors = ["wangmengdi <790990241@qq.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.7"
