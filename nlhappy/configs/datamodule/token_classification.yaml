@@ -1,4 +1,4 @@
-_target_: d_lab.datamodules.TokenClassificationDataModule
+_target_: nlhappy.datamodules.TokenClassificationDataModule
 
 dataset: 
 max_length: 

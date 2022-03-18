@@ -1,4 +1,4 @@
-_target_: d_lab.models.text_classification.BertTextClassification
+_target_: nlhappy.models.text_classification.BertTextClassification
 
 hidden_size: 256
 lr: 3e-5

@@ -1,4 +1,4 @@
-_target_: d_lab.datamodules.TripleExtractionDataModule
+_target_: nlhappy.datamodules.TripleExtractionDataModule
 
 dataset: 
 max_length: 

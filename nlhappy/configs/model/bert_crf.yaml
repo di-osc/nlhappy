@@ -1,4 +1,4 @@
-_target_: d_lab.models.token_classification.BertCRF
+_target_: nlhappy.models.token_classification.BertCRF
 
 lr: 3e-5
 dropout: 0.2

@@ -1,4 +1,4 @@
-_target_: d_lab.datamodules.SpanClassificationDataModule
+_target_: nlhappy.datamodules.SpanClassificationDataModule
 
 
 dataset: 

@@ -19,8 +19,8 @@ class SpanClassificationDataModule(pl.LightningDataModule):
         batch_size: int,
         pin_memory: bool,
         num_workers: int,
-        data_dir: str ,
-        pretrained_dir: str
+        data_dir: str ='./datasets',
+        pretrained_dir: str = './plms',
         ) :
         super().__init__()
         self.save_hyperparameters()

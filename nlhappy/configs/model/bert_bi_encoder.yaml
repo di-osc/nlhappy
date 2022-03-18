@@ -1,4 +1,4 @@
-_target_: d_lab.models.BERTBiEncoder
+_target_: nlhappy.models.BERTBiEncoder
 
 hidden_size: 768
 lr: 3e-5

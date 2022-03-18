@@ -1,4 +1,4 @@
-_target_: d_lab.models.BertGlobalPointer
+_target_: nlhappy.models.BertGlobalPointer
 
 lr:        
 dropout: 0.2

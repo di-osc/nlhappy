@@ -1,5 +1,4 @@
 import pytorch_lightning as pl
-from sklearn import multiclass
 from transformers import BertModel, BertTokenizer
 from ...layers import SimpleDense
 import torch.nn as nn

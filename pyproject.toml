@@ -1,11 +1,11 @@
 [tool.poetry]
 name = "nlhappy"
-version = "0.1.3"
-description = "一款以实现SOTA模型为目的的中文自然语言处理库"
+version = "0.1.11"
+description = "一款致力于SOTA的中文自然语言处理库"
 authors = ["wangmengdi <790990241@qq.com>"]
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.7"
 torch = "^1.10.2"
 pytorch-lightning = "^1.5.10"
 transformers = "^4.16.2"
@@ -13,18 +13,17 @@ datasets = "^1.18.3"
 oss2 = "^2.15.0"
 spacy = "^3.2.2"
 hydra-core = "^1.1.1"
-hydra-colorlog = "^1.1.0"
-hydra-optuna-sweeper = "^1.1.2"
-scikit-learn = "^1.0.2"
 jieba = "^0.42.1"
-wandb = "^0.12.10"
-rich = "^12.0.0"
 tqdm = "^4.63.0"
+rich = "^12.0.0"
+hydra-colorlog = "^1.1.0"
+pkuseg = "^0.0.25"
+scikit-learn = "^1.0.2"
 
 [tool.poetry.dev-dependencies]
 
 [tool.poetry.plugins."spacy_factories"]
-"sent_spancat" = "nlhappy.spacy_components:make_spancat"
+"span_classifier" = "nlhappy.spacy_components:make_spancat"
 
 [tool.poetry.scripts]
 nlhappy = "nlhappy.run:train"

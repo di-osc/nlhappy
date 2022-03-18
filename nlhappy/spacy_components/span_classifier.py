@@ -1,4 +1,3 @@
-from distutils.spawn import spawn
 import shutil
 from ..models import BertGlobalPointer
 from spacy.lang.zh import Chinese

@@ -9,11 +9,11 @@ import os
 import zipfile
 from datasets import load_from_disk
 
-class SentencePairDataModule(pl.LightningDataModule):
+class TextPairDataModule(pl.LightningDataModule):
     '''句子对数据模块,用来构建pytorch_lightning的数据模块
     参数:
     - dataset: 数据集名称, 文件为datasets.DataSet  feature 必须包含 sentence1, sentence2, label
-    - pretrained_model: 预训练模型名称
+    - plm: 预训练模型名称
     - max_length: 单个句子的最大长度
     - return_sentence_pair: 是否返回句子对
     - batch_size: 批大小
@@ -25,13 +25,13 @@ class SentencePairDataModule(pl.LightningDataModule):
     def __init__(
             self,
             dataset: str,
-            pretrained_model: str,
+            plm: str,
             max_length: int,
             return_sentence_pair: bool,
             batch_size: int,
             num_workers: int,
             pin_memory: bool,
-            data_dir = 'data/',
+            data_dir = 'datasets/',
             pretrained_dir = 'pretrained_models/'
     ):  
         super().__init__()

@@ -1,4 +1,4 @@
-_target_: d_lab.datamodules.TextClassificationDataModule
+_target_: nlhappy.datamodules.TextClassificationDataModule
 
 dataset: 
 max_length: 

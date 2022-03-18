@@ -1,10 +1,11 @@
 import pytorch_lightning as pl
 from ...layers import CRF, SimpleDense
-import torch
 from ...metrics.chunk import ChunkF1, get_entities
 from transformers import BertModel, BertTokenizer
 import torch.nn as nn
 from ...utils.preprocessing import fine_grade_tokenize
+import os
+import torch
 
 class BertCRF(pl.LightningModule):
     def __init__(self,
@@ -130,7 +131,6 @@ class BertCRF(pl.LightningModule):
         
 
     def _init_tokenizer(self):
-        import os
         with open('./vocab.txt', 'w') as f:
             for k in self.hparams.token2id.keys():
                 f.writelines(k + '\n')
