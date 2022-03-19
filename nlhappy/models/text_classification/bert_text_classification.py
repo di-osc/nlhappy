@@ -8,6 +8,7 @@ from ...layers.classifier import SimpleDense
 from ...utils.preprocessing import fine_grade_tokenize
 from typing import List, Dict
 from datasets import Dataset, concatenate_datasets
+import os
 
 class BertTextClassification(LightningModule):
     '''
@@ -26,14 +27,14 @@ class BertTextClassification(LightningModule):
 
         self.label2id = self.hparams['label2id']
         self.id2label = {v:k for k,v in self.label2id.items()}
-        self.tokenizer = BertTokenizer.from_pretrained(data_params['pretrained_dir'] + data_params['pretrained_model'])
+        self.tokenizer = self._init_tokenizer()
         
         #模型架构
-        self.encoder = BertModel.from_pretrained(data_params['pretrained_dir'] + data_params['pretrained_model'])
+        self.encoder = BertModel(self.hparams['bert_config'])
+        self.dropout = torch.nn.Dropout(dropout)
         self.classifier = SimpleDense(self.encoder.config.hidden_size, hidden_size, len(self.label2id))
+        
         self.criterion = torch.nn.CrossEntropyLoss()
-        self.optimizer = None
-        self.scheduler = None
 
         # 评价指标
         self.train_f1 = F1Score(num_classes=len(self.label2id), average='macro')
@@ -43,8 +44,13 @@ class BertTextClassification(LightningModule):
 
     def forward(self, input_ids, token_type_ids, attention_mask):
         x = self.encoder(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask).pooler_output
+        x = self.dropout(x)
         logits = self.classifier(x)  # (batch_size, output_size)
         return logits
+
+    def on_train_start(self) -> None:
+        state_dict = torch.load(self.hparams.pretrained_dir + self.hparams.plm + '/pytorch_model.bin')
+        self.bert.load_state_dict(state_dict)
         
     def shared_step(self, batch):
         inputs, label_ids = batch['inputs'], batch['label_ids']
@@ -93,4 +99,14 @@ class BertTextClassification(LightningModule):
             cats[self.id2label[i]] = v
         
         return cats
+
+    def _init_tokenizer(self):
+        with open('./vocab.txt', 'w') as f:
+            for k in self.hparams.token2id.keys():
+                f.writelines(k + '\n')
+        self.hparams.bert_config.to_json_file('./config.json')
+        tokenizer = BertTokenizer.from_pretrained('./')
+        os.remove('./vocab.txt')
+        os.remove('./config.json')
+        return tokenizer
 

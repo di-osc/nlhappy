@@ -32,7 +32,7 @@ def convert_docs_to_dataset(docs: List[Doc], sentence_level: bool =False) -> Dat
     for doc in tqdm(docs):
         if not sentence_level:
             d['text'].append(doc.text)
-            d['labels'].append(doc._.labels)
+            d['labels'].append([label for label in doc._.labels])
 
             spans = []
             if ('all' in doc.spans) and len(doc.spans['all']) > 0:
