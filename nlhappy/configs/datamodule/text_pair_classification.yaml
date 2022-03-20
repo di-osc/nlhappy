@@ -1,4 +1,4 @@
-_target_: nlhappy.datamodules.TextPairDataModule
+_target_: nlhappy.datamodules.TextPairClassificationDataModule
 
 data_dir: ${data_dir} # data_dir is specified in config.yaml
 pretrained_dir: ${pretrained_dir}

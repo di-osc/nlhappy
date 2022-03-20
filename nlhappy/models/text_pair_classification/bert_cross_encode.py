@@ -1,0 +1,88 @@
+import torch
+from pytorch_lightning import LightningModule
+from torchmetrics.classification import Accuracy
+from typing import List, Any
+from transformers import AutoModel, BertModel, BertConfig, BertTokenizer
+import torch.nn.functional as F
+import os
+
+
+
+
+class BERTCrossEncoder(LightningModule):
+    '''
+    交互式的bert句子对分类模型
+    '''
+    def __init__(
+        self, 
+        lr: float ,
+        hidden_size: int,
+        dropout: float,
+        weight_decay: float ,
+        **kwargs
+        ):
+        super(BERTCrossEncoder, self).__init__()  
+        
+        self.save_hyperparameters(logger=False)
+        self.bert = BertModel(self.hparams['bert_config'])
+        self.pooler = torch.nn.Linear(self.bert.config.hidden_size, hidden_size)
+        self.classifier = torch.nn.Linear(hidden_size, len(self.hparams.label2id))
+        self.criterion = torch.nn.CrossEntropyLoss()
+        self.train_acc = Accuracy()
+        self.val_acc = Accuracy()
+        self.test_acc = Accuracy()
+        self.tokenizer = self._init_tokenizer()
+        
+
+    def forward(self, inputs):
+        x = self.bert(**inputs).last_hidden_state
+        x = x.mean(dim=1)
+        x = self.pooler(x)
+        x = F.relu(x)
+        logits = self.classifier(x)
+        return logits
+
+
+    def shared_step(self, batch):
+        inputs = batch['inputs']
+        labels = batch['label_ids']
+        logits = self(inputs)
+        loss = self.criterion(logits, labels)
+        preds = torch.argmax(logits, dim=-1)
+        return loss, preds, labels
+
+    def training_step(self, batch, batch_idx):
+        loss, preds, labels = self.shared_step(batch)
+        self.train_acc(preds, labels)
+        self.log('train/acc', self.train_acc, on_step=True, on_epoch=True, prog_bar=True)
+        return {'loss': loss}
+
+    def validation_step(self, batch, batch_idx):
+        loss, preds, labels = self.shared_step(batch)
+        self.val_acc(preds, labels)
+        self.log('val/acc', self.val_acc, on_step=False, on_epoch=True, prog_bar=True)
+        return {'loss': loss}
+
+
+    def test_step(self, batch, batch_idx):
+        loss, preds, labels = self.shared_step(batch)
+        self.test_acc(preds, labels)
+        self.log('test/acc', self.test_acc, on_step=False, on_epoch=True, prog_bar=True)
+        return {'loss': loss}
+
+
+    def configure_optimizers(self):
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
+        self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lambda epoch: 1.0 / (epoch + 1.0))
+        return [self.optimizer], [self.scheduler]
+
+    def _init_tokenizer(self):
+        with open('./vocab.txt', 'w') as f:
+            for k in self.hparams.token2id.keys():
+                f.writelines(k + '\n')
+        self.hparams.bert_config.to_json_file('./config.json')
+        tokenizer = BertTokenizer.from_pretrained('./')
+        os.remove('./vocab.txt')
+        os.remove('./config.json')
+        return tokenizer
+

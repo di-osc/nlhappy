@@ -16,6 +16,8 @@ def explain(key: str):
         return "CBLUE排行榜中中文医学文本实体关系抽取任务数据集,文本中含有@,并且语义模糊."
     elif key == "CMeEE":
         return "CBLUE排行榜中中文医学命名实体识别数据集, 含有嵌套的情况."
+    elif key == "LCQMC":
+        return "中文问答匹配数据集, 238766训练集、8802验证集和12500测试集"
 
     
     else: return "No such key"
