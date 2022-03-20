@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "nlhappy"
-version = "0.1.12"
+version = "0.1.13"
 description = "致力于SOTA的中文自然语言处理库"
 authors = ["wangmengdi <790990241@qq.com>"]
 

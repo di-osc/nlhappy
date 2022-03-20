@@ -24,8 +24,9 @@ def convert_docs_to_dataset(docs: List[Doc], sentence_level: bool =False) -> Dat
         docs: a list of spacy.tokens.Doc
         sentence_level: whether to convert to sentence level dataset
     """
+
     if sentence_level:
-        warnings.warn('注意: 转换为句子级别数据集, 仅适用于token, span分类任务')
+        print('注意: 转换为句子级别数据集, 仅适用于token, span分类任务')
         
 
     d = {'text':[], 'labels':[],  'spans':[], 'tokens':[], 'triples':[]}
@@ -81,10 +82,7 @@ def convert_docs_to_dataset(docs: List[Doc], sentence_level: bool =False) -> Dat
                 triples = []
                 d['triples'].append(triples)
 
-
-
-    ds = Dataset
-    ds = ds.from_dict(d)
+    ds = Dataset.from_dict(d)
     return ds
 
 

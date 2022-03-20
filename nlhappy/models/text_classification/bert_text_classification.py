@@ -43,18 +43,19 @@ class BertTextClassification(LightningModule):
 
 
     def forward(self, input_ids, token_type_ids, attention_mask):
-        x = self.encoder(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask).pooler_output
+        x = self.encoder(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask).last_hidden_state
         x = self.dropout(x)
+        x = x.mean(dim=1)
         logits = self.classifier(x)  # (batch_size, output_size)
         return logits
 
     def on_train_start(self) -> None:
         state_dict = torch.load(self.hparams.pretrained_dir + self.hparams.plm + '/pytorch_model.bin')
-        self.bert.load_state_dict(state_dict)
+        self.encoder.load_state_dict(state_dict)
         
     def shared_step(self, batch):
-        inputs, label_ids = batch['inputs'], batch['label_ids']
-        logits = self(**inputs)
+        input_ids, token_type_ids, attention_mask, label_ids = batch['input_ids'], batch['token_type_ids'], batch['attention_mask'], batch['label_ids']
+        logits = self(input_ids, token_type_ids, attention_mask)
         loss = self.criterion(logits, label_ids)
         pred_ids = torch.argmax(logits, dim=-1)
         return loss, pred_ids, label_ids

@@ -121,7 +121,6 @@ class OSSStorer:
         if os.path.exists(file_path):
             os.remove(path=file_path)
         
-        
 
     def upload_dataset(
         self, 
@@ -140,6 +139,7 @@ class OSSStorer:
         if os.path.exists(file_path):
             os.remove(path=file_path)
 
+
     def upload_pretrained(
         self, 
         model, 
@@ -155,6 +155,25 @@ class OSSStorer:
         with zipfile.ZipFile(file=file_path, mode='w') as z:
             zip_all_files(model_path, z, model)
         self.model_bucket.put_object_from_file(key=file, filename=file_path)
+        if os.path.exists(file_path):
+            os.remove(path=file_path)
+
+
+    def upload_asset(
+        self,
+        asset,
+        localpath: str = './assets/'
+    ):
+        """上传原始数据
+        - asset: 数据名称
+        - localpath: 数据的路径, 默认为./assets/
+        """
+        file = asset + '.zip'
+        file_path = localpath + file
+        asset_path = localpath + asset
+        with zipfile.ZipFile(file=file_path, mode='w') as z:
+            zip_all_files(asset_path, z, asset)
+        self.assets_bucket.put_object_from_file(key=file, filename=file_path)
         if os.path.exists(file_path):
             os.remove(path=file_path)
 
