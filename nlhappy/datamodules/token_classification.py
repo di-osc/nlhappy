@@ -1,13 +1,10 @@
 import pytorch_lightning as pl
-import os
 from ..utils.storer import OSSStorer
-import zipfile
 from datasets import load_from_disk
 from transformers import BertTokenizer, BertConfig
-import srsly
 from torch.utils.data import DataLoader
-import torch
 from ..utils.preprocessing import fine_grade_tokenize
+import torch
 
 
 class TokenClassificationDataModule(pl.LightningDataModule):
@@ -38,49 +35,47 @@ class TokenClassificationDataModule(pl.LightningDataModule):
         '''下载数据集和预训练模型'''
         oss = OSSStorer()
         oss.download_dataset(self.hparams.dataset, self.hparams.data_dir)
-        oss.download_plm(self.hparams.pretrained_model, self.hparams.pretrained_dir)
+        oss.download_plm(self.hparams.plm, self.hparams.pretrained_dir)
 
-    def transform(self, example):
-        tokens = example['tokens'][0]
-        text = ''.join(tokens)
-        new_tokens = fine_grade_tokenize(text, self.tokenizer)
-        inputs = self.tokenizer.encode_plus(
-            new_tokens, 
-            is_pretokenized=True, 
-            add_special_tokens=True,
-            padding='max_length',  
-            max_length=self.hparams.max_length,
-            truncation=True)
-        inputs = dict(zip(inputs.keys(), map(torch.tensor, inputs.values())))
-        labels = example['labels'][0]
-        labels = [self.hparams.label2id[label] for label in labels] 
-        labels = [self.hparams.label2id['O']] + labels + [self.hparams.label2id['O']] + (self.hparams.max_length - len(labels)-2) * [self.hparams.label_pad_id]
-        labels = torch.tensor(labels)
-        return {'inputs':[inputs], 'label_ids':[labels]}
+    def transform(self, examples):
+        batch = {'inputs':[], 'label_ids':[]}
+        for i, t_list in enumerate(examples['tokens']):
+            tokens = [t['text'] for t in t_list]
+            label_ids = [self.hparams['label2id'][t['label']] for t in t_list]
+            inputs = self.tokenizer.encode_plus(
+                tokens,  
+                add_special_tokens=True,
+                padding='max_length',  
+                max_length=self.hparams.max_length,
+                truncation=True)
+            inputs = dict(zip(inputs.keys(), map(torch.tensor, inputs.values())))
+            if len(label_ids) < (self.hparams.max_length-2):
+                label_ids = [-100] + label_ids + [-100] + [-100]*(self.hparams.max_length-len(label_ids)-2)
+            else: label_ids = [-100] + label_ids + [-100]
+            batch['inputs'].append(inputs)
+            label_ids = torch.tensor(label_ids)
+            batch['label_ids'].append(label_ids)
+        return batch
 
 
 
     def setup(self, stage):
-        data = load_from_disk(self.hparams.data_dir + self.hparams.dataset)
-        set_labels = sorted(set([label for labels in data['train']['labels'] for label in labels]))
+        self.dataset = load_from_disk(self.hparams.data_dir + self.hparams.dataset)
+        set_labels = sorted(set([t['label'] for t_list in self.dataset['train']['tokens'] for t in t_list]))
         label2id = {label: i for i, label in enumerate(set_labels)}
         id2label = {i: label for label, i in label2id.items()}
         self.hparams.label2id = label2id
         self.hparams.id2label = id2label
-        data.set_transform(transform=self.transform)
-        self.train_dataset = data['train']
-        self.valid_dataset = data['validation']
-        if 'test' in data:
-            self.test_dataset = data['test']
-        self.tokenizer = BertTokenizer.from_pretrained(self.hparams.pretrained_dir +self.hparams.pretrained_model)
+        self.dataset.set_transform(transform=self.transform)
+        self.tokenizer = BertTokenizer.from_pretrained(self.hparams.pretrained_dir +self.hparams.plm)
         self.hparams.token2id = dict(self.tokenizer.vocab)
-        bert_config = BertConfig.from_pretrained(self.hparams.pretrained_dir + self.hparams.pretrained_model)
+        bert_config = BertConfig.from_pretrained(self.hparams.pretrained_dir + self.hparams.plm)
         self.hparams.bert_config = bert_config
         
 
 
     def train_dataloader(self):
-        return DataLoader(dataset=self.train_dataset, 
+        return DataLoader(dataset=self.dataset['train'], 
                           batch_size=self.hparams.batch_size, 
                           shuffle=True,
                           pin_memory=self.hparams.pin_memory,
@@ -88,7 +83,7 @@ class TokenClassificationDataModule(pl.LightningDataModule):
 
 
     def val_dataloader(self):
-        return DataLoader(dataset=self.valid_dataset,
+        return DataLoader(dataset=self.dataset['validation'],
                           batch_size=self.hparams.batch_size,
                           shuffle=False,
                           pin_memory=self.hparams.pin_memory,
@@ -97,7 +92,7 @@ class TokenClassificationDataModule(pl.LightningDataModule):
 
     def test_dataloader(self):
         if self.test_dataset is not None:
-            return DataLoader(dataset=self.test_dataset,
+            return DataLoader(dataset=self.dataset['test'],
                               batch_size=self.hparams.batch_size,
                               shuffle=False,
                               pin_memory=self.hparams.pin_memory,

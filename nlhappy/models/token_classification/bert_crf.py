@@ -66,9 +66,8 @@ class BertCRF(pl.LightningModule):
 
     
     def on_train_start(self) -> None:
-        state_dict = torch.load(self.hparams.pretrained_dir + self.hparams.pretrained_model + '/pytorch_model.bin')
+        state_dict = torch.load(self.hparams.pretrained_dir + self.hparams.plm + '/pytorch_model.bin')
         self.bert.load_state_dict(state_dict)
-        self.print(f'{self.hparams.pretrained_dir + self.hparams.pretrained_model} loaded')
         
 
     

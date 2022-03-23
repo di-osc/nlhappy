@@ -4,7 +4,6 @@ from typing import List, Type
 from spacy.tokens import Doc
 from .data import Triple
 from tqdm import tqdm
-import warnings
 
 dataset_features = Features(
     {

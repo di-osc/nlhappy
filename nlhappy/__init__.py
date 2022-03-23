@@ -18,6 +18,14 @@ def explain(key: str):
         return "CBLUE排行榜中中文医学命名实体识别数据集, 含有嵌套的情况."
     elif key == "LCQMC":
         return "中文问答匹配数据集, 238766训练集、8802验证集和12500测试集"
-
+    elif key == "CHIP-CTC":
+        return "临床试验筛选标准短文本分类, https://tianchi.aliyun.com/dataset/dataDetail?dataId=95414#1"
+    elif key == "CHIP-STS":
+        return "平安医疗科技疾病问答迁移学习, https://tianchi.aliyun.com/dataset/dataDetail?dataId=95414#1"
+    elif key == "TNEWS":
+        return "今日头条中文新闻（短文本）分类, 该数据集来自今日头条的新闻版块，共提取了15个类别的新闻，包括旅游，教育，金融，军事等"
+    elif key == "JDNER":
+        return "京东商城商品标题命名实体识别数据集. 标签全部为数字"
+    
     
     else: return "No such key"

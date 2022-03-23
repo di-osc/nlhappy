@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "nlhappy"
-version = "0.1.14"
+version = "0.1.5"
 description = "致力于SOTA的中文自然语言处理库"
 authors = ["wangmengdi <790990241@qq.com>"]
 
@@ -14,6 +14,7 @@ hydra-core = "^1.1.1"
 hydra-colorlog = "^1.1.0"
 oss2 = "^2.15.0"
 rich = "^12.0.0"
+catalogue = "^2.0.7"
 
 [tool.poetry.dev-dependencies]
 

@@ -2,9 +2,9 @@ _target_: nlhappy.datamodules.TokenClassificationDataModule
 
 dataset: 
 max_length: 
-batch_size: 
+batch_size: 1
 label_pad_id: -100
-pretrained_model: chinese-macbert-base
+plm: chinese-macbert-base
 pin_memory: True
 num_workers: 2
 data_dir: ${data_dir}
