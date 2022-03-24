@@ -76,6 +76,7 @@ class PGD():
                 param.grad = self.grad_backup[name]
 
 
+@adversical_tricks.register('FreeLB')
 class FreeLB():
     def __init__(self, model, args, optimizer, base_model='xlm-roberta'):
         self.args = args

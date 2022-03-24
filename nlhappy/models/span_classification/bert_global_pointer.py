@@ -176,6 +176,28 @@ class BertGlobalPointer(pl.LightningModule):
             spans.append([start-1, end, self.hparams.id2label[span[1]], span_text])
         return spans
 
+    def to_onnx(self, file_path: str):
+        text = '我是中国人'
+        torch_inputs = self.tokenizer(text, return_tensors='pt')
+        dynamic_axes = {
+                    'input_ids': {0: 'batch', 1: 'seq'},
+                    'attention_mask': {0: 'batch', 1: 'seq'},
+                    'token_type_ids': {0: 'batch', 1: 'seq'},
+                }
+        with torch.no_grad():
+            torch.onnx.export(
+                model=self,
+                args=tuple(torch_inputs.values()), 
+                f=file_path, 
+                input_names=list(torch_inputs.keys()),
+                dynamic_axes=dynamic_axes, 
+                opset_version=14,
+                output_names=['logits'],
+                export_params=True)
+        
+
+
+
 
 
         
