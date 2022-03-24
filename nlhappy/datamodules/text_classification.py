@@ -2,12 +2,8 @@ import pytorch_lightning as pl
 from typing import Optional,  Tuple, List, Dict
 from transformers import BertTokenizer, BertConfig
 from ..utils.storer import OSSStorer
-import pandas as pd
-from ..utils import utils
 from torch.utils.data import DataLoader
-import os
 from ..utils.preprocessing import fine_grade_tokenize
-import zipfile
 from datasets import load_from_disk
 import torch
 
@@ -121,11 +117,3 @@ class TextClassificationDataModule(pl.LightningDataModule):
 
 
 
-if __name__ == "__main__":
-    dm = TextClassificationDataModule(
-        dataset='CHIP-CTC',
-        plm='chinese-roberta-wwm-ext',
-        max_length=512,
-        is_multi_label=False,
-        batch_size=2,
-    )

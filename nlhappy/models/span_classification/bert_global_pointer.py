@@ -7,7 +7,7 @@ import os
 from ...metrics.span import SpanF1
 from ...utils.preprocessing import fine_grade_tokenize
 from ...layers import MultiLabelCategoricalCrossEntropy, EfficientGlobalPointer
-from ...tricks.adversarial_training import FGM
+from ...tricks.adversarial_training import adversical_tricks
 
 
 class BertGlobalPointer(pl.LightningModule):
@@ -17,8 +17,8 @@ class BertGlobalPointer(pl.LightningModule):
         lr: float,
         weight_decay: float,
         dropout: float ,
-        threshold: float = 0.5,
-        use_adv: bool = False,
+        threshold: float = 0.5 ,
+        adv: str =None,
         **data_params
     ) : 
         super().__init__()
@@ -44,8 +44,7 @@ class BertGlobalPointer(pl.LightningModule):
 
         self.tokenizer = self._init_tokenizer()
 
-        if use_adv:
-            self.fgm = FGM(self.bert)
+        
 
 
     def forward(self, input_ids, token_type_ids, attention_mask=None):
@@ -58,6 +57,7 @@ class BertGlobalPointer(pl.LightningModule):
     def on_train_start(self) -> None:
         state_dict = torch.load(self.hparams.pretrained_dir + self.hparams.plm + '/pytorch_model.bin')
         self.bert.load_state_dict(state_dict)
+        self.adv = adversical_tricks.get(self.hparams.adv)(self.bert)
 
 
     def shared_step(self, batch):
@@ -77,11 +77,24 @@ class BertGlobalPointer(pl.LightningModule):
         scheduler = self.lr_schedulers()
         loss, pred, true = self.shared_step(batch)
         self.manual_backward(loss)
-        if self.hparams.use_adv:
-            self.fgm.attack()
+        if self.hparams.adv == 'FGM':
+            self.adv.attack()
             loss_adv,  _,  _ = self.shared_step(batch)
             self.manual_backward(loss_adv)
-            self.fgm.restore()
+            self.adv.restore()
+            self.log_dict({'train_loss': loss, 'adv_loss': loss_adv}, prog_bar=True)
+        elif self.hparams.adv == "PGD":
+            self.adv.backup_grad()
+            K=3
+            for t in range(K):
+                self.adv.attack(is_first_attack=(t==0)) # 在embedding上添加对抗扰动, first attack时备份param.data
+                if t != K-1:
+                    self.zero_grad()
+                else:
+                    self.adv.restore_grad()
+                loss_adv, _, _ = self.shared_step(batch)
+                self.manual_backward(loss_adv) # 反向传播，并在正常的grad基础上，累加对抗训练的梯度
+            self.adv.restore()
             self.log_dict({'train_loss': loss, 'adv_loss': loss_adv}, prog_bar=True)
         optimizer.step()
         if self.trainer.is_last_batch:
@@ -148,7 +161,6 @@ class BertGlobalPointer(pl.LightningModule):
         tokens = fine_grade_tokenize(text, self.tokenizer)
         inputs = self.tokenizer.encode_plus(
             tokens,
-            is_pretokenized=True,
             add_special_tokens=True,
             max_length=self.hparams.max_length,
             truncation=True,

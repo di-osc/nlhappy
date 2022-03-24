@@ -74,11 +74,14 @@ class OSSStorer:
         file_path = localpath + file
         dataset_path = localpath + dataset
         if not os.path.exists(dataset_path):
-            self.data_bucket.get_object_to_file(key=file, filename=file_path)
-            with zipfile.ZipFile(file=file_path, mode='r') as zf:
-                zf.extractall(path=localpath)
-        if os.path.exists(file_path):
-            os.remove(path=file_path)
+            try:
+                self.data_bucket.get_object_to_file(key=file, filename=file_path)
+                with zipfile.ZipFile(file=file_path, mode='r') as zf:
+                    zf.extractall(path=localpath)
+            except Exception:
+                if os.path.exists(file_path):
+                    os.remove(path=file_path)
+                raise ValueError()
 
     def download_plm(
         self, 
@@ -94,11 +97,15 @@ class OSSStorer:
         file_path = localpath + file
         model_path = localpath + model
         if not os.path.exists(model_path):
-            self.model_bucket.get_object_to_file(key=file, filename=file_path)
-            with zipfile.ZipFile(file=file_path, mode='r') as zf:
-                zf.extractall(path=localpath)
-        if os.path.exists(file_path):
-            os.remove(path=file_path)
+            try:
+                self.model_bucket.get_object_to_file(key=file, filename=file_path)
+                with zipfile.ZipFile(file=file_path, mode='r') as zf:
+                    zf.extractall(path=localpath)
+            except Exception:
+                if os.path.exists(file_path):
+                    os.remove(path=file_path)
+                raise ValueError()
+                
 
 
     def download_asset(
@@ -115,11 +122,15 @@ class OSSStorer:
         file_path = localpath + file
         asset_path = localpath + asset
         if not os.path.exists(asset_path):
-            self.assets_bucket.get_object_to_file(key=file, filename=file_path)
-            with zipfile.ZipFile(file=file_path, mode='r') as zf:
-                zf.extractall(path=localpath)
-        if os.path.exists(file_path):
-            os.remove(path=file_path)
+            try:
+                self.assets_bucket.get_object_to_file(key=file, filename=file_path)
+                with zipfile.ZipFile(file=file_path, mode='r') as zf:
+                    zf.extractall(path=localpath)
+            except Exception:
+                if os.path.exists(file_path):
+                    os.remove(path=file_path)
+                raise ValueError(f"{asset} not found")
+                
         
 
     def upload_dataset(

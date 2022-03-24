@@ -1,10 +1,13 @@
 import torch
+import catalogue
+
+adversical_tricks = catalogue.create('nlhappy', 'adversarical_tricks')
 
 '''
 对抗训练实现和使用方法参考:
 - https://zhuanlan.zhihu.com/p/445354197
 '''
-
+@adversical_tricks.register('FGM')
 class FGM():
     def __init__(self, model):
         self.model = model
@@ -29,6 +32,7 @@ class FGM():
         self.backup = {}
 
 
+@adversical_tricks.register('PGD')
 class PGD():
     def __init__(self, model):
         self.model = model
@@ -63,12 +67,12 @@ class PGD():
 
     def backup_grad(self):
         for name, param in self.model.named_parameters():
-            if param.requires_grad:
+            if param.requires_grad and param.grad is not None:
                 self.grad_backup[name] = param.grad.clone()
 
     def restore_grad(self):
         for name, param in self.model.named_parameters():
-            if param.requires_grad:
+            if param.requires_grad and param.grad is not None:
                 param.grad = self.grad_backup[name]
 
 
