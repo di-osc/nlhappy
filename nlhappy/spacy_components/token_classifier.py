@@ -4,6 +4,7 @@ import shutil
 from thinc.api import Config
 import os
 import torch
+from spacy.tokens import Span
 
 models = {
     'bert_crf': BertCRF, 
@@ -28,9 +29,10 @@ class SentTokencat:
     def __call__(self, doc):
         all_spans = []
         for sent in doc.sents:
-            spans = self.model.predict(sent.text)
+            text = ''.join([t.text for t in sent])
+            spans = self.model.predict(text)
             for span in spans:
-                s = sent.char_span(span[0], span[1]+1, span[2])
+                s = Span(doc, span[0]+sent.start, span[1]+1+sent.start, span[2])
                 all_spans.append(s)
         doc.set_ents(all_spans)
         return doc
@@ -72,9 +74,10 @@ class Tokencat:
         
     def __call__(self, doc):
         all_spans = []
-        spans = self.model.predict(doc.text, self.device)
+        text = ''.join([t.text for t in doc])
+        spans = self.model.predict(text, self.device)
         for span in spans:
-            s = doc.char_span(span[0], span[1]+1, span[2])
+            s = Span(doc, span[0], span[1]+1, span[2])
             all_spans.append(s)
         doc.set_ents(all_spans)
         return doc

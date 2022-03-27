@@ -27,12 +27,12 @@ class OSSStorer:
         self.model_bucket = oss2.Bucket(self.auth, endpoint, model_bucket)
         self.assets_bucket = oss2.Bucket(self.auth, endpoint, asset_bucket)
 
-    def download(
-        self, 
-        filename : str, 
-        localfile : str
-        ):
-        self.data_bucket.get_object_to_file(key=filename, filename=localfile)
+    # def download(
+    #     self, 
+    #     filename : str, 
+    #     localfile : str
+    #     ):
+    #     self.data_bucket.get_object_to_file(key=filename, filename=localfile)
 
     def list_all_assets(self):
         """获取数据名称"""
@@ -78,10 +78,10 @@ class OSSStorer:
                 self.data_bucket.get_object_to_file(key=file, filename=file_path)
                 with zipfile.ZipFile(file=file_path, mode='r') as zf:
                     zf.extractall(path=localpath)
-            except Exception:
+            finally:
                 if os.path.exists(file_path):
                     os.remove(path=file_path)
-                raise ValueError()
+
 
     def download_plm(
         self, 
@@ -101,10 +101,9 @@ class OSSStorer:
                 self.model_bucket.get_object_to_file(key=file, filename=file_path)
                 with zipfile.ZipFile(file=file_path, mode='r') as zf:
                     zf.extractall(path=localpath)
-            except Exception:
+            finally:
                 if os.path.exists(file_path):
                     os.remove(path=file_path)
-                raise ValueError()
                 
 
 
@@ -126,10 +125,9 @@ class OSSStorer:
                 self.assets_bucket.get_object_to_file(key=file, filename=file_path)
                 with zipfile.ZipFile(file=file_path, mode='r') as zf:
                     zf.extractall(path=localpath)
-            except Exception:
+            finally:
                 if os.path.exists(file_path):
                     os.remove(path=file_path)
-                raise ValueError(f"{asset} not found")
                 
         
 

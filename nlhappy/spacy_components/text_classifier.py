@@ -6,7 +6,7 @@ from spacy.tokens import Doc
 
 models = {'bert_text_classification': BertTextClassification}
 
-Doc.set_extension('labels', default=set())
+Doc.set_extension('labels', default=[])
 
 class TextClassification:
     '''spacy 文本分类管道'''

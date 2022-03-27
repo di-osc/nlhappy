@@ -1,6 +1,6 @@
 import pytorch_lightning as pl
 from transformers import BertModel, BertTokenizer
-from transformers.optimization import get_cosine_schedule_with_warmup, get_constant_schedule
+from transformers.optimization import get_linear_schedule_with_warmup, get_cosine_schedule_with_warmup, get_constant_schedule_with_warmup
 import torch.nn as nn
 import torch
 import os
@@ -18,7 +18,7 @@ class BertGlobalPointer(pl.LightningModule):
         weight_decay: float,
         dropout: float ,
         threshold: float = 0.5 ,
-        adv: str =None,
+        adv: str ='',
         **data_params
     ) : 
         super().__init__()
@@ -57,7 +57,8 @@ class BertGlobalPointer(pl.LightningModule):
     def on_train_start(self) -> None:
         state_dict = torch.load(self.hparams.pretrained_dir + self.hparams.plm + '/pytorch_model.bin')
         self.bert.load_state_dict(state_dict)
-        self.adv = adversical_tricks.get(self.hparams.adv)(self.bert)
+        if self.hparams.adv != '':
+            self.adv = adversical_tricks.get(self.hparams.adv)(self.bert)
 
 
     def shared_step(self, batch):
@@ -139,7 +140,7 @@ class BertGlobalPointer(pl.LightningModule):
         # self.print("all_steps:", all_steps)
         # self.print('warm_steps:', warm_steps)
         # scheduler = get_constant_schedule(optimizer)
-        # scheduler = get_cosine_schedule_with_warmup(optimizer, num_warmup_steps=warm_steps, num_training_steps=all_steps)
+        # scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warm_steps, num_training_steps=all_steps)
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 1.0 / (epoch + 1.0))
         return [optimizer], [scheduler]
 

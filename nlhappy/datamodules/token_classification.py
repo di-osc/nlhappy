@@ -50,8 +50,9 @@ class TokenClassificationDataModule(pl.LightningDataModule):
                 truncation=True)
             inputs = dict(zip(inputs.keys(), map(torch.tensor, inputs.values())))
             if len(label_ids) < (self.hparams.max_length-2):
-                label_ids = [-100] + label_ids + [-100] + [-100]*(self.hparams.max_length-len(label_ids)-2)
-            else: label_ids = [-100] + label_ids + [-100]
+                O_id = self.hparams.label2id['O']
+                label_ids = [O_id] + label_ids + [O_id] + [-100]*(self.hparams.max_length-len(label_ids)-2)
+            else: label_ids = [O_id] + label_ids + [O_id]
             batch['inputs'].append(inputs)
             label_ids = torch.tensor(label_ids)
             batch['label_ids'].append(label_ids)
