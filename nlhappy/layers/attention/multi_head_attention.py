@@ -28,43 +28,60 @@ attentions = {
     }
 
 
-class MultiHeadAttention(nn.Module):
+class MultiHeadAttentionLayer(nn.Module):
     """
     多头注意力机制
+    参考: https://github.com/mmmwhy/pure_attention/blob/v0.0.22/pure_attention/backbone_bert/bert_layer.py
     """
     def __init__(
         self, 
-        n_head:int,
-        d_in:int,
-        attention_type: str = 'scaled_mul_self_attention'
+        hidden_size:int,
+        num_attention_heads: int,
+        attention_probs_dropout_prob: float,
+        return_attention_scores: bool
         ):
         """
-        - n_head: 头数
-        - d_in: 输入张量的特征维度
-        - p_drop: dropout概率
+        参数:
+        - hidden_size: 隐层维度
+        - num_attention_heads: 注意力头的数量
+        - attention_probs_dropout_prob: 注意力机制后dropout的概率
+        - return_attention_scores: 是否返回注意力得分
         """
         super().__init__()
-        assert d_in % n_head == 0, "d_in must be divisible by n_head"
-        self.d_in = d_in
-        self.n_head = n_head
-        self.attention = attentions[attention_type]
-        self.linears = nn.ModuleList([
-            nn.Linear(d_in, d_in) for _ in range(4)
-        ])
+        assert hidden_size % num_attention_heads == 0, "隐层维度不能被多头注意力头数整除"
+        self.hidden_size = hidden_size
+        self.num_attention_heads = num_attention_heads 
+        self.attention_head_size  = int(hidden_size / num_attention_heads)
+        self.return_attention_scores = return_attention_scores
+        self.query = nn.Linear(hidden_size, hidden_size)
+        self.key = nn.Linear(hidden_size, hidden_size)
+        self.value = nn.Linear(hidden_size, hidden_size)
+        self.dropout = nn.Dropout(attention_probs_dropout_prob)
 
-    def forward(self, q, k, v, mask=None, return_attention=False):
-        q_view, k_view, v_view = [model(x).view(q.size(0), -1, self.n_head, self.d_in//self.n_head).transpose(1,2) for model, x in zip(self.linears, (q, k, v))]
-        q_out, q_attn = self.attention(q_view, k_view, v_view, mask)
-        q_out = q_out.transpose(1,2).contiguous().view(q.size(0), -1, self.d_in)
-        q_attn = q_attn.transpose(1,2).contiguous().view(q.size(0), -1, self.d_in)
-        q_out = self.linears[-1](q_out)
-        if return_attention:
-            return q_out, q_attn
-        else:
-            return q_out
+    def forward(self, query, key, value, attention_mask=None, head_mask=None):
+        mixed_query_layer = self.query(query)
+        mixed_key_layer = self.key(key)
+        mixed_value_layer = self.value(value)
+        query_layer = self.transpose_for_scores(mixed_query_layer)
+        key_layer = self.transpose_for_scores(mixed_key_layer)
+        value_layer = self.transpose_for_scores(mixed_value_layer)
+        attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2)) / math.sqrt(self.attention_head_size)
+        if attention_mask is not None:
+            attention_scores += attention_mask
+        attention_probs = nn.Softmax(dim=-1)(attention_scores)
+        if head_mask is not None:
+            attention_probs += head_mask
+        context_layer = torch.matmul(attention_scores, value_layer)
+        # view操作需要内存连续, permute和transpose之后张量在内存中不再连续所以要加上contiguous
+        context_layer = context_layer.permute(0,2,1,3).contiguous()
+        new_context_layer_size = context_layer.size()[:-2] + (self.hidden_size)
+        context_layer = context_layer.view(*new_context_layer_size)
+        outputs = (context_layer, attention_scores) if self.return_attention_scores else (context_layer,)
+        return outputs
 
-if __name__ == "__main__":
-    input = torch.randn(2, 10, 20)
-    model = MultiHeadAttention(n_head=2, d_in=20)
-    outputs = model(input, input, input, return_attention=True)
-    print(outputs[1].shape)
+    def transpose_for_scores(self, x):
+        new_x_size = x.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
+        x = x.view(*new_x_size)
+        x = x.permute(0, 2, 1, 3)
+        return x         
+

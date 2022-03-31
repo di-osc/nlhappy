@@ -1,3 +1,4 @@
-from .multi_head_attention import MultiHeadAttention
+from .multi_head_attention import MultiHeadAttentionLayer
 
-__all__ = ['MultiHeadAttention']
+
+__all__ = ['MultiHeadAttentionLayer']

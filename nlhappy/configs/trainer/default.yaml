@@ -13,3 +13,7 @@ weights_summary: "full"
 
 # number of validation steps to execute at the beginning of the training
 num_sanity_val_steps: 0
+# SWA
+stochastic_weight_avg: False
+# 梯度积累
+accumulate_grad_batches: 1

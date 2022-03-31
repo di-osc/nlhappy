@@ -11,8 +11,8 @@ class LayerNorm(nn.Module):
            条件layernorm来自于苏剑林的想法，详情：https://spaces.ac.cn/archives/7124
         """
         super(LayerNorm, self).__init__()
-        self.gamma = nn.Parameter(torch.ones(hidden_size))
-        self.beta = nn.Parameter(torch.zeros(hidden_size))
+        self.weight = nn.Parameter(torch.ones(hidden_size))
+        self.bias = nn.Parameter(torch.zeros(hidden_size))
         self.eps = eps
         self.conditional = conditional
         if conditional:
@@ -32,10 +32,9 @@ class LayerNorm(nn.Module):
             u = inputs.mean(-1, keepdim=True)
             s = (inputs - u).pow(2).mean(-1, keepdim=True)
             x = (inputs - u) / torch.sqrt(s + self.eps)
-            return (self.beta + self.dense1(cond)) * x + (self.gamma + self.dense2(cond))
+            return (self.weight + self.dense1(cond)) * x + (self.bias + self.dense2(cond))
         else:
             u = x.mean(-1, keepdim=True)
             s = (x - u).pow(2).mean(-1, keepdim=True)
             x = (x - u) / torch.sqrt(s + self.eps)
-            return self.gamma * x + self.beta
-
+            return self.weight * x + self.bias

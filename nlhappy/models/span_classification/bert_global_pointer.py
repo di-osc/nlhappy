@@ -18,7 +18,7 @@ class BertGlobalPointer(pl.LightningModule):
         weight_decay: float,
         dropout: float ,
         threshold: float = 0.5 ,
-        adv: str ='',
+        adv: str =None,
         **data_params
     ) : 
         super().__init__()
@@ -41,11 +41,7 @@ class BertGlobalPointer(pl.LightningModule):
         self.train_metric = SpanF1()
         self.val_metric = SpanF1()
         self.test_metric = SpanF1()
-
         self.tokenizer = self._init_tokenizer()
-
-        
-
 
     def forward(self, input_ids, token_type_ids, attention_mask=None):
         x = self.bert(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask).last_hidden_state
@@ -133,14 +129,6 @@ class BertGlobalPointer(pl.LightningModule):
              'lr': self.hparams.lr * 5, 'weight_decay': 0.0}
         ]
         optimizer = torch.optim.AdamW(grouped_parameters)
-        # epoch_steps = len(self.trainer.datamodule.train_dataloader()) / self.trainer.gpus
-        # all_steps = epoch_steps * self.trainer.max_epochs
-        # warm_steps = int(epoch_steps)
-        # last_epoch = self.trainer.max_epochs
-        # self.print("all_steps:", all_steps)
-        # self.print('warm_steps:', warm_steps)
-        # scheduler = get_constant_schedule(optimizer)
-        # scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warm_steps, num_training_steps=all_steps)
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 1.0 / (epoch + 1.0))
         return [optimizer], [scheduler]
 

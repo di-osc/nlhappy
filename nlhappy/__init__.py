@@ -25,7 +25,7 @@ def explain(key: str):
     elif key == "TNEWS":
         return "今日头条中文新闻（短文本）分类, 该数据集来自今日头条的新闻版块，共提取了15个类别的新闻，包括旅游，教育，金融，军事等"
     elif key == "JDNER":
-        return "京东商城商品标题命名实体识别数据集. 标签全部为数字"
+        return "京东商城商品标题命名实体识别数据集. 标签全部为脱敏数字, 标签非常不均衡."
     
     
     else: return "No such key"
