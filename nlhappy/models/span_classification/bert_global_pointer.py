@@ -1,6 +1,5 @@
 import pytorch_lightning as pl
 from transformers import BertModel, BertTokenizer
-from transformers.optimization import get_linear_schedule_with_warmup, get_cosine_schedule_with_warmup, get_constant_schedule_with_warmup
 import torch.nn as nn
 import torch
 import os
@@ -16,8 +15,8 @@ class BertGlobalPointer(pl.LightningModule):
         hidden_size: int,
         lr: float,
         weight_decay: float,
-        dropout: float ,
-        threshold: float = 0.5 ,
+        dropout: float,
+        threshold: float = 0.5,
         adv: str =None,
         **data_params
     ) : 
