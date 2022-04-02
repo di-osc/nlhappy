@@ -8,4 +8,4 @@ from .word2vector import SkipGram
 
 
 
-activations = {'gelu':GELU, 'swish':SWISH,'gelu_approximate':GELU_Approximate}
+

@@ -1,12 +1,12 @@
-from typing import type_check_only
 from .attention import MultiHeadAttentionLayer
 from .normalization import LayerNorm as BertLayerNorm
 import torch.nn as nn
-from ..layers import activations
 import torch
 from .normalization import LayerNorm
 import os
 from typing import Optional,  Tuple
+from .activation import activations
+
 
 class BertEmbeddings(nn.Module):
     """bert的Embedding"""

@@ -25,3 +25,7 @@ class SWISH(torch.nn.Module):
     def forward(self, x):
         return x * torch.sigmoid(x)
 
+
+
+activations = {'gelu':GELU, 'swish':SWISH,'gelu_approximate':GELU_Approximate}
+
