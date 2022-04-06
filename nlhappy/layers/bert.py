@@ -107,7 +107,9 @@ class BertLayer(nn.Module):
         self.attention = BertAttention(
             hidden_size=hidden_size,
             num_attention_heads=num_attention_heads,
-            attention_probs_dropout_prob=hidden_dropout_prob
+            attention_probs_dropout_prob=hidden_dropout_prob,
+            hidden_dropout_prob=hidden_dropout_prob,
+            layer_norm_eps=layer_norm_eps
         )
         self.intermediate = BertIntermediate(hidden_size=hidden_size,intermediate_size=intermediate_size, hidden_act=hidden_act)
         self.output = BertAddNorm(intermediate_size, hidden_size, hidden_dropout_prob, layer_norm_eps)
@@ -197,19 +199,18 @@ class BertOutput:
 
 
 class Bert(nn.Module):
-    def __init__(
-        self,
+    def __init__(self,
         vocab_size,
         type_vocab_size,
         hidden_size,
         max_position_embeddings,
         hidden_dropout_prob,
-        layer_norm_eps,
         num_attention_heads,
         hidden_act,
         intermediate_size,
         output_attentions,
-        output_hidden_states
+        output_hidden_states,
+        layer_norm_eps:float = 3e-12
         ) -> None:
         super().__init__()
         self.embeddings =BertEmbeddings(
