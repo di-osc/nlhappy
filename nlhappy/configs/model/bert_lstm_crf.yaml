@@ -1,0 +1,6 @@
+_target_: nlhappy.models.token_classification.BertLstmCRF
+
+lr: 3e-5
+dropout: 0.2
+hidden_size: 256
+weight_decay: 0.0
