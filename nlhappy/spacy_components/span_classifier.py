@@ -23,10 +23,12 @@ class SpanClassification:
         self.device = torch.device(device)
         self.threshold = threshold
         self.model_name = model
-        self.model_class = models[model]
-        self.model = models[model].load_from_checkpoint(ckpt)
-        self.model.to(self.device)
-        self.model.freeze()
+        try:
+            self.model = models[self.model_name].load_from_checkpoint(self.ckpt)
+            self.model.to(self.device)
+            self.model.freeze()
+        except Exception:
+            pass
         
         
         
@@ -53,15 +55,19 @@ class SpanClassification:
         # 复制原来模型参数到新的路径
         shutil.copy(self.ckpt, path)
         # 重写NLP配置文件config.cfg 改变pipeline的ckpt路径
+        # nlp_path = str(path).split(self.pipe_name)[0]
+        # config_path = os.path.join(nlp_path, 'config.cfg')
+        # config = Config().from_disk(config_path)
+        # config['components'][self.pipe_name]['ckpt'] = str(path)
+        # config.to_disk(config_path)
+
+    def from_disk(self, path:str, exclude):
         nlp_path = str(path).split(self.pipe_name)[0]
         config_path = os.path.join(nlp_path, 'config.cfg')
         config = Config().from_disk(config_path)
-        config['components'][self.pipe_name]['ckpt'] = str(path)
-        config.to_disk(config_path)
-
-    def from_disk(self, path:str, exclude):
-        self.model = self.model_class.load_from_checkpoint(path)
-        self.model.to(self.device)
+        ckpt_name = config['components'][self.pipe_name]['ckpt'].split('/')[-1]
+        ckpt_path = os.path.join(path, ckpt_name)
+        self.model = models[self.model_name].load_from_checkpoint(ckpt_path)
 
 @Chinese.factory('span_classifier',assigns=['doc.spans'],default_config={'model':'bert_global_pointer', 'device':'cpu', 'sentence_level':False, 'threshold':0.5,'set_ents':False})
 def make_spancat(nlp, name:str, model:str, ckpt:str, device:str, sentence_level:bool, threshold:float, set_ents: bool):
