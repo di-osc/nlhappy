@@ -143,7 +143,7 @@ class BertGlobalPointer(pl.LightningModule):
         return tokenizer
 
 
-    def predict(self, text: str, device: str, threshold = None):
+    def predict(self, text: str, device: str='cpu', threshold = None):
         if threshold is None:
             threshold = self.hparams.threshold
         tokens = fine_grade_tokenize(text, self.tokenizer)

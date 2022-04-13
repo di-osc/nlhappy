@@ -1,11 +1,12 @@
 [tool.poetry]
 name = "nlhappy"
-version = "0.1.51"
+version = "2022."
 description = "致力于SOTA的中文自然语言处理库"
 authors = ["wangmengdi <790990241@qq.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.7"
+torch = "^1.11.0"
 pytorch-lightning = "^1.5.10"
 datasets = "^2.0.0"
 spacy = "^3.2.3"
@@ -22,7 +23,7 @@ wandb = "^0.12.11"
 [tool.poetry.dev-dependencies]
 
 [tool.poetry.plugins."spacy_factories"]
-"span_classifier" = "nlhappy.spacy_components:make_spancat"
+"span_classifier" = "nlhappy.components:make_spancat"
 
 [tool.poetry.scripts]
 nlhappy = "nlhappy.run:train"

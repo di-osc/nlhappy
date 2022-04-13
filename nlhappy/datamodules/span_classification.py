@@ -6,22 +6,21 @@ from datasets import load_from_disk
 from transformers import BertTokenizer, BertConfig
 from torch.utils.data import DataLoader
 from ..utils.preprocessing import fine_grade_tokenize
+import datasets
 
 
 class SpanClassificationDataModule(pl.LightningDataModule):
     """span分类的数据模块 数据集必须有text, spans两个字段
     """
-    def __init__(
-        self,
-        dataset: str,
-        plm: str,
-        max_length: int,
-        batch_size: int,
-        pin_memory: bool,
-        num_workers: int,
-        data_dir: str ='./datasets',
-        pretrained_dir: str = './plms',
-        ) :
+    def __init__(self,
+                dataset: str,
+                plm: str,
+                max_length: int,
+                batch_size: int,
+                pin_memory: bool,
+                num_workers: int,
+                data_dir: str ='./datasets/',
+                pretrained_dir: str = './plms/') :
         super().__init__()
         self.save_hyperparameters()
 
@@ -32,7 +31,7 @@ class SpanClassificationDataModule(pl.LightningDataModule):
         oss.download_dataset(self.hparams.dataset, self.hparams.data_dir)
         oss.download_plm(self.hparams.plm, self.hparams.pretrained_dir)
 
-    def set_transform(self, example):
+    def transform(self, example):
         batch_text = example['text']
         batch_spans = example['spans']
         max_length = self.hparams.max_length
@@ -62,13 +61,17 @@ class SpanClassificationDataModule(pl.LightningDataModule):
         return batch
 
     def setup(self, stage: str) -> None:
-        self.dataset = load_from_disk(self.hparams.data_dir + self.hparams.dataset)
+        if isinstance(self.hparams.dataset, datasets.DatasetDict):
+            self.dataset = self.hparams.dataset
+        elif isinstance(self.hparams.dataset, str):
+            self.dataset = load_from_disk(self.hparams.data_dir + self.hparams.dataset)
+        # self.dataset = load_from_disk(self.hparams.data_dir + self.hparams.dataset)
         set_labels = sorted(set([span['label'] for spans in self.dataset['train']['spans'] for span in spans]))
         label2id = {label: i for i, label in enumerate(set_labels)}
         id2label = {i: label for label, i in label2id.items()}
         self.hparams['label2id'] = label2id
         self.hparams['id2label'] = id2label
-        self.dataset.set_transform(transform=self.set_transform)
+        self.dataset.set_transform(transform=self.transform)
         self.tokenizer = BertTokenizer.from_pretrained(self.hparams.pretrained_dir + self.hparams.plm)
         self.hparams['token2id'] = dict(self.tokenizer.vocab)
         bert_config = BertConfig.from_pretrained(self.hparams.pretrained_dir + self.hparams.plm)
