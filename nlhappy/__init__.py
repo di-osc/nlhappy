@@ -1,3 +1,16 @@
+from .components.tokenizer import CharTokenizer
+import spacy
+
+
+
+def make_zh_nlp(tokenize_type: str = 'char'):
+    '''构建适合中文的自然语言处理基础流程,只包含tokenizer'''
+    nlp = spacy.blank('zh')
+    if tokenize_type == 'char':
+        nlp.tokenizer = CharTokenizer(vocab=nlp.vocab)
+    return nlp
+
+
 
 def explain(key: str):
 
@@ -26,6 +39,8 @@ def explain(key: str):
         return "今日头条中文新闻（短文本）分类, 该数据集来自今日头条的新闻版块，共提取了15个类别的新闻，包括旅游，教育，金融，军事等"
     elif key == "JDNER":
         return "京东商城商品标题命名实体识别数据集. 标签全部为脱敏数字, 标签非常不均衡."
+    elif key == "ChnSentiCorp":
+        return "经典的句子级情感分类数据集，包含酒店、笔记本电脑和数据相关的网络评论数据，共包含积极、消极两个类别。"
     
     
     else: return "No such key"

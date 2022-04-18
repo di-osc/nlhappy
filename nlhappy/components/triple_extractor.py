@@ -166,6 +166,7 @@ class TripleExtractor(object):
         ckpt_name = config['components'][self.pipe_name]['ckpt'].split('/')[-1]
         ckpt_path = os.path.join(path, ckpt_name)
         self.model = models[self.model_name].load_from_checkpoint(ckpt_path)
+        self.model.freeze()
 
 @Chinese.factory('triple_extractor',assigns=['doc._.triples'],default_config={'model':'bert_gplinker', 'device':'cpu', 'threshold':None})
 def make_triple_extractor(nlp, name:str, model:str, ckpt:str, device:str, threshold):

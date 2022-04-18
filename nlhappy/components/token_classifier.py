@@ -70,6 +70,7 @@ class Tokenclassifier:
         ckpt_name = config['components'][self.pipe_name]['ckpt'].split('/')[-1]
         ckpt_path = os.path.join(path, ckpt_name)
         self.model = models[self.model_name].load_from_checkpoint(ckpt_path)
+        self.model.freeze()
 
 @Chinese.factory('token_classifier',assigns=['doc.ents'],default_config={'model':'bert_crf', 'device':'cpu'})
 def make_tokencat(nlp, name, ckpt, model, device, sentence_level):

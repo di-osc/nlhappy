@@ -68,6 +68,7 @@ class SpanClassification:
         ckpt_name = config['components'][self.pipe_name]['ckpt'].split('/')[-1]
         ckpt_path = os.path.join(path, ckpt_name)
         self.model = models[self.model_name].load_from_checkpoint(ckpt_path)
+        self.model.freeze()
 
 @Chinese.factory('span_classifier',assigns=['doc.spans'],default_config={'model':'bert_global_pointer', 'device':'cpu', 'sentence_level':False, 'threshold':0.5,'set_ents':False})
 def make_spancat(nlp, name:str, model:str, ckpt:str, device:str, sentence_level:bool, threshold:float, set_ents: bool):

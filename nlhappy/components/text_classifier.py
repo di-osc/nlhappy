@@ -31,6 +31,7 @@ class TextClassification:
 
     def from_disk(self, path: str, exclude):
         self.model = self.model_class.load_from_checkpoint(path)
+        self.model.freeze()
 
 
 @Chinese.factory('text_classifier', default_config={'model_name':'bert_text_classification'})
