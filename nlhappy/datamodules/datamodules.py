@@ -18,8 +18,8 @@ class BertDataModule(pl.LightningDataModule):
         batch_size: int,
         pin_memory: bool,
         num_workers: int,
-        data_dir: str ='./datasets',
-        pretrained_dir: str = './plms',
+        data_dir: str ='./datasets/',
+        pretrained_dir: str = './plms/',
         ) :
         super().__init__()
         self.save_hyperparameters()
