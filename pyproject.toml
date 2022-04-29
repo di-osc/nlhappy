@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "nlhappy"
 version = "2022.04.13"
-description = "致力于SOTA的中文自然语言处理库"
+description = "复现收录一些常用的NLP模型"
 authors = ["wangmengdi <790990241@qq.com>"]
 
 [tool.poetry.dependencies]

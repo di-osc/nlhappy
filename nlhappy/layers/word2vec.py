@@ -9,10 +9,14 @@ class SkipGram(nn.Module):
     参考:
     - https://github.com/jasoncao11/nlp-notebook/blob/master/1-1.Word2Vec/model.py
     """
-    def __init__(
-        self,
-        vocab_size,
-        hidden_size) -> None:
+    def __init__(self,
+                vocab_size,
+                hidden_size) -> None:
+        '''
+        参数:
+        - vocab_size: 词表大小
+        - hidden_size: 词向量维度
+        '''
         super().__init__()
         self.in_embedding = nn.Embedding(vocab_size, hidden_size)
         self.out_embedding = nn.Embedding(vocab_size, hidden_size)

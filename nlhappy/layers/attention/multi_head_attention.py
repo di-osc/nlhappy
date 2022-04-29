@@ -29,39 +29,49 @@ attentions = {
 
 
 class MultiHeadAttentionLayer(nn.Module):
-    """
-    多头注意力机制
-    参考: https://github.com/mmmwhy/pure_attention/blob/v0.0.22/pure_attention/backbone_bert/bert_layer.py
-    """
-    def __init__(
-        self, 
-        hidden_size:int,
-        num_attention_heads: int,
-        attention_probs_dropout_prob: float,
-        return_attention_scores: bool
-        ):
-        """
+    def __init__(self, 
+                hidden_size:int,
+                num_attention_heads: int,
+                attention_probs_dropout_prob: float,
+                return_attention_scores: bool,
+                attention_scale: bool= True,
+                bias:bool =True,
+                **kwargs):
+
+        """多头注意力机制
         参数:
         - hidden_size: 隐层维度
         - num_attention_heads: 注意力头的数量
         - attention_probs_dropout_prob: 注意力机制后dropout的概率
         - return_attention_scores: 是否返回注意力得分
+        - attention_scale: 是否对注意力值缩放,默认True
+        - bias: 
+
+        参考: 
+        - https://github.com/mmmwhy/pure_attention/blob/v0.0.22/pure_attention/backbone_bert/bert_layer.py
+        - https://github.com/Tongjilibo/bert4torch/blob/a0db5a59a1ec2ec4820c4d055ceef463ce4e5d28/bert4torch/layers.py#L1
         """
         super().__init__()
         assert hidden_size % num_attention_heads == 0, "隐层维度不能被多头注意力头数整除"
         self.hidden_size = hidden_size
         self.num_attention_heads = num_attention_heads 
         self.attention_head_size  = int(hidden_size / num_attention_heads)
+        self.attention_scale = attention_scale
         self.return_attention_scores = return_attention_scores
-        self.query = nn.Linear(hidden_size, hidden_size)
-        self.key = nn.Linear(hidden_size, hidden_size)
-        self.value = nn.Linear(hidden_size, hidden_size)
+        self.q = nn.Linear(hidden_size, hidden_size)
+        self.k = nn.Linear(hidden_size, hidden_size)
+        self.v = nn.Linear(hidden_size, hidden_size)
         self.dropout = nn.Dropout(attention_probs_dropout_prob)
 
+        self.a_bias, self.p_bias = kwargs.get('a_bias'), kwargs.get('p_bias')
+
+        if self.p_bias == 'typical_relative':
+            pass
+
     def forward(self, query, key, value, attention_mask=None, head_mask=None):
-        mixed_query_layer = self.query(query)
-        mixed_key_layer = self.key(key)
-        mixed_value_layer = self.value(value)
+        mixed_query_layer = self.q(query)
+        mixed_key_layer = self.k(key)
+        mixed_value_layer = self.v(value)
         query_layer = self.transpose_for_scores(mixed_query_layer)
         key_layer = self.transpose_for_scores(mixed_key_layer)
         value_layer = self.transpose_for_scores(mixed_value_layer)
