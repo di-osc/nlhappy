@@ -1,6 +1,10 @@
 import re
 import torch
 from typing import List
+import six
+import numpy as np
+import unicodedata
+from torch.nn.utils.rnn import pad_sequence
 
 
 FH_SPACE = FHS = ((u"　", u" "),)
@@ -64,60 +68,6 @@ def convert_FH(text, *maps, **ops):
 
     return text
 
-def cut_sentences_v1(sent):
-    """
-    the first rank of sentence cut
-    """
-    sent = re.sub('([。？！\?])([^”’])', r"\1\n\2", sent)  # 单字符断句符
-    sent = re.sub('(\.{6})([^”’])', r"\1\n\2", sent)  # 英文省略号
-    sent = re.sub('(\…{2})([^”’])', r"\1\n\2", sent)  # 中文省略号
-    sent = re.sub('([。！？\?][”’])([^，。！？\?])', r"\1\n\2", sent)
-    # 如果双引号前有终止符，那么双引号才是句子的终点，把分句符\n放到双引号后
-    return sent.split("\n")
-
-def cut_sentences_v2(sent):
-    """
-    the second rank of spilt sentence, split '；' | ';'
-    """
-    sent = re.sub('([；;])([^”’])', r"\1\n\2", sent)
-    return sent.split("\n")
-
-def cut_sent(text, max_seq_len):
-    # 将句子分句，细粒度分句后再重新合并
-    sentences = []
-
-    # 细粒度划分
-    sentences_v1 = cut_sentences_v1(text)
-    for sent_v1 in sentences_v1:
-        if len(sent_v1) > max_seq_len - 2:
-            sentences_v2 = cut_sentences_v2(sent_v1)
-            sentences.extend(sentences_v2)
-        else:
-            sentences.append(sent_v1)
-    assert ''.join(sentences) == text
-
-    # 合并
-    merged_sentences = []
-    start_index_ = 0
-
-    while start_index_ < len(sentences):
-        tmp_text = sentences[start_index_]
-
-        end_index_ = start_index_ + 1
-
-        while end_index_ < len(sentences) and \
-                len(tmp_text) + len(sentences[end_index_]) <= max_seq_len - 2:
-            tmp_text += sentences[end_index_]
-            end_index_ += 1
-
-        start_index_ = end_index_
-
-        merged_sentences.append(tmp_text)
-
-    return merged_sentences
-
-
-
 def fine_grade_tokenize(raw_text:str, tokenizer, convert_fh:bool =False) -> List[str]:
     """
     - 全角转半角
@@ -138,12 +88,6 @@ def fine_grade_tokenize(raw_text:str, tokenizer, convert_fh:bool =False) -> List
                 tokens.append('[INV]')
             else:
                 tokens.append(_ch)
-
     return tokens
 
 
-if __name__ == '__main__':
-    from transformers import BertTokenizer
-    tokenizer = BertTokenizer.from_pretrained('bert-base-chinese')
-    text = '她写道：抗战胜利时我从重庆坐民联轮到南京，去中山陵瞻仰，也到秦淮河去过。然后就去北京了。'
-    print(fine_grade_tokenize(text, tokenizer))

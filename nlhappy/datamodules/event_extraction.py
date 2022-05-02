@@ -1,7 +1,8 @@
-from .datamodules import BertDataModule
+from .base import PLMDataModule
 
 
-class EventExtractionDataModule(BertDataModule):
+
+class EventExtractionDataModule(PLMDataModule):
     def __init__(self, 
                 dataset: str, 
                 plm: str, 
