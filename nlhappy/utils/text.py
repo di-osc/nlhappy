@@ -7,13 +7,6 @@ import unicodedata
 from torch.nn.utils.rnn import pad_sequence
 
 
-is_py2 = six.PY2
-
-if not is_py2:
-    basestring = str
-
-def is_string(s):
-    return isinstance(s, basestring)
 
 def truncate_sequences(maxlen, indices, *sequences):
     """截断总长度至不超过maxlen
@@ -33,8 +26,6 @@ def truncate_sequences(maxlen, indices, *sequences):
 def lowercase_and_normalize(text):
     """转小写，并进行简单的标准化
     """
-    if is_py2:
-        text = unicode(text)
     text = text.lower()
     text = unicodedata.normalize('NFD', text)
     text = ''.join([ch for ch in text if unicodedata.category(ch) != 'Mn'])

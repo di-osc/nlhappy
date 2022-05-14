@@ -65,162 +65,31 @@ def load_vocab(vocab_file):
     return vocab
 
 
-def whitespace_tokenize(text):
-    """去除文本中的空白符"""
-    text = text.strip()
-    if not text:
-        return []
-    tokens = text.split()
-    return tokens
-
-
-class Tokenizer(object):
-
-    def __init__(
-        self, 
-        vocab_file_or_path, 
-        do_lower_case=True, 
-        do_basic_tokenize=True,
-        unk_token="[UNK]",
-        sep_token="[SEP]",
-        pad_token="[PAD]",
-        cls_token="[CLS]",
-        mask_token="[MASK]"):
-        """
-        参数:
-            vocab_file_or_path:
-                词典文件
-            do_lower_case:
-                是否转换成小写
-            do_basic_tokenize:
-                分词前，是否进行基础的分词
-            unk_token:
-                未知词标记
-            sep_token:
-                句子切分标记，当只有一句话作为输入时，此标记知识作为结束符；当有两句话作为输入时，此标记作为分隔符、最后一句话的结束符
-            pad_token:
-                padding填充标记
-            cls_token:
-                分类标记，位于整个序列的第一个
-            mask_token:
-                mask标记
-          
-        """
-        vocab = vocab_file_or_path
-        if isinstance(vocab, dict):
-            self.vocab = vocab
-        else: 
-            if not os.path.isfile(vocab):
-                raise ValueError(
-                    "Can't find a vocabulary file at path '{}'.".format(vocab))
-            else:
-                self.vocab = load_vocab(vocab)
-        self.ids_to_tokens = collections.OrderedDict(
-            [(ids, tok) for tok, ids in self.vocab.items()])
-        self.do_basic_tokenize = do_basic_tokenize
-        if do_basic_tokenize:
-          self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case,
-                                                never_split=(unk_token, sep_token, pad_token, cls_token, mask_token))
-        self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab)
-        self.unk_token = unk_token
-        self.sep_token = sep_token
-        self.pad_token = pad_token
-        self.cls_token = cls_token
-        self.mask_token = mask_token
-
-    def tokenize(self, text):
-        split_tokens = []
-        if self.do_basic_tokenize:
-            for token in self.basic_tokenizer.tokenize(text):
-                for sub_token in self.wordpiece_tokenizer.tokenize(token):
-                    split_tokens.append(sub_token)
-        else:
-            split_tokens = self.wordpiece_tokenizer.tokenize(text)
-        if self.cls_token is not None:
-            split_tokens.insert(0, self.cls_token)
-        if self.sep_token is not None:
-            split_tokens.append(self.sep_token)
-        return split_tokens
-
-    def convert_tokens_to_ids(self, tokens):
-        """tokens转为vocab中的id"""
-        ids = []
-        for token in tokens:
-            ids.append(self.vocab[token])
-        return ids
-
-    def convert_ids_to_tokens(self, ids):
-        """ids转为词表中的token"""
-        tokens = []
-        for i in ids:
-            tokens.append(self.ids_to_tokens[i])
-        return tokens
-    
-    def encode(
-        self,
-        first_text,
-        second_text=None,
-        max_len=None,
-        truncate_from='right'
-    ):
-        """输出文本对应token id和segment id
-        """
-        if isinstance(first_text, str):
-            first_tokens = self.tokenize(first_text)
-        else:
-            first_tokens = first_text
-
-        if second_text is None:
-            second_tokens = None
-        elif isinstance(second_text, str):
-            second_tokens = self.tokenize(second_text)
-        else:
-            second_tokens = second_text
-
-        if max_len is not None:
-            if truncate_from == 'right':
-                index = -2
-            elif truncate_from == 'left':
-                index = 1
-            else:
-                index = truncate_from
-            if second_text is not None:
-                max_len += 1
-            truncate_sequences(max_len, index, first_tokens, second_tokens)
-
-        first_token_ids = self.convert_tokens_to_ids(first_tokens)
-        first_segment_ids = [0] * len(first_token_ids)
-
-        if second_text is not None:
-            idx = int(bool('[CLS]'))
-            second_tokens = second_tokens[idx:]
-            second_token_ids = self.convert_tokens_to_ids(second_tokens)
-            second_segment_ids = [1] * len(second_token_ids)
-            first_token_ids.extend(second_token_ids)
-            first_segment_ids.extend(second_segment_ids)
-
-        return first_token_ids, first_segment_ids
-
 
 
 class BasicTokenizer(object):
-    """Runs basic tokenization (punctuation splitting, lower casing, etc.)."""
+    """基础分词器
+    - 中文按照字切分
+    - 英文按照词切分
+    - 数字单个切分
+    - 标点切分
+    - 英文转小写,去掉重音符号
+    - """
 
     def __init__(self,
                  do_lower_case=True,
-                 never_split=("[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]")):
-        """Constructs a BasicTokenizer.
-        Args:
-          do_lower_case: Whether to lower case the input.
-        """
+                 return_offset=False,
+                 never_split=[]):
         self.do_lower_case = do_lower_case
         self.never_split = never_split
+        self.return_offset = return_offset
 
     def tokenize(self, text):
         """文本切分成token"""
-        text = self._clean_text(text)
+        origin = text
+        text = self._clean_text(origin)
         text = self._tokenize_chinese_chars(text)
-        orig_tokens = whitespace_tokenize(text)
+        orig_tokens = self._whitespace_tokenize(text)
         split_tokens = []
         for token in orig_tokens:
             if self.do_lower_case and token not in self.never_split:
@@ -228,7 +97,10 @@ class BasicTokenizer(object):
                 token = self._run_strip_accents(token)
             split_tokens.extend(self._run_split_on_punc(token))
 
-        output_tokens = whitespace_tokenize(" ".join(split_tokens))
+        output_tokens = self._whitespace_tokenize(" ".join(split_tokens))
+        if self.return_offset:
+            offsets = self.rematch(text=origin, tokens=output_tokens)
+            return output_tokens, offsets
         return output_tokens
 
     def _run_strip_accents(self, text):
@@ -252,7 +124,7 @@ class BasicTokenizer(object):
         output = []
         while i < len(chars):
             char = chars[i]
-            if _is_punctuation(char):
+            if self._is_punctuation(char):
                 output.append([char])
                 start_new_word = True
             else:
@@ -264,12 +136,12 @@ class BasicTokenizer(object):
 
         return ["".join(x) for x in output]
 
-    def _tokenize_chinese_chars(self, text):
+    def _tokenize_chinese_chars(self, text:str):
         """Adds whitespace around any CJK character."""
         output = []
         for char in text:
             cp = ord(char)
-            if self._is_chinese_char(cp):
+            if self._is_chinese_char(cp) or char.isdigit():
                 output.append(" ")
                 output.append(char)
                 output.append(" ")
@@ -304,117 +176,120 @@ class BasicTokenizer(object):
         output = []
         for char in text:
             cp = ord(char)
-            if cp == 0 or cp == 0xfffd or _is_control(char):
+            if cp == 0 or cp == 0xfffd or self._is_control(char):
                 continue
-            if _is_whitespace(char):
+            if self._is_whitespace(char):
                 output.append(" ")
             else:
                 output.append(char)
         return "".join(output)
 
+    def _whitespace_tokenize(self, text):
+        """去除文本中的空白符"""
+        text = text.strip()
+        if not text:
+            return []
+        tokens = text.split()
+        return tokens
 
-class WordpieceTokenizer(object):
-    """Runs WordPiece tokenization."""
 
-    def __init__(self, vocab, unk_token="[UNK]", max_input_chars_per_word=100):
-        self.vocab = vocab
-        self.unk_token = unk_token
-        self.max_input_chars_per_word = max_input_chars_per_word
 
-    def tokenize(self, text):
-        """Tokenizes a piece of text into its word pieces.
-        This uses a greedy longest-match-first algorithm to perform tokenization
-        using the given vocabulary.
-        For example:
-          input = "unaffable"
-          output = ["un", "##aff", "##able"]
-        Args:
-          text: A single token or whitespace separated tokens. This should have
-            already been passed through `BasicTokenizer`.
-        Returns:
-          A list of wordpiece tokens.
+    def _is_whitespace(self, char):
+        """Checks whether `chars` is a whitespace character."""
+        # \t, \n, and \r are technically contorl characters but we treat them
+        # as whitespace since they are generally considered as such.
+        if len(char) == 0:
+            return False
+        if char == " " or char == "\t" or char == "\n" or char == "\r":
+            return True
+        cat = unicodedata.category(char)
+        if cat == "Zs":
+            return True
+        return False
+
+
+    def _is_control(self, char):
+        """Checks whether `chars` is a control character."""
+        # These are technically control characters but we count them as whitespace
+        # characters.
+        if len(char) ==0:
+            return False
+        if char == "\t" or char == "\n" or char == "\r":
+            return False
+        cat = unicodedata.category(char)
+        if cat.startswith("C"):
+            return True
+        return False
+
+
+    def _is_punctuation(self, char):
+        """Checks whether `chars` is a punctuation character."""
+        cp = ord(char)
+        # We treat all non-letter/number ASCII as punctuation.
+        # Characters such as "^", "$", and "`" are not in the Unicode
+        # Punctuation class but we treat them as punctuation anyways, for
+        # consistency.
+        if ((cp >= 33 and cp <= 47) or (cp >= 58 and cp <= 64) or
+                (cp >= 91 and cp <= 96) or (cp >= 123 and cp <= 126)):
+            return True
+        cat = unicodedata.category(char)
+        if cat.startswith("P"):
+            return True
+        return False
+
+    def _convert_to_unicode(self, text):
+        """Converts `text` to Unicode (if it's not already), assuming utf-8 input."""
+        if isinstance(text, str):
+            return text
+        elif isinstance(text, bytes):
+            return text.decode("utf-8", "ignore")
+        else:
+            raise ValueError("Unsupported string type: %s" % (type(text)))
+
+    def _lowercase_and_normalize(self, text):
+        """转小写，并进行简单的标准化
+        """
+        text = text.lower()
+        text = unicodedata.normalize('NFD', text)
+        text = ''.join([ch for ch in text if unicodedata.category(ch) != 'Mn'])
+        return text
+
+    def _is_special(self, ch):
+        """判断是不是有特殊含义的符号
+        """
+        return bool(ch) and (ch[0] == '[') and (ch[-1] == ']')
+
+    def rematch(self, text, tokens):
+        """给出原始的text和tokenize后的tokens的映射关系
         """
 
-        output_tokens = []
-        for token in whitespace_tokenize(text):
-            chars = list(token)
-            if len(chars) > self.max_input_chars_per_word:
-                output_tokens.append(self.unk_token)
-                continue
+        if self.do_lower_case:
+            text = text.lower()
 
-            is_bad = False
-            start = 0
-            sub_tokens = []
-            while start < len(chars):
-                end = len(chars)
-                cur_substr = None
-                while start < end:
-                    substr = "".join(chars[start:end])
-                    if start > 0:
-                        substr = "##" + substr
-                    if substr in self.vocab:
-                        cur_substr = substr
-                        break
-                    end -= 1
-                if cur_substr is None:
-                    is_bad = True
-                    break
-                sub_tokens.append(cur_substr)
-                start = end
+        normalized_text, char_mapping = '', []
+        for i, ch in enumerate(text):
+            if self.do_lower_case:
+                ch = self._lowercase_and_normalize(ch)
+            ch = ''.join([
+                c for c in ch
+                if not (ord(c) == 0 or ord(c) == 0xfffd or self._is_control(c))
+            ])
+            normalized_text += ch
+            char_mapping.extend([i] * len(ch))
 
-            if is_bad:
-                output_tokens.append(self.unk_token)
-            else:
-                output_tokens.extend(sub_tokens)
-        return output_tokens
+        text, token_mapping, offset = normalized_text, [], 0
+        for token in tokens:
+            # if self._is_special(token):
+            #     token_mapping.append([])
+            # else:
+            if self.do_lower_case:
+                token = token.lower()
+            start = text[offset:].index(token) + offset
+            end = start + len(token)
+            # token_mapping.append(char_mapping[start:end])
+            token_mapping.append((start, end))
+            offset = end
 
-
-def _is_whitespace(char):
-    """Checks whether `chars` is a whitespace character."""
-    # \t, \n, and \r are technically contorl characters but we treat them
-    # as whitespace since they are generally considered as such.
-    if char == " " or char == "\t" or char == "\n" or char == "\r":
-        return True
-    cat = unicodedata.category(char)
-    if cat == "Zs":
-        return True
-    return False
-
-
-def _is_control(char):
-    """Checks whether `chars` is a control character."""
-    # These are technically control characters but we count them as whitespace
-    # characters.
-    if char == "\t" or char == "\n" or char == "\r":
-        return False
-    cat = unicodedata.category(char)
-    if cat.startswith("C"):
-        return True
-    return False
-
-
-def _is_punctuation(char):
-    """Checks whether `chars` is a punctuation character."""
-    cp = ord(char)
-    # We treat all non-letter/number ASCII as punctuation.
-    # Characters such as "^", "$", and "`" are not in the Unicode
-    # Punctuation class but we treat them as punctuation anyways, for
-    # consistency.
-    if ((cp >= 33 and cp <= 47) or (cp >= 58 and cp <= 64) or
-            (cp >= 91 and cp <= 96) or (cp >= 123 and cp <= 126)):
-        return True
-    cat = unicodedata.category(char)
-    if cat.startswith("P"):
-        return True
-    return False
-
-def convert_to_unicode(text):
-    """Converts `text` to Unicode (if it's not already), assuming utf-8 input."""
-    if isinstance(text, str):
-        return text
-    elif isinstance(text, bytes):
-        return text.decode("utf-8", "ignore")
-    else:
-        raise ValueError("Unsupported string type: %s" % (type(text)))
+        return token_mapping
 
 
