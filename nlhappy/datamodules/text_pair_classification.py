@@ -1,4 +1,3 @@
-from pyrsistent import b
 import pytorch_lightning as pl
 from typing import Optional,  Tuple, List
 from transformers import BertConfig, BertTokenizer
@@ -7,7 +6,6 @@ from ..utils import utils
 from torch.utils.data import DataLoader
 import torch
 import os
-import zipfile
 from datasets import load_from_disk
 
 class TextPairClassificationDataModule(pl.LightningDataModule):

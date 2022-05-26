@@ -149,3 +149,8 @@ wandb/
 .autoenv
 
 .gitignore
+
+# test
+test.ipynb 
+datasets/
+plms/

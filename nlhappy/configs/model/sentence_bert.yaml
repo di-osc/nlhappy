@@ -1,0 +1,5 @@
+_target_: nlhappy.models.text_pair_regression.SentenceBERT
+
+lr: 3e-5
+dropout: 0.2
+weight_decay: 0.0

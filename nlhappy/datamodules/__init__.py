@@ -1,5 +1,6 @@
 from .text_classification import TextClassificationDataModule
 from .text_pair_classification import TextPairClassificationDataModule
+from .text_pair_regression import TextPairRegressionDataModule
 from .token_classification import TokenClassificationDataModule
 from .span_classification import SpanClassificationDataModule
 from .triple_extraction import TripleExtractionDataModule

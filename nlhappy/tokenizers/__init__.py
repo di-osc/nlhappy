@@ -1,7 +1,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import collections
-import os
 import unicodedata
 from io import open
 import numpy as np
