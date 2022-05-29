@@ -1,7 +1,5 @@
-import re
 import torch
 from typing import List
-import six
 import numpy as np
 import unicodedata
 from torch.nn.utils.rnn import pad_sequence

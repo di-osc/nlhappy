@@ -9,6 +9,8 @@ from ...layers import MultiLabelCategoricalCrossEntropy, EfficientGlobalPointer
 from ...tricks.adversarial_training import adversical_tricks
 
 
+
+
 class BertGlobalPointer(pl.LightningModule):
     def __init__(
         self,
@@ -52,7 +54,7 @@ class BertGlobalPointer(pl.LightningModule):
     def on_train_start(self) -> None:
         state_dict = torch.load(self.hparams.pretrained_dir + self.hparams.plm + '/pytorch_model.bin')
         self.bert.load_state_dict(state_dict)
-        if self.hparams.adv != '':
+        if self.hparams.adv :
             self.adv = adversical_tricks.get(self.hparams.adv)(self.bert)
 
 
@@ -182,14 +184,10 @@ class BertGlobalPointer(pl.LightningModule):
                 opset_version=14,
                 output_names=['logits'],
                 export_params=True)
+        print('export to onnx successfully')
+            
         
-
-
-
-
-
         
-
     
 
 

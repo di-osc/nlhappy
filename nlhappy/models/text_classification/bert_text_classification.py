@@ -30,7 +30,7 @@ class BertTextClassification(LightningModule):
         self.tokenizer = self._init_tokenizer()
         
         #模型架构
-        self.encoder = BertModel(self.hparams['bert_config'])
+        self.encoder = BertModel(self.hparams['trf_config'])
         self.dropout = torch.nn.Dropout(dropout)
         self.classifier = SimpleDense(self.encoder.config.hidden_size, hidden_size, len(self.label2id))
         
@@ -43,19 +43,20 @@ class BertTextClassification(LightningModule):
 
 
     def forward(self, input_ids, token_type_ids, attention_mask):
-        x = self.encoder(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask).last_hidden_state
+        x = self.encoder(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask).pooler_output
         x = self.dropout(x)
-        x = x.mean(dim=1)
         logits = self.classifier(x)  # (batch_size, output_size)
         return logits
 
     def on_train_start(self) -> None:
-        state_dict = torch.load(self.hparams.pretrained_dir + self.hparams.plm + '/pytorch_model.bin')
+        plm_path = os.path.join(self.hparams.plm_dir ,self.hparams.plm, 'pytorch_model.bin')
+        state_dict = torch.load(plm_path)
         self.encoder.load_state_dict(state_dict)
         
     def shared_step(self, batch):
-        input_ids, token_type_ids, attention_mask, label_ids = batch['input_ids'], batch['token_type_ids'], batch['attention_mask'], batch['label_ids']
-        logits = self(input_ids, token_type_ids, attention_mask)
+        inputs = batch['inputs']
+        label_ids = batch['label_ids']
+        logits = self(**inputs)
         loss = self.criterion(logits, label_ids)
         pred_ids = torch.argmax(logits, dim=-1)
         return loss, pred_ids, label_ids
@@ -103,9 +104,9 @@ class BertTextClassification(LightningModule):
 
     def _init_tokenizer(self):
         with open('./vocab.txt', 'w') as f:
-            for k in self.hparams.token2id.keys():
+            for k in self.hparams.vocab.keys():
                 f.writelines(k + '\n')
-        self.hparams.bert_config.to_json_file('./config.json')
+        self.hparams.trf_config.to_json_file('./config.json')
         tokenizer = BertTokenizer.from_pretrained('./')
         os.remove('./vocab.txt')
         os.remove('./config.json')

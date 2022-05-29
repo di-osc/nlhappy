@@ -1,25 +1,16 @@
 import pytorch_lightning as pl
-from typing import Optional,  Tuple, List
-from transformers import BertConfig, BertTokenizer
+from typing import Optional,  Tuple, List, Union
+from transformers import AutoConfig, AutoTokenizer
 from ..utils.storer import OSSStorer
-from ..utils import utils
 from torch.utils.data import DataLoader
 import torch
 import os
-from datasets import load_from_disk
+from datasets import load_from_disk, Dataset, DatasetDict 
+
+example = """{'text_a': '左膝退变伴游离体','text_b': '单侧膝关节骨性关节病','label': 0}"""
 
 class TextPairClassificationDataModule(pl.LightningDataModule):
     '''句子对数据模块,用来构建pytorch_lightning的数据模块
-    参数:
-    - dataset: 数据集名称, 文件为datasets.DataSet  feature 必须包含 text_a, text_b, label
-    - plm: 预训练模型名称
-    - max_length: 单个句子的最大长度
-    - return_pair: 是否以文本对为输入
-    - batch_size: 批大小
-    - num_workers: 加载数据时的线程数
-    - pin_memory: 是否将数据加载到GPU
-    - data_dir: 数据集所在的目录
-    - pretrained_dir: 预训练模型所在的目录
     '''
     def __init__(
             self,
@@ -27,36 +18,48 @@ class TextPairClassificationDataModule(pl.LightningDataModule):
             plm: str,
             max_length: int,
             batch_size: int,
-            return_pair: bool,
-            num_workers: int = 2,
-            pin_memory: bool =True,
-            data_dir = 'datasets/',
-            pretrained_dir = 'plms/'
-    ):  
+            return_pair: bool=False,
+            num_workers: int = 0,
+            pin_memory: bool =False,
+            dataset_dir = './datasets/',
+            plm_dir = './plms/'): 
+        """参数:
+        - dataset: 数据集名称,feature 必须包含 text_a, text_b, label
+        - plm: 预训练模型名称
+        - max_length: 单个句子的最大长度
+        - batch_size: 批大小
+        - return_pair: 是否以文本对为输入
+        - num_workers: 加载数据时的线程数
+        - pin_memory: 是否将数据加载到GPU
+        - dataset_dir: 数据集所在的目录
+        - plm_dir: 预训练模型所在的目录
+        """ 
         super().__init__()
 
         # 这一行代码为了保存传入的参数可以当做self.hparams的属性
         self.save_hyperparameters(logger=False)
-
         
-        
+        self.dataset = load_from_disk(os.path.join(self.hparams.dataset_dir , self.hparams.dataset))
+        self.tokenizer = AutoTokenizer.from_pretrained(self.hparams.plm_dir + self.hparams.plm)
+        set_labels = sorted(set([label for label in self.dataset['train']['label']]))
+        self.hparams['label2id'] = {label: i for i, label in enumerate(set_labels)}
+        self.hparams['vocab'] = dict(self.tokenizer.vocab)
+        self.hparams['trf_config'] = AutoConfig.from_pretrained(self.hparams.plm_dir + self.hparams.plm)
 
     def prepare_data(self):
         '''
         下载数据集.这个方法只会在一个GPU上执行一次.
         '''
         oss = OSSStorer()
-        oss.download_dataset(self.hparams.dataset, self.hparams.data_dir)
-        oss.download_plm(self.hparams.plm, self.hparams.pretrained_dir)
+        dataset_path = os.path.join(self.hparams.dataset_dir, self.hparams.dataset)
+        plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
+        if not os.path.exists(dataset_path):
+            oss.download_dataset(self.hparams.dataset, self.hparams.dataset_dir)
+        elif not os.path.exists(plm_path): 
+            oss.download_plm(self.hparams.plm, self.hparams.plm_dir)
         
     
     def setup(self, stage: str):
-        self.dataset = load_from_disk(self.hparams.data_dir + self.hparams.dataset)
-        set_labels = sorted(set([label for label in self.dataset['train']['label']]))
-        self.hparams['label2id'] = {label: i for i, label in enumerate(set_labels)}
-        self.tokenizer = BertTokenizer.from_pretrained(self.hparams.pretrained_dir + self.hparams.plm)
-        self.hparams['token2id'] = dict(self.tokenizer.vocab)
-        self.hparams['bert_config'] = BertConfig.from_pretrained(self.hparams.pretrained_dir + self.hparams.plm)
         self.dataset.set_transform(transform=self.transform)
 
     def transform(self, examples):
@@ -124,6 +127,10 @@ class TextPairClassificationDataModule(pl.LightningDataModule):
                           num_workers=self.hparams.num_workers, 
                           pin_memory=self.hparams.pin_memory,
                           shuffle=False)
+        
+    @property
+    def example(self):
+        return example
 
 
         

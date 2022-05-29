@@ -1,0 +1,4 @@
+_target_: nlhappy.models.text_pair_regression.CoSentBERT
+
+lr: 2e-5
+weight_decay: 0.00

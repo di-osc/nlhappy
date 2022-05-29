@@ -1,3 +1,4 @@
+from turtle import forward
 import torch
 from torch import Tensor
 
@@ -64,3 +65,33 @@ class SparseMultiLabelCrossEntropy(torch.nn.Module):
         aux_loss = torch.clamp(1 - torch.exp(aux_loss), min=epsilon, max=1)
         neg_loss = all_loss + torch.log(aux_loss)
         return pos_loss + neg_loss
+    
+    
+class CoSentLoss(torch.nn.Module):
+    '''CoSentLoss的实现
+    参考:
+    - https://kexue.fm/archives/8847'''
+    def __init__(self) -> None:
+        super().__init__()
+    
+    def forward(self, preds, targs, device):
+        '''
+        参数:
+        - preds: 余弦相似度 [0.1, 0.2, 0.3,...]
+        - targs: 标签 [0,1,1,0, ...]
+        - device: 运行的设备
+        返回:
+        - loss: 余弦相似度与标签的交叉熵
+        '''
+        # 20为公式里面的lambda 这里取20
+        preds = preds * 20
+        # 利用广播机制, 所有位置, 两两差值
+        preds = preds[:, None] - preds[None, :]
+        # 
+        targs = targs[:, None] < targs[None, :]
+        targs = targs.float()
+        # 这里之所以要这么减，是因为公式中所有的正样本对的余弦值减去负样本对的余弦值才计算损失，把不是这些部分通过exp(-inf)忽略掉
+        preds = preds - (1 - targs) * 1e12
+        preds = preds.view(-1)
+        preds = torch.cat((torch.tensor([0], dtype=torch.float, device=device), preds), dim=0)
+        return torch.logsumexp(preds, dim=0)

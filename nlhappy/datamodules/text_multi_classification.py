@@ -4,6 +4,7 @@ from typing import Any
 from ..utils.storer import OSSStorer
 from torch.utils.data import DataLoader
 from datasets import load_from_disk
+import os
 
 class TextMultiClassification(pl.LightningModule):
     """多标签多分类的数据模块, 每个标签下有多重选择的情况"""
@@ -12,10 +13,22 @@ class TextMultiClassification(pl.LightningModule):
                 plm: str,
                 max_length: int,
                 batch_size: int,
-                pin_memory: bool,
-                num_workers: int,
+                pin_memory: bool=False,
+                num_workers: int=0,
                 data_dir: str ='./datasets',
-                pretrained_dir: str = './plms'):
+                plm_dir: str = './plms'):
+        """多标签多分类数据模块, 每个标签下游多重选择
+
+        Args:
+            dataset (str): 数据集名称
+            plm (str): 预训练模型名称
+            max_length (int): 单文本最大长度
+            batch_size (int): 批次大小
+            pin_memory (bool, optional): _description_. Defaults to False.
+            num_workers (int, optional): _description_. Defaults to 0.
+            data_dir (str, optional): _description_. Defaults to './datasets'.
+            plm_dir (str, optional): _description_. Defaults to './plms'.
+        """
         super().__init__()
         self.save_hyperparameters()
 
@@ -24,7 +37,7 @@ class TextMultiClassification(pl.LightningModule):
         '下载数据集和预训练模型'
         oss = OSSStorer()
         oss.download_dataset(self.hparams.dataset, self.hparams.data_dir)
-        oss.download_plm(self.hparams.plm, self.hparams.pretrained_dir)
+        oss.download_plm(self.hparams.plm, self.hparams.plm_dir)
 
     def transform(self, batch):
         raise NotImplementedError

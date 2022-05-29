@@ -17,8 +17,8 @@ class SpanClassificationDataModule(pl.LightningDataModule):
                 plm: str,
                 max_length: int,
                 batch_size: int,
-                pin_memory: bool,
-                num_workers: int,
+                pin_memory: bool=True,
+                num_workers: int=1,
                 data_dir: str ='./datasets/',
                 pretrained_dir: str = './plms/') :
         super().__init__()
@@ -42,7 +42,6 @@ class SpanClassificationDataModule(pl.LightningDataModule):
                 tokens, 
                 padding='max_length',  
                 max_length=max_length,
-                add_special_tokens=True,
                 truncation=True)
             spans = batch_spans[i]
             span_ids = torch.zeros(len(self.hparams.label2id), max_length, max_length)

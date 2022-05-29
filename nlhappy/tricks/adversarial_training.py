@@ -1,13 +1,6 @@
 import torch
-import catalogue
 
-adversical_tricks = catalogue.create('nlhappy', 'adversarical_tricks')
 
-'''
-对抗训练实现和使用方法参考:
-- https://zhuanlan.zhihu.com/p/445354197
-'''
-@adversical_tricks.register('FGM')
 class FGM():
     def __init__(self, model):
         self.model = model
@@ -32,7 +25,6 @@ class FGM():
         self.backup = {}
 
 
-@adversical_tricks.register('PGD')
 class PGD():
     def __init__(self, model):
         self.model = model
@@ -76,7 +68,7 @@ class PGD():
                 param.grad = self.grad_backup[name]
 
 
-@adversical_tricks.register('FreeLB')
+
 class FreeLB():
     def __init__(self, model, args, optimizer, base_model='xlm-roberta'):
         self.args = args
@@ -141,3 +133,6 @@ class FreeLB():
 
             embeds_init = getattr(model, self.base_model).embeddings.word_embeddings(input_ids.to(args.device))
         return loss
+    
+    
+adversical_tricks = {'fgm': FGM, 'pgd': PGD, 'free_lb': FreeLB}

@@ -1,6 +1,4 @@
-import torch
 from typing import List, Tuple
-from spacy.tokens import Doc, Span
 
 class Triple(tuple):
     """存放三元组的五元形式(sub_start, sub_end, predicate, obj_start, obj_end), 这样改写方便求交集"""

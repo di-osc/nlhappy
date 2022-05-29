@@ -1,9 +1,4 @@
 from typing import List
-from datasets.features import Features
-from datasets import DatasetDict, Sequence, Value, Dataset, concatenate_datasets 
-from typing import List, Type
-from spacy.tokens import Doc
-from tqdm import tqdm
 
 def end_of_chunk(prev_tag, tag, prev_type, type_):
     """Checks if a chunk ended between the previous and current word.

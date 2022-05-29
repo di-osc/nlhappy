@@ -1,14 +1,14 @@
-from .components.tokenizer import CharTokenizer
-import spacy
+# from .components.tokenizer import CharTokenizer
+# import spacy
 
 
 
-def make_zh_nlp(tokenize_type: str = 'char'):
-    '''构建适合中文的自然语言处理基础流程,只包含tokenizer'''
-    nlp = spacy.blank('zh')
-    if tokenize_type == 'char':
-        nlp.tokenizer = CharTokenizer(vocab=nlp.vocab)
-    return nlp
+# def make_zh_nlp(tokenize_type: str = 'char'):
+#     '''构建适合中文的自然语言处理基础流程,只包含tokenizer'''
+#     nlp = spacy.blank('zh')
+#     if tokenize_type == 'char':
+#         nlp.tokenizer = CharTokenizer(vocab=nlp.vocab)
+#     return nlp
 
 
 

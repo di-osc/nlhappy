@@ -24,7 +24,7 @@ class BERTCrossEncoder(LightningModule):
         super(BERTCrossEncoder, self).__init__()  
         
         self.save_hyperparameters(logger=False)
-        self.bert = BertModel(self.hparams['bert_config'])
+        self.bert = BertModel(self.hparams['trf_config'])
         self.pooler = torch.nn.Linear(self.bert.config.hidden_size, hidden_size)
         self.classifier = torch.nn.Linear(hidden_size, len(self.hparams.label2id))
         self.criterion = torch.nn.CrossEntropyLoss()
@@ -34,9 +34,12 @@ class BERTCrossEncoder(LightningModule):
         self.tokenizer = self._init_tokenizer()
         
 
-    def forward(self, inputs):
-        x = self.bert(**inputs).last_hidden_state
-        x = x.mean(dim=1)
+    def forward(self, input_ids, token_type_ids, attention_mask):
+        x = self.bert(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask)
+        x = x.last_hidden_state
+        x = x * attention_mask.unsqueeze(-1).float()
+        x = torch.sum(x, dim=1)
+        x = x / torch.sum(attention_mask, dim=1).unsqueeze(-1)
         x = self.pooler(x)
         x = F.relu(x)
         logits = self.classifier(x)
@@ -46,7 +49,7 @@ class BERTCrossEncoder(LightningModule):
     def shared_step(self, batch):
         inputs = batch['inputs']
         labels = batch['label_ids']
-        logits = self(inputs)
+        logits = self(**inputs)
         loss = self.criterion(logits, labels)
         preds = torch.argmax(logits, dim=-1)
         return loss, preds, labels
@@ -78,9 +81,9 @@ class BERTCrossEncoder(LightningModule):
 
     def _init_tokenizer(self):
         with open('./vocab.txt', 'w') as f:
-            for k in self.hparams.token2id.keys():
+            for k in self.hparams.vocab.keys():
                 f.writelines(k + '\n')
-        self.hparams.bert_config.to_json_file('./config.json')
+        self.hparams.trf_config.to_json_file('./config.json')
         tokenizer = BertTokenizer.from_pretrained('./')
         os.remove('./vocab.txt')
         os.remove('./config.json')

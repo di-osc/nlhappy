@@ -2,7 +2,7 @@ _target_: nlhappy.datamodules.TextPairRegressionDataModule
 dataset_dir: ${data_dir} 
 plm_dir: ${pretrained_dir}
 
-dataset: ICDSIM
+dataset: 
 plm: chinese-roberta-wwm-ext
 max_length: 50
 batch_size: 32

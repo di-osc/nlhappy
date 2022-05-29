@@ -25,10 +25,10 @@ defaults:
 work_dir: ${hydra:runtime.cwd}
 
 # path to folder with data
-data_dir: ${work_dir}/datasets/
+dataset_dir: ${work_dir}/datasets/
 
 # path to pretrained models
-pretrained_dir: ${work_dir}/plms/
+plm_dir: ${work_dir}/plms/
 
 # pretty print config at the start of the run using Rich library
 print_config: True

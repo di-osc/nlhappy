@@ -79,14 +79,17 @@ def train(config: DictConfig) -> Optional[float]:
 
     # Send some parameters from config to all lightning loggers
     log.info("Logging hyperparameters!")
-    utils.log_hyperparameters(
-        config=config,
-        model=model,
-        datamodule=datamodule,
-        trainer=trainer,
-        callbacks=callbacks,
-        logger=logger,
-    )
+    try:
+        utils.log_hyperparameters(
+            config=config,
+            model=model,
+            datamodule=datamodule,
+            trainer=trainer,
+            callbacks=callbacks,
+            logger=logger,
+        )
+    except Exception:
+        print("Could not log hyperparameters!")
 
 
     # Train the model
