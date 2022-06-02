@@ -5,6 +5,7 @@ from typing import List, Any, Dict
 from transformers import AutoModel, BertModel, BertConfig, BertTokenizer
 import torch.nn.functional as F
 import os
+from ...layers.classifier import SimpleDense
 
 
 
@@ -24,25 +25,26 @@ class BERTCrossEncoder(LightningModule):
         super(BERTCrossEncoder, self).__init__()  
         
         self.save_hyperparameters(logger=False)
-        
+        # 模型结构
         self.bert = BertModel(self.hparams['trf_config'])
-        self.pooler = torch.nn.Linear(self.bert.config.hidden_size, hidden_size)
-        self.classifier = torch.nn.Linear(hidden_size, len(self.hparams.label2id))
+        self.dropout = torch.nn.Dropout(dropout)
+        self.classifier = SimpleDense(self.bert.config.hidden_size, hidden_size=hidden_size, output_size=len(self.hparams.label2id))
+        
+        # 损失函数
         self.criterion = torch.nn.CrossEntropyLoss()
+        # 指标评价函数
         self.train_f1 = F1Score(average='macro', num_classes=len(self.hparams.label2id))
         self.val_f1 = F1Score(average='macro', num_classes=len(self.hparams.label2id))
         self.test_f1 = F1Score(average='macro', num_classes=len(self.hparams.label2id))
+        # 预处理流程
         self.tokenizer = self._init_tokenizer()
         
 
     def forward(self, input_ids, token_type_ids, attention_mask):
         x = self.bert(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask)
         x = x.last_hidden_state
-        x = x * attention_mask.unsqueeze(-1).float()
-        x = torch.sum(x, dim=1)
-        x = x / torch.sum(attention_mask, dim=1).unsqueeze(-1)
-        x = self.pooler(x)
-        x = F.relu(x)
+        x = x[:, 0] # CLS
+        x = self.dropout(x)
         logits = self.classifier(x)
         return logits
 
@@ -76,9 +78,20 @@ class BERTCrossEncoder(LightningModule):
 
 
     def configure_optimizers(self):
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
-        self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lambda epoch: 1.0 / (epoch + 1.0))
-        return [self.optimizer], [self.scheduler]
+        no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
+        grouped_parameters = [
+            {'params': [p for n, p in self.bert.named_parameters() if not any(nd in n for nd in no_decay)],
+             'lr': self.hparams.lr, 'weight_decay': self.hparams.weight_decay},
+            {'params': [p for n, p in self.bert.named_parameters() if any(nd in n for nd in no_decay)],
+             'lr': self.hparams.lr, 'weight_decay': 0.0},
+            {'params': [p for n, p in self.classifier.named_parameters() if not any(nd in n for nd in no_decay)],
+             'lr': self.hparams.lr *5, 'weight_decay': self.hparams.weight_decay},
+            {'params': [p for n, p in self.classifier.named_parameters() if any(nd in n for nd in no_decay)],
+             'lr': self.hparams.lr * 5, 'weight_decay': 0.0}
+        ]
+        optimizer = torch.optim.AdamW(grouped_parameters)
+        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 1.0 / (epoch + 1.0))
+        return [optimizer], [scheduler]
 
     def _init_tokenizer(self):
         with open('./vocab.txt', 'w') as f:
