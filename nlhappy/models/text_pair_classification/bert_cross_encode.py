@@ -1,8 +1,7 @@
-from matplotlib.pyplot import text
 import torch
 from pytorch_lightning import LightningModule
 from torchmetrics import F1Score
-from typing import List, Any
+from typing import List, Any, Dict
 from transformers import AutoModel, BertModel, BertConfig, BertTokenizer
 import torch.nn.functional as F
 import os
@@ -111,4 +110,27 @@ class BERTCrossEncoder(LightningModule):
                 output_names=['logits'],
                 export_params=True)
         print('export to onnx successfully')
+        
+        
+    def predict(self, text_pair: List, device: str='cpu') -> Dict[str, float]:
+        device = torch.device(device)
+        inputs = self.tokenizer(
+                text_pair[0],
+                text_pair[1],
+                padding='max_length',
+                max_length=self.hparams.max_length,
+                return_tensors='pt',
+                truncation=True)
+        inputs.to(device)
+        # self.to(device)
+        # self.freeze()
+        self.eval()
+        with torch.no_grad():
+            logits = self(**inputs)
+            scores = torch.nn.functional.softmax(logits, dim=-1).tolist()
+            cats = {}
+            for i, v in enumerate(scores[0]): # scores : [[0.1, 0.2, 0.3, 0.4]]
+                id2label = {v: k for k, v in self.hparams.label2id.items()}
+                cats[id2label[i]] = v
+        return sorted(cats.items(), key=lambda x: x[1], reverse=True)
 
