@@ -40,6 +40,7 @@ class BertTextClassification(LightningModule):
     def forward(self, input_ids, token_type_ids, attention_mask):
         x = self.bert(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask)
         x = x.last_hidden_state[:, 0]
+        x = self.dropout(x)
         logits = self.classifier(x)  # (batch_size, output_size)
         return logits
     
@@ -87,7 +88,7 @@ class BertTextClassification(LightningModule):
             {'params': [p for n, p in self.classifier.named_parameters() if not any(nd in n for nd in no_decay)],
              'lr': self.hparams.lr *5, 'weight_decay': self.hparams.weight_decay},
             {'params': [p for n, p in self.classifier.named_parameters() if any(nd in n for nd in no_decay)],
-             'lr': self.hparams.lr * 10, 'weight_decay': 0.0}
+             'lr': self.hparams.lr * 5, 'weight_decay': 0.0}
         ]
         optimizer = torch.optim.AdamW(grouped_parameters)
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 1.0 / (epoch + 1.0))
