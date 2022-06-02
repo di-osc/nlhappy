@@ -102,7 +102,8 @@ class TextClassificationDataModule(pl.LightningDataModule):
         self.hparams['id2label'] = id2label
         plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
         self.tokenizer = AutoTokenizer.from_pretrained(plm_path)
-        self.hparams['vocab'] = dict(self.tokenizer.vocab)
+        # self.hparams['vocab'] = dict(self.tokenizer.vocab)
+        self.hparams['vocab'] = dict(sorted(self.tokenizer.vocab.items(), key=lambda x: x[1]))
         trf_config = AutoConfig.from_pretrained(plm_path)
         self.hparams['trf_config'] = trf_config
         self.dataset.set_transform(transform=self.transform)

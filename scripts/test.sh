@@ -1,4 +1,5 @@
 nlhappy \
+trainer=ddp \
 datamodule=text_classification \
 datamodule.dataset=num \
 datamodule.plm=chinese-roberta-wwm-ext \

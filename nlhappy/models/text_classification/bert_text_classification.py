@@ -112,7 +112,7 @@ class BertTextClassification(LightningModule):
             cats = {}
             for i, v in enumerate(scores[0]):   # scores : [[0.1, 0.2, 0.3, 0.4]]
                 cats[self.hparams.id2label[i]] = v
-        return cats
+        return sorted(cats.items(), key=lambda x: x[1], reverse=True)
 
     def _init_tokenizer(self):
         with open('./vocab.txt', 'w') as f:
