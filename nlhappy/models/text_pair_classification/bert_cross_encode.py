@@ -1,3 +1,4 @@
+from matplotlib.pyplot import text
 import torch
 from pytorch_lightning import LightningModule
 from torchmetrics import F1Score
@@ -89,4 +90,25 @@ class BERTCrossEncoder(LightningModule):
         os.remove('./vocab.txt')
         os.remove('./config.json')
         return tokenizer
+    
+    def to_onnx(self, file_path: str):
+        text1 = '我是中国人'
+        text2 = '我是河北人'
+        torch_inputs = self.tokenizer(text1, text2, return_tensors='pt')
+        dynamic_axes = {
+                    'input_ids': {0: 'batch', 1: 'seq'},
+                    'attention_mask': {0: 'batch', 1: 'seq'},
+                    'token_type_ids': {0: 'batch', 1: 'seq'},
+                }
+        with torch.no_grad():
+            torch.onnx.export(
+                model=self,
+                args=tuple(torch_inputs.values()), 
+                f=file_path, 
+                input_names=list(torch_inputs.keys()),
+                dynamic_axes=dynamic_axes, 
+                opset_version=14,
+                output_names=['logits'],
+                export_params=True)
+        print('export to onnx successfully')
 

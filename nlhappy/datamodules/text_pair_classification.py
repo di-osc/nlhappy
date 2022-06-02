@@ -10,22 +10,21 @@ from ..utils import utils
 
 log = utils.get_logger(__name__)
 
-example = """{'text_a': '左膝退变伴游离体','text_b': '单侧膝关节骨性关节病','label': 0}"""
+example = """{'text_a': '肺结核','text_b': '关节炎','label': 不是一种病}"""
 
 class TextPairClassificationDataModule(pl.LightningDataModule):
     '''句子对数据模块,用来构建pytorch_lightning的数据模块
     '''
-    def __init__(
-            self,
-            dataset: str,
-            plm: str,
-            max_length: int,
-            batch_size: int,
-            return_pair: bool=False,
-            num_workers: int = 0,
-            pin_memory: bool =False,
-            dataset_dir = './datasets/',
-            plm_dir = './plms/'): 
+    def __init__(self,
+                dataset: str,
+                plm: str,
+                max_length: int,
+                batch_size: int,
+                return_pair: bool=False,
+                num_workers: int = 0,
+                pin_memory: bool =False,
+                dataset_dir = './datasets/',
+                plm_dir = './plms/'): 
         """参数:
         - dataset: 数据集名称,feature 必须包含 text_a, text_b, label
         - plm: 预训练模型名称
@@ -72,7 +71,7 @@ class TextPairClassificationDataModule(pl.LightningDataModule):
         self.tokenizer = AutoTokenizer.from_pretrained(plm_path)
         set_labels = sorted(set([label for label in self.dataset['train']['label']]))
         self.hparams['label2id'] = {label: i for i, label in enumerate(set_labels)}
-        self.hparams['vocab'] = dict(self.tokenizer.vocab)
+        self.hparams['vocab'] = dict(sorted(self.tokenizer.vocab.items(), key=lambda x: x[1]))
         self.hparams['trf_config'] = AutoConfig.from_pretrained(plm_path)
         self.dataset.set_transform(transform=self.transform)
         

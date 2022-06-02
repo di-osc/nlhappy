@@ -1,7 +1,7 @@
 import pytorch_lightning as pl
 from ..utils.storer import OSSStorer
 from datasets import load_from_disk
-from transformers import BertTokenizer, BertConfig
+from transformers import BertTokenizer, BertConfig, AutoTokenizer, AutoConfig
 from torch.utils.data import DataLoader
 from ..utils.preprocessing import fine_grade_tokenize
 import torch
@@ -68,10 +68,10 @@ class TokenClassificationDataModule(pl.LightningDataModule):
         self.hparams.label2id = label2id
         self.hparams.id2label = id2label
         self.dataset.set_transform(transform=self.transform)
-        self.tokenizer = BertTokenizer.from_pretrained(self.hparams.pretrained_dir +self.hparams.plm)
-        self.hparams.token2id = dict(self.tokenizer.vocab)
-        bert_config = BertConfig.from_pretrained(self.hparams.pretrained_dir + self.hparams.plm)
-        self.hparams.bert_config = bert_config
+        self.tokenizer = AutoTokenizer.from_pretrained(self.hparams.pretrained_dir +self.hparams.plm)
+        self.hparams['vocab'] = dict(sorted(self.tokenizer.vocab.items(), key=lambda x: x[1]))
+        trf_config = AutoConfig.from_pretrained(self.hparams.pretrained_dir + self.hparams.plm)
+        self.hparams.trf_config = trf_config
         
 
 

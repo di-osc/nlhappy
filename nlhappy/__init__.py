@@ -43,6 +43,9 @@ def explain(key: str):
         return "经典的句子级情感分类数据集，包含酒店、笔记本电脑和数据相关的网络评论数据，共包含积极、消极两个类别。"
     elif key == "DuUIE":
         return "2022CCKS通用信息抽取数据集, 包含实体抽取、关系抽取、事件抽取和情感抽取四个任务."
-    
+    elif key == 'TPC':
+        return 'text-pair classification, 文本对分类简称'
+    elif key == 'TC':
+        return 'text classification, 文本分类简称'
     
     else: return "No such key"

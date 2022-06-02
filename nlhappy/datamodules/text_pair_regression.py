@@ -50,7 +50,7 @@ class TextPairRegressionDataModule(pl.LightningDataModule):
         self.dataset = load_from_disk(dataset_path)
         plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
         self.tokenizer = AutoTokenizer.from_pretrained(plm_path)
-        self.hparams['vocab'] = dict(self.tokenizer.vocab)
+        self.hparams['vocab'] = dict(sorted(self.tokenizer.vocab.items(), key=lambda x: x[1]))
         self.hparams['trf_config'] = AutoConfig.from_pretrained(plm_path)
         self.dataset.set_transform(transform=self.transform)
 
