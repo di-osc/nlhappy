@@ -71,6 +71,7 @@ class TextPairClassificationDataModule(pl.LightningDataModule):
         self.tokenizer = AutoTokenizer.from_pretrained(plm_path)
         set_labels = sorted(set([label for label in self.dataset['train']['label']]))
         self.hparams['label2id'] = {label: i for i, label in enumerate(set_labels)}
+        self.hparams['id2label'] = {i: label for i, label in enumerate(set_labels)}
         self.hparams['vocab'] = dict(sorted(self.tokenizer.vocab.items(), key=lambda x: x[1]))
         self.hparams['trf_config'] = AutoConfig.from_pretrained(plm_path)
         self.dataset.set_transform(transform=self.transform)
