@@ -7,6 +7,9 @@ from ..utils.preprocessing import fine_grade_tokenize
 from datasets import load_from_disk
 import torch
 import os
+from ..utils import utils
+
+log = utils.get_logger(__name__)
 
 example = '''
         单标签:
@@ -58,9 +61,17 @@ class TextClassificationDataModule(pl.LightningDataModule):
         oss = OSSStorer()
         dataset_path = os.path.join(self.hparams.dataset_dir, self.hparams.dataset)
         plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
-        if not os.path.exists(dataset_path):
+        if os.path.exists(dataset_path):
+            log.info(f'{dataset_path} already exists.')
+        else:
+            log.info('not exists dataset in {}'.format(dataset_path))
+            log.info('start downloading dataset from oss')
             oss.download_dataset(self.hparams.dataset, self.hparams.dataset_dir)
-        elif not os.path.exists(plm_path): 
+        if os.path.exists(plm_path):
+            log.info(f'{plm_path} already exists.') 
+        else : 
+            log.info('not exists plm in {}'.format(plm_path))
+            log.info('start downloading plm from oss')
             oss.download_plm(self.hparams.plm, self.hparams.plm_dir)
         
 
@@ -72,7 +83,7 @@ class TextClassificationDataModule(pl.LightningDataModule):
             inputs = self.tokenizer(
                 text, 
                 padding='max_length',  
-                max_length=self.hparams.max_length,
+                max_length=self.hparams.max_length+2,
                 truncation=True)
             inputs = dict(zip(inputs.keys(), map(torch.tensor, inputs.values())))
             batch['inputs'].append(inputs)
@@ -82,8 +93,9 @@ class TextClassificationDataModule(pl.LightningDataModule):
 
         
     def setup(self, stage: str) -> None:
-        self.dataset = load_from_disk(self.hparams.dataset_dir + self.hparams.dataset)
-        set_labels = sorted(set([label for label in self.dataset['train']['label']]))
+        dataset_path = os.path.join(self.hparams.dataset_dir, self.hparams.dataset)
+        self.dataset = load_from_disk(dataset_path)
+        set_labels = set(self.dataset['train']['label'])
         label2id = {label: i for i, label in enumerate(set_labels)}
         id2label = {i: label for label, i in label2id.items()}
         self.hparams['label2id'] = label2id

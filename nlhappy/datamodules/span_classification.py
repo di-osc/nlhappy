@@ -19,8 +19,8 @@ class SpanClassificationDataModule(pl.LightningDataModule):
                 batch_size: int,
                 pin_memory: bool=True,
                 num_workers: int=1,
-                data_dir: str ='./datasets/',
-                pretrained_dir: str = './plms/') :
+                dataset_dir: str ='./datasets/',
+                plm_dir: str = './plms/') :
         super().__init__()
         self.save_hyperparameters()
 
@@ -28,8 +28,8 @@ class SpanClassificationDataModule(pl.LightningDataModule):
     def prepare_data(self) -> None:
         '下载数据集和预训练模型'
         oss = OSSStorer()
-        oss.download_dataset(self.hparams.dataset, self.hparams.data_dir)
-        oss.download_plm(self.hparams.plm, self.hparams.pretrained_dir)
+        oss.download_dataset(self.hparams.dataset, self.hparams.dataset_dir)
+        oss.download_plm(self.hparams.plm, self.hparams.plm_dir)
 
     def transform(self, example):
         batch_text = example['text']
@@ -63,17 +63,17 @@ class SpanClassificationDataModule(pl.LightningDataModule):
         if isinstance(self.hparams.dataset, datasets.DatasetDict):
             self.dataset = self.hparams.dataset
         elif isinstance(self.hparams.dataset, str):
-            self.dataset = load_from_disk(self.hparams.data_dir + self.hparams.dataset)
-        # self.dataset = load_from_disk(self.hparams.data_dir + self.hparams.dataset)
+            self.dataset = load_from_disk(self.hparams.dataset_dir + self.hparams.dataset)
+        # self.dataset = load_from_disk(self.hparams.dataset_dir + self.hparams.dataset)
         set_labels = sorted(set([span['label'] for spans in self.dataset['train']['spans'] for span in spans]))
         label2id = {label: i for i, label in enumerate(set_labels)}
         id2label = {i: label for label, i in label2id.items()}
         self.hparams['label2id'] = label2id
         self.hparams['id2label'] = id2label
         self.dataset.set_transform(transform=self.transform)
-        self.tokenizer = BertTokenizer.from_pretrained(self.hparams.pretrained_dir + self.hparams.plm)
+        self.tokenizer = BertTokenizer.from_pretrained(self.hparams.plm_dir + self.hparams.plm)
         self.hparams['token2id'] = dict(self.tokenizer.vocab)
-        bert_config = BertConfig.from_pretrained(self.hparams.pretrained_dir + self.hparams.plm)
+        bert_config = BertConfig.from_pretrained(self.hparams.plm_dir + self.hparams.plm)
         self.hparams['bert_config'] = bert_config
     
 

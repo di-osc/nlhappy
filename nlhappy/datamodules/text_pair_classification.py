@@ -6,6 +6,9 @@ from torch.utils.data import DataLoader
 import torch
 import os
 from datasets import load_from_disk, Dataset, DatasetDict 
+from ..utils import utils
+
+log = utils.get_logger(__name__)
 
 example = """{'text_a': '左膝退变伴游离体','text_b': '单侧膝关节骨性关节病','label': 0}"""
 
@@ -39,12 +42,7 @@ class TextPairClassificationDataModule(pl.LightningDataModule):
         # 这一行代码为了保存传入的参数可以当做self.hparams的属性
         self.save_hyperparameters(logger=False)
         
-        self.dataset = load_from_disk(os.path.join(self.hparams.dataset_dir , self.hparams.dataset))
-        self.tokenizer = AutoTokenizer.from_pretrained(self.hparams.plm_dir + self.hparams.plm)
-        set_labels = sorted(set([label for label in self.dataset['train']['label']]))
-        self.hparams['label2id'] = {label: i for i, label in enumerate(set_labels)}
-        self.hparams['vocab'] = dict(self.tokenizer.vocab)
-        self.hparams['trf_config'] = AutoConfig.from_pretrained(self.hparams.plm_dir + self.hparams.plm)
+        
 
     def prepare_data(self):
         '''
@@ -53,15 +51,31 @@ class TextPairClassificationDataModule(pl.LightningDataModule):
         oss = OSSStorer()
         dataset_path = os.path.join(self.hparams.dataset_dir, self.hparams.dataset)
         plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
-        if not os.path.exists(dataset_path):
+        if os.path.exists(dataset_path):
+            log.info(f'{dataset_path} already exists.')
+        else:
+            log.info('not exists dataset in {}'.format(dataset_path))
+            log.info('start downloading dataset from oss')
             oss.download_dataset(self.hparams.dataset, self.hparams.dataset_dir)
-        elif not os.path.exists(plm_path): 
+        if os.path.exists(plm_path):
+            log.info(f'{plm_path} already exists.') 
+        else : 
+            log.info('not exists plm in {}'.format(plm_path))
+            log.info('start downloading plm from oss')
             oss.download_plm(self.hparams.plm, self.hparams.plm_dir)
         
     
     def setup(self, stage: str):
+        dataset_path = os.path.join(self.hparams.dataset_dir , self.hparams.dataset)
+        plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
+        self.dataset = load_from_disk(dataset_path=dataset_path)
+        self.tokenizer = AutoTokenizer.from_pretrained(plm_path)
+        set_labels = sorted(set([label for label in self.dataset['train']['label']]))
+        self.hparams['label2id'] = {label: i for i, label in enumerate(set_labels)}
+        self.hparams['vocab'] = dict(self.tokenizer.vocab)
+        self.hparams['trf_config'] = AutoConfig.from_pretrained(plm_path)
         self.dataset.set_transform(transform=self.transform)
-
+        
     def transform(self, examples):
         batch_text_a = examples['text_a']
         batch_text_b = examples['text_b']
@@ -72,7 +86,7 @@ class TextPairClassificationDataModule(pl.LightningDataModule):
             for i  in range(len(batch_text_a)):
                 inputs_a= self.tokenizer(batch_text_a[i], 
                                         padding='max_length', 
-                                        max_length=self.hparams.max_length, 
+                                        max_length=self.hparams.max_length+2, 
                                         truncation=True)
                 inputs_a = dict(zip(inputs_a.keys(), map(torch.tensor, inputs_a.values())))
                 batch['inputs_a'].append(inputs_a)
@@ -89,12 +103,11 @@ class TextPairClassificationDataModule(pl.LightningDataModule):
                 inputs = self.tokenizer(batch_text_a[i],
                                         batch_text_b[i], 
                                         padding='max_length', 
-                                        max_length=self.hparams.max_length*2, 
+                                        max_length=self.hparams.max_length*2+2, 
                                         truncation=True)
                 inputs = dict(zip(inputs.keys(), map(torch.tensor, inputs.values())))
                 batch_cross['inputs'].append(inputs)
                 batch_cross['label_ids'].append(self.hparams['label2id'][batch_labels[i]])
-            
             return batch_cross
 
 

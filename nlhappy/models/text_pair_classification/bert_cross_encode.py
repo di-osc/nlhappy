@@ -1,6 +1,6 @@
 import torch
 from pytorch_lightning import LightningModule
-from torchmetrics.classification import Accuracy
+from torchmetrics import F1Score
 from typing import List, Any
 from transformers import AutoModel, BertModel, BertConfig, BertTokenizer
 import torch.nn.functional as F
@@ -24,13 +24,14 @@ class BERTCrossEncoder(LightningModule):
         super(BERTCrossEncoder, self).__init__()  
         
         self.save_hyperparameters(logger=False)
+        
         self.bert = BertModel(self.hparams['trf_config'])
         self.pooler = torch.nn.Linear(self.bert.config.hidden_size, hidden_size)
         self.classifier = torch.nn.Linear(hidden_size, len(self.hparams.label2id))
         self.criterion = torch.nn.CrossEntropyLoss()
-        self.train_acc = Accuracy()
-        self.val_acc = Accuracy()
-        self.test_acc = Accuracy()
+        self.train_f1 = F1Score(average='macro', num_classes=len(self.hparams.label2id))
+        self.val_f1 = F1Score(average='macro', num_classes=len(self.hparams.label2id))
+        self.test_f1 = F1Score(average='macro', num_classes=len(self.hparams.label2id))
         self.tokenizer = self._init_tokenizer()
         
 
@@ -56,21 +57,21 @@ class BERTCrossEncoder(LightningModule):
 
     def training_step(self, batch, batch_idx):
         loss, preds, labels = self.shared_step(batch)
-        self.train_acc(preds, labels)
-        self.log('train/acc', self.train_acc, on_step=True, on_epoch=True, prog_bar=True)
+        self.train_f1(preds, labels)
+        self.log('train/f1', self.train_f1, on_step=True, on_epoch=True, prog_bar=True)
         return {'loss': loss}
 
     def validation_step(self, batch, batch_idx):
         loss, preds, labels = self.shared_step(batch)
-        self.val_acc(preds, labels)
-        self.log('val/acc', self.val_acc, on_step=False, on_epoch=True, prog_bar=True)
+        self.val_f1(preds, labels)
+        self.log('val/f1', self.val_f1, on_step=False, on_epoch=True, prog_bar=True)
         return {'loss': loss}
 
 
     def test_step(self, batch, batch_idx):
         loss, preds, labels = self.shared_step(batch)
-        self.test_acc(preds, labels)
-        self.log('test/acc', self.test_acc, on_step=False, on_epoch=True, prog_bar=True)
+        self.test_f1(preds, labels)
+        self.log('test/f1', self.test_f1, on_step=False, on_epoch=True, prog_bar=True)
         return {'loss': loss}
 
 

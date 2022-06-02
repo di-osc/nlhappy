@@ -128,6 +128,9 @@ def log_hyperparameters(
     Additionaly saves:
         - number of model parameters
     """
+    
+    if not trainer.logger:
+        return
 
     hparams = {}
 

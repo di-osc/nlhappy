@@ -4,3 +4,4 @@ defaults:
 gpus: 2
 strategy: ddp
 precision: 16
+sync_batchnorm: True

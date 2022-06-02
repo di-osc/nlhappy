@@ -1,12 +1,12 @@
 [tool.poetry]
 name = "nlhappy"
-version = "2022.05.29"
+version = "2022.06.1"
 description = "复现收录一些常用的NLP模型"
 authors = ["wangmengdi <790990241@qq.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.7"
-torch = "1.11.0"
+torch = "^1.11.0"
 pytorch-lightning = "^1.5.10"
 datasets = "^2.0.0"
 transformers = "^4.17.0"

@@ -5,6 +5,9 @@ from datasets import load_from_disk, DatasetDict
 from transformers import AutoConfig, AutoTokenizer
 from torch.utils.data import DataLoader
 from ..tokenizers import load_vocab
+from ..utils import utils
+
+log = utils.get_logger(__name__)
 
 
 class PLMDataModuleBase(pl.LightningDataModule):
@@ -15,10 +18,10 @@ class PLMDataModuleBase(pl.LightningDataModule):
         dataset: str,
         plm: str,
         batch_size: int,
-        pin_memory: bool=True,
+        pin_memory: bool=False,
         num_workers: int=0,
         data_dir: str ='./datasets/',
-        pretrained_dir: str = './plms/',
+        plm_dir: str = './plms/',
         **kwargs
         ) :
         super().__init__()
@@ -28,15 +31,27 @@ class PLMDataModuleBase(pl.LightningDataModule):
     def prepare_data(self) -> None:
         '下载数据集和预训练模型'
         oss = OSSStorer()
-        oss.download_dataset(self.hparams.dataset, self.hparams.data_dir)
-        oss.download_plm(self.hparams.plm, self.hparams.pretrained_dir)
+        dataset_path = os.path.join(self.hparams.dataset_dir, self.hparams.dataset)
+        plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
+        if os.path.exists(dataset_path):
+            log.info(f'{dataset_path} already exists.')
+        else:
+            log.info('not exists dataset in {}'.format(dataset_path))
+            log.info('start downloading dataset from oss')
+            oss.download_dataset(self.hparams.dataset, self.hparams.dataset_dir)
+        if os.path.exists(plm_path):
+            log.info(f'{plm_path} already exists.') 
+        else : 
+            log.info('not exists plm in {}'.format(plm_path))
+            log.info('start downloading plm from oss')
+            oss.download_plm(self.hparams.plm, self.hparams.plm_dir)
 
 
     def setup(self, stage: str) -> None:
         """需要设置参数label2id, id2label, token2id, bert_config最后要对dataset设置transform"""
         self.dataset = load_from_disk(os.path.join(self.hparams.data_dir, self.hparams.dataset))
-        self.hparams.token2id = self.token2id
-        self.hparams.label2id = self.label2id
+        self.hparams.token_vocab = self.token_vocab
+        self.hparams.label_vocab = self.label_vocab
         self.hparams.trf_config = self.trf_config
         self.dataset.set_transform(self.transform)
 
@@ -47,23 +62,23 @@ class PLMDataModuleBase(pl.LightningDataModule):
 
 
     @property
-    def token2id(self):
-        return load_vocab(os.path.join(self.hparams.pretrained_dir, self.hparams.plm, 'vocab.txt'))
+    def token_vocab(self):
+        return load_vocab(os.path.join(self.hparams.plm_dir, self.hparams.plm, 'vocab.txt'))
 
 
     @property
-    def label2id(self):
+    def label_vocab(self):
         raise NotImplementedError
 
 
     @property
     def trf_config(self):
-        return AutoConfig.from_pretrained(self.hparams.pretrained_dir+self.hparams.plm)
+        return AutoConfig.from_pretrained(self.hparams.plm_dir+self.hparams.plm)
 
 
     @property
     def tokenizer(self):
-        return AutoTokenizer.from_pretrained(os.path.join(self.hparams.pretrained_dir, self.hparams.plm))
+        return AutoTokenizer.from_pretrained(os.path.join(self.hparams.plm_dir, self.hparams.plm))
 
     
     def train_dataloader(self):

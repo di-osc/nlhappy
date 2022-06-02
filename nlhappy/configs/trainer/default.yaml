@@ -8,8 +8,10 @@ max_epochs: 20
 
 profiler: "simple"
 progress_bar_refresh_rate: 5
-resume_from_checkpoint: null
 weights_summary: "full"
+
+# 默认为tensorboard
+logger: True
 
 # number of validation steps to execute at the beginning of the training
 num_sanity_val_steps: 0
@@ -17,3 +19,6 @@ num_sanity_val_steps: 0
 stochastic_weight_avg: False
 # 梯度积累
 accumulate_grad_batches: 1
+
+# ckpt path
+resume_from_checkpoint: null
