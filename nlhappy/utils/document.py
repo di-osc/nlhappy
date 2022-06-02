@@ -5,7 +5,6 @@ from spacy.tokens import Doc
 from .data import Triple
 from tqdm import tqdm
 from spacy.language import Language
-import matplotlib.pyplot as plt
 from spacy.training import Example 
 from spacy.scorer import get_ner_prf
 
