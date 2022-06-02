@@ -2,6 +2,6 @@ _target_: nlhappy.models.BERTCrossEncoder
                    
 lr: 3e-5                            # 学习率
 hidden_size: 256
-dropout: 0.3
+dropout: 0.2
 weight_decay: 0.00               # 权重衰减
 
