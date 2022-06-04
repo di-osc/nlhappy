@@ -7,7 +7,7 @@ from transformers import AutoTokenizer, AutoConfig
 from torch.utils.data import DataLoader
 
 
-class PromptSpanExtractionDataModule(pl.LightningModule):
+class PromptSpanExtractionDataModule(pl.LightningDataModule):
     """
     Data module for the prompt span extraction task.
 
