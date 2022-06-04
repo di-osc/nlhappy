@@ -11,9 +11,11 @@ class PromptSpanExtractionDataModule(pl.LightningModule):
     """
     Data module for the prompt span extraction task.
 
-    Dataset example:
+    Dataset examples:
     {'text':'北京是中国的首都', 'prompt':'国家', 'spans':[{'text': '中国', 'offset':(3, 5)}]}
     {'text':'北京是中国的首都', 'prompt':'中国的首都', 'spans':[{'text': '北京', 'offset':(0, 2)}]}
+    {'text': '北京是中国的首都', 'prompt': '北京的国家', 'spans': [{'text': '中国', 'offset': (3, 5)}]}
+    其中offset 为左闭右开的字符级别下标
     """
     
     def __init__(self,
