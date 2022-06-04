@@ -10,7 +10,7 @@ from ..utils import utils
 log = utils.get_logger(__name__)
 
 
-class PLMDataModuleBase(pl.LightningDataModule):
+class PLMDataModule(pl.LightningDataModule):
     """预训练语言模型的数据模块基类,需要重写transform和label2id两个方法即可
     """
     def __init__(
