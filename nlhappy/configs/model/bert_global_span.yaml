@@ -1,0 +1,7 @@
+_target_: nlhappy.models.prompt_span_extraction.BERTGlobalSpan
+
+lr: 3e-5
+dropout: 0.1
+hidden_size: 256 
+weight_decay: 0.0
+threshold: 0.5
