@@ -1,17 +1,16 @@
 import pytorch_lightning as pl
-from transformers import BertModel, BertTokenizer
+from transformers import BertModel,  AutoTokenizer
 import torch.nn as nn
 import torch
 import os
 from ...metrics.span import SpanF1
-from ...utils.preprocessing import fine_grade_tokenize
 from ...layers import MultiLabelCategoricalCrossEntropy, EfficientGlobalPointer
-from ...tricks.adversarial_training import adversical_tricks
 
 
 
 
-class BertGlobalSpan(pl.LightningModule):
+class BERTGlobalSpan(pl.LightningModule):
+    
     def __init__(self,
                 hidden_size: int,
                 lr: float,
@@ -19,11 +18,21 @@ class BertGlobalSpan(pl.LightningModule):
                 dropout: float,
                 threshold: float = 0.5,
                 **kwargs):
+        """全局span抽取模型
+        Args:
+            hidden_size (int): 隐藏层维度
+            lr (float): 学习率
+            weight_decay (float): 权重衰减
+            dropout (float): dropout比例
+            threshold (float, optional): 抽取阈值. Defaults to 0.5.
+            kwargs: 其他参数包括trf_config, vocab
+        """
         super().__init__()
+        
         self.save_hyperparameters()   
 
 
-        self.bert = BertModel(self.hapams.trf_config)
+        self.bert = BertModel(self.hparams.trf_config)
         self.classifier = EfficientGlobalPointer(
                         input_size=self.bert.config.hidden_size, 
                         hidden_size=hidden_size,
@@ -45,7 +54,7 @@ class BertGlobalSpan(pl.LightningModule):
 
 
     def on_train_start(self) -> None:
-        plm_path = os.path.join(self.hparams.trf_config.pretrained_weights, 'pytorch_model.bin')
+        plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm, 'pytorch_model.bin')
         state_dict = torch.load(plm_path)
         self.bert.load_state_dict(state_dict)
 
@@ -102,10 +111,10 @@ class BertGlobalSpan(pl.LightningModule):
 
     def _init_tokenizer(self):
         with open('./vocab.txt', 'w') as f:
-            for k in self.hparams.token2id.keys():
+            for k in self.hparams.vocab.keys():
                 f.writelines(k + '\n')
-        self.hparams.bert_config.to_json_file('./config.json')
-        tokenizer = BertTokenizer.from_pretrained('./')
+        self.hparams.trf_config.to_json_file('./config.json')
+        tokenizer = AutoTokenizer.from_pretrained('./')
         os.remove('./vocab.txt')
         os.remove('./config.json')
         return tokenizer
@@ -120,6 +129,13 @@ class BertGlobalSpan(pl.LightningModule):
             max_length=self.hparams.max_length,
             truncation=True,
             return_tensors='pt')
+        offset_ls = self.tokenizer(
+            prompt,
+            text,
+            max_length=self.hparams.max_length,
+            truncation=True,
+            return_offsets_mapping=True)['offset_mapping']
+        
         inputs.to(device)
         logits = self(**inputs)
         spans_ls = torch.nonzero(logits>threshold).tolist()
@@ -127,7 +143,9 @@ class BertGlobalSpan(pl.LightningModule):
         for span in spans_ls :
             start = span[2]
             end = span[3]
-            spans.append([start-1, end])
+            start_text = offset_ls[start][0]
+            end_text = offset_ls[end][1]
+            spans.append([start_text, end_text, text[start_text:end_text]])
         return spans
 
     def to_onnx(self, file_path: str):
