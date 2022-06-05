@@ -1,0 +1,11 @@
+_target_: nlhappy.datamodules.PromptSpanExtractionDataModule
+dataset_dir: ${dataset_dir}
+plm_dir: ${plm_dir}
+
+
+dataset: 
+plm: 
+max_length: 
+batch_size: 
+pin_memory:  False
+num_workers:  0
