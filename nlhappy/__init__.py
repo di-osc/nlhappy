@@ -16,6 +16,7 @@ explain_dict = {
     'CHIP-CDN': 'CBLUE排行榜中临床术语标准化任务的数据集, 诊断词与标准词含有一对多的情况',
     'CHIP-CTC': '临床试验筛选标准短文本分类, https://tianchi.aliyun.com/dataset/dataDetail?dataId=95414#1',
     'CHIP-STS': '平安医疗科技疾病问答迁移学习, https://tianchi.aliyun.com/dataset/dataDetail?dataId=95414#1',
+    'IMCS': '该数据集收集了真实的在线医患对话，并进行了多层次（Multi-Level）的人工标注，包含命名实体、对话意图、症状标签、医疗报告等，并在CCL 2021会议上举办了第一届智能对话诊疗评测比赛 （http://www.fudan-disc.com/sharedtask/imcs21/index.html）'
 }
 
 
