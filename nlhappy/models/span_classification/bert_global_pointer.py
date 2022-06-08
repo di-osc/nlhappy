@@ -20,7 +20,8 @@ class BertGlobalPointer(pl.LightningModule):
         dropout: float,
         threshold: float = 0.5,
         adv: str =None,
-        **data_params
+        load_plm_checkpoint: bool = True,
+        **kwargs
     ) : 
         super().__init__()
         self.save_hyperparameters()
@@ -29,7 +30,7 @@ class BertGlobalPointer(pl.LightningModule):
         self.automatic_optimization = False    
 
 
-        self.bert = BertModel(data_params['bert_config'])
+        self.bert = BertModel(self.hparams.bert_config)
         self.classifier = EfficientGlobalPointer(
                         input_size=self.bert.config.hidden_size, 
                         hidden_size=hidden_size,
@@ -52,8 +53,9 @@ class BertGlobalPointer(pl.LightningModule):
 
 
     def on_train_start(self) -> None:
-        state_dict = torch.load(self.hparams.plm_dir + self.hparams.plm + '/pytorch_model.bin')
-        self.bert.load_state_dict(state_dict)
+        if self.hparams.load_plm_checkpoint:
+            state_dict = torch.load(self.hparams.plm_dir + self.hparams.plm + '/pytorch_model.bin')
+            self.bert.load_state_dict(state_dict)
         if self.hparams.adv :
             self.adv = adversical_tricks.get(self.hparams.adv)(self.bert)
 
