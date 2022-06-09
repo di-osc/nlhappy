@@ -16,9 +16,12 @@ early_stopping:
   patience: 3 # how many validation epochs of not improving until training stops
   min_delta: 0 # minimum change in the monitored metric needed to qualify as an improvement
 
-model_summary:
-  _target_: pytorch_lightning.callbacks.RichModelSummary
-  max_depth: 1
+# model_summary:
+#   _target_: pytorch_lightning.callbacks.RichModelSummary
+#   max_depth: 1
 
 rich_progress_bar:
   _target_: pytorch_lightning.callbacks.RichProgressBar
+
+load_plm:
+  _target_: nlhappy.callbacks.transformer_callbacks.LoadPLM
