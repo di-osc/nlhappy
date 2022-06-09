@@ -30,18 +30,22 @@ def prepare_data_from_oss(dataset: str,
         oss = OSSStorer()
         dataset_path = os.path.join(dataset_dir, dataset)
         plm_path = os.path.join(plm_dir, plm)
+        log.info('check dataset {}'.format(dataset_path))
         if os.path.exists(dataset_path):
             log.info(f'{dataset_path} already exists.')
         else:
             log.info('not exists dataset in {}'.format(dataset_path))
             log.info('start downloading dataset from oss')
             oss.download_dataset(dataset, dataset_dir)
+            log.info('finish downloading dataset from oss')
+        log.info('check plm {}'.format(plm_path))
         if os.path.exists(plm_path):
             log.info(f'{plm_path} already exists.') 
         else : 
             log.info('not exists plm in {}'.format(plm_path))
             log.info('start downloading plm from oss')
             oss.download_plm(plm, plm_dir)
+            log.info('finish downloading plm from oss')
         log.info('all data are ready')
         
         
