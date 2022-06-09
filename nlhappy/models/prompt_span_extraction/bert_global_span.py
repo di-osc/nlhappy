@@ -1,5 +1,5 @@
 import pytorch_lightning as pl
-from transformers import BertModel,  AutoTokenizer
+from transformers import AutoModel,  AutoTokenizer
 import torch.nn as nn
 import torch
 import os
@@ -25,6 +25,7 @@ class BERTGlobalSpan(pl.LightningModule):
             weight_decay (float): 权重衰减
             dropout (float): dropout比例
             threshold (float, optional): 抽取阈值. Defaults to 0.5.
+            load_plm (bool, optional): 是否加载plm的参数. Defaults to False.
             kwargs: 其他参数包括trf_config, vocab
         """
         super().__init__()
@@ -32,9 +33,9 @@ class BERTGlobalSpan(pl.LightningModule):
         self.save_hyperparameters()   
 
 
-        self.bert = BertModel(self.hparams.trf_config)
+        self.plm = AutoModel.from_config(self.hparams.trf_config)
         self.classifier = EfficientGlobalPointer(
-                        input_size=self.bert.config.hidden_size, 
+                        input_size=self.plm.config.hidden_size, 
                         hidden_size=hidden_size,
                         output_size=1)
 
@@ -47,16 +48,11 @@ class BERTGlobalSpan(pl.LightningModule):
         self.tokenizer = self._init_tokenizer()
 
     def forward(self, input_ids, token_type_ids, attention_mask=None):
-        x = self.bert(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask).last_hidden_state
+        x = self.plm(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask).last_hidden_state
         x = self.dropout(x)
         logits = self.classifier(x, mask=attention_mask)
         return logits
 
-
-    def on_train_start(self) -> None:
-        plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm, 'pytorch_model.bin')
-        state_dict = torch.load(plm_path)
-        self.bert.load_state_dict(state_dict)
 
 
     def shared_step(self, batch):
@@ -95,9 +91,9 @@ class BERTGlobalSpan(pl.LightningModule):
     def configure_optimizers(self):
         no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
         grouped_parameters = [
-            {'params': [p for n, p in self.bert.named_parameters() if not any(nd in n for nd in no_decay)],
+            {'params': [p for n, p in self.plm.named_parameters() if not any(nd in n for nd in no_decay)],
              'lr': self.hparams.lr, 'weight_decay': self.hparams.weight_decay},
-            {'params': [p for n, p in self.bert.named_parameters() if any(nd in n for nd in no_decay)],
+            {'params': [p for n, p in self.plm.named_parameters() if any(nd in n for nd in no_decay)],
              'lr': self.hparams.lr, 'weight_decay': 0.0},
             {'params': [p for n, p in self.classifier.named_parameters() if not any(nd in n for nd in no_decay)],
              'lr': self.hparams.lr * 5, 'weight_decay': self.hparams.weight_decay},
