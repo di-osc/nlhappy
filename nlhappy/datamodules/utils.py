@@ -30,7 +30,8 @@ def prepare_data_from_oss(dataset: str,
         oss = OSSStorer()
         dataset_path = os.path.join(dataset_dir, dataset)
         plm_path = os.path.join(plm_dir, plm)
-        log.info('check dataset {}'.format(dataset_path))
+        # 检测数据
+        log.info('Checking all data ...' )
         if os.path.exists(dataset_path):
             log.info(f'{dataset_path} already exists.')
         else:
@@ -38,7 +39,6 @@ def prepare_data_from_oss(dataset: str,
             log.info('start downloading dataset from oss')
             oss.download_dataset(dataset, dataset_dir)
             log.info('finish downloading dataset from oss')
-        log.info('check plm {}'.format(plm_path))
         if os.path.exists(plm_path):
             log.info(f'{plm_path} already exists.') 
         else : 
