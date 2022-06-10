@@ -84,7 +84,11 @@ class PromptSpanExtractionDataModule(pl.LightningDataModule):
             for span in spans:
                 start = char_idx_to_token(span['offset'][0]+bias, offset_mapping)
                 end = char_idx_to_token(span['offset'][1]-1+bias, offset_mapping)
-                span_ids[0, start, end] = 1.0
+                # 如果超出边界，则跳过
+                try:
+                    span_ids[0, start, end] = 1.0
+                except Exception:
+                    pass 
             del inputs['offset_mapping']
             inputs = dict(zip(inputs.keys(), map(torch.tensor, inputs.values())))
             batch['inputs'].append(inputs)
