@@ -132,7 +132,7 @@ def convert_ents_to_prompt_span_dataset(docs: list,
                 for ent in sent.ents:
                     if ent.label_ not in label_dict:
                         label_dict[ent.label_] = []
-                    label_dict[ent.label_].append({'text': ent.text, 'offset':[ent.start_char, ent.end_char]})
+                    label_dict[ent.label_].append({'text': ent.text, 'offset':[ent.start_char-sent.start_char, ent.end_char-sent.start_char]})
                 if len(label_dict) == 0:
                     continue
                 else:
@@ -153,5 +153,124 @@ def convert_ents_to_prompt_span_dataset(docs: list,
                             else:
                                 prompt_ls.append(label)
                             spans_ls.append([])   
-    print("保存数据....") 
-    return Dataset.from_dict({'text': text_ls, 'prompt': prompt_ls, 'spans': spans_ls})
+    print("转换数据....") 
+    ds = Dataset.from_dict({'text': text_ls, 'prompt': prompt_ls, 'spans': spans_ls})
+    print("转换完成....")
+    return ds
+
+
+
+    
+def convert_events_to_prompt_span_dataset(docs: List[Doc],
+                                        alias_dict: Dict[str, List[str]] = {},
+                                        span_alias_dict : Dict[str, List[str]] = {},
+                                        add_negative_sample: bool =False,
+                                        sentence_level: bool = False,
+                                        add_span_prompt: bool = False) -> Dataset:
+
+    """convert doc._.events to prompt span dataset
+    Args:
+        docs (List[Doc]): doc list
+        alias_dict (Dict[str, List[str]], optional): alias dict like {'姓名':[名称]}. Defaults to {}.
+        span_alias_dict (Dict[str, List[str]], optional): span alias dict like {'姓名':[名称]}. Defaults to {}.
+        add_negative_sample (bool, optional): add negative sample. Defaults to False.
+        sentence_level (bool, optional): if add sentence level text. the text contains all sentences the event belongs to. Defaults to False.
+        add_span_prompt (bool, optional): add span prompt. Defaults to False.
+
+    Returns:
+        Dataset: converted dataset
+    """
+    all_roles = set([role for doc in docs for event in doc._.events for role in event.roles])
+    all_span_labels = set([span.label_ for doc in docs for event in doc._.events for role in event.roles for span in event.roles[role]])
+    text_ls = []
+    prompt_ls = []
+    spans_ls = []
+    for doc in tqdm(docs):
+        for event in doc._.events:
+            if not sentence_level:
+                span_label_dict = {} # 用来保存每种类别的span
+                for role in event.roles:
+                    if role in alias_dict:
+                        role = random.choice(alias_dict[role]+[role])
+                    text_ls.append(doc.text)
+                    prompt_ls.append(event.label + '的' + role)
+                    spans_ls.append([{'text': span.text, 'offset':[span.start_char, span.end_char]} for span in event.roles[role]])
+                    if add_span_prompt:
+                        for span in event.roles[role]:
+                            if span.label_ not in span_label_dict:
+                                span_label_dict[span.label_] = []
+                            span_label_dict[span.label_].append({'text': span.text, 'offset':[span.start_char, span.end_char]})
+                # 添加span prompt数据
+                if add_span_prompt:
+                    for span_label in span_label_dict:
+                        if span_label in span_alias_dict:
+                            span_label = random.choice(span_alias_dict[span_label]+[span_label])
+                        text_ls.append(doc.text)
+                        prompt_ls.append(span_label)
+                        spans_ls.append(span_label_dict[span_label])
+                    
+                if add_negative_sample:
+                    other_roles = all_roles - set(event.roles.keys())
+                    if len(other_roles)>0:
+                        role = random.choice(list(other_roles))
+                        if role in alias_dict:
+                            role = random.choice(alias_dict[role]+[role])
+                        text_ls.append(doc.text)
+                        prompt_ls.append(event.label + '的' + role)
+                        spans_ls.append([])
+                    if add_span_prompt:
+                        other_span_labels = all_span_labels - set(span_label_dict.keys())
+                        if len(other_span_labels)>0:
+                            span_label = random.choice(list(other_span_labels))
+                            if span_label in span_alias_dict:
+                                span_label = random.choice(span_alias_dict[span_label]+[span_label])
+                            text_ls.append(doc.text)
+                            prompt_ls.append(span_label)
+                            spans_ls.append([])
+            else:
+                text = ''.join([sent.text for sent in event.sents])
+                span_label_dict = {} # 用来保存每种类别的span
+                for role in event.roles:
+                    if role in alias_dict:
+                        role = random.choice(alias_dict[role]+[role])
+                    text_ls.append(text)
+                    prompt_ls.append(event.label + '的' + role)
+                    spans_ls.append([{'text': span.text, 'offset':[span.start_char-event.sents[0].start_char, span.end_char-event.sents[0].start_char]} for span in event.roles[role]])
+                    if add_span_prompt:
+                        for span in event.roles[role]:
+                            if span.label_ not in span_label_dict:
+                                span_label_dict[span.label_] = []
+                            span_label_dict[span.label_].append({'text': span.text, 'offset':[span.start_char-event.sents[0].start_char, span.end_char-event.sents[0].start_char]})
+                # 添加span prompt数据
+                if add_span_prompt:
+                    for span_label in span_label_dict:
+                        if span_label in span_alias_dict:
+                            span_label = random.choice(span_alias_dict[span_label]+[span_label])
+                        text_ls.append(text)
+                        prompt_ls.append(span_label)
+                        spans_ls.append(span_label_dict[span_label])
+                # 添加负样本 
+                if add_negative_sample:
+                    other_roles = all_roles - set(event.roles.keys())
+                    if len(other_roles)>0:
+                        role = random.choice(list(other_roles))
+                        if role in alias_dict:
+                            role = random.choice(alias_dict[role]+[role])
+                        text_ls.append(text)
+                        prompt_ls.append(event.label + '的' + role)
+                        spans_ls.append([])
+                    if add_span_prompt:
+                        other_span_labels = all_span_labels - set(span_label_dict.keys())
+                        if len(other_span_labels)>0:
+                            span_label = random.choice(list(other_span_labels))
+                            if span_label in span_alias_dict:
+                                span_label = random.choice(span_alias_dict[span_label]+[span_label])
+                            text_ls.append(text)
+                            prompt_ls.append(span_label)
+                            spans_ls.append([])
+                        
+    print("转换为数据集....")
+    ds = Dataset.from_dict({'text': text_ls, 'prompt': prompt_ls, 'spans': spans_ls})
+    print("转换完成")
+    return ds
+                
