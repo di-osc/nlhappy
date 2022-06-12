@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "nlhappy"
-version = "2022.06.9"
+version = "2022.06.12"
 description = "复现收录一些常用的NLP模型"
 authors = ["wangmengdi <790990241@qq.com>"]
 
