@@ -2,8 +2,6 @@ from spacy.tokens import Token, Span, Doc
 from typing import Dict, List 
 
 
-
-
 Doc.set_extension('events', default=[])
 Doc.set_extension('relations', default=[])
 
@@ -33,7 +31,6 @@ class Event:
         sents.append(last.sent)
         return sents
 
-        
         
     @property
     def doc(self) -> Doc:
@@ -78,6 +75,7 @@ class Relation:
         self.sub = sub
         self.obj = obj
         
+        
     @property
     def sents(self) -> List[Span]:
         left_idx = min([self.sub.start, self.obj.start])
@@ -88,13 +86,16 @@ class Relation:
         sents.append(last.sent)
         return sents
     
+    
     @property
     def doc(self) -> Doc:
         assert self.sub.doc == self.obj.doc
         return self.sub.doc
         
+        
     def __repr__(self) -> str:
         return f'Relation({self.label})'
+    
     
     def __eq__(self, rel) -> bool:
         return self.label == rel.label and self.sub == rel.sub and self.obj == rel.obj
