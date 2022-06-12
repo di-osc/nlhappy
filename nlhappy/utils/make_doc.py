@@ -5,6 +5,7 @@ from typing import Dict, List
 
 
 Doc.set_extension('events', default=[])
+Doc.set_extension('relations', default=[])
 
 
 class Event:
@@ -56,6 +57,48 @@ class Event:
             if self.roles[arg] != event.roles[arg]:
                 return False
         return True
+    
+    
+    
+class Relation:
+    """used to store the relation in the doc
+    """
+    def __init__(self,
+                 label: str,
+                 sub: Span,
+                 obj: Span) -> None:
+        """
+
+        Args:
+            label (str): the relation label
+            sub (Span): the subject of the relation
+            obj (Span): the object of the relation
+        """
+        self.label = label
+        self.sub = sub
+        self.obj = obj
+        
+    @property
+    def sents(self) -> List[Span]:
+        left_idx = min([self.sub.start, self.obj.start])
+        right_idx = max([self.sub.end, self.obj.end])
+        # return self.doc[left_idx:right_idx].sents
+        sents = list(self.doc[left_idx:right_idx].sents)
+        last = sents.pop()
+        sents.append(last.sent)
+        return sents
+    
+    @property
+    def doc(self) -> Doc:
+        assert self.sub.doc == self.obj.doc
+        return self.sub.doc
+        
+    def __repr__(self) -> str:
+        return f'Relation({self.label})'
+    
+    def __eq__(self, rel) -> bool:
+        return self.label == rel.label and self.sub == rel.sub and self.obj == rel.obj
+        
 
 
     
