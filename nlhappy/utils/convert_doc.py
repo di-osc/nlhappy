@@ -168,7 +168,7 @@ def convert_events_to_prompt_span_dataset(docs: List[Doc],
                                         sentence_level: bool = False,
                                         add_span_prompt: bool = False) -> Dataset:
 
-    """convert doc._.events to prompt span dataset
+    """convert doc._.events to prompt span dataset({'text': '', 'prompt': '', 'spans': []})
     Args:
         docs (List[Doc]): doc list
         alias_dict (Dict[str, List[str]], optional): alias dict like {'姓名':[名称]}. Defaults to {}.
@@ -273,4 +273,123 @@ def convert_events_to_prompt_span_dataset(docs: List[Doc],
     ds = Dataset.from_dict({'text': text_ls, 'prompt': prompt_ls, 'spans': spans_ls})
     print("转换完成")
     return ds
-                
+
+
+
+def convert_relations_to_prompt_span_dataset(docs: List[Doc],
+                                             alias_dict: Dict[str, List[str]]={},
+                                             span_alias_dict: Dict[str, List[str]]={},
+                                             sentence_level: bool = False,
+                                             add_negative_sample: bool = False,
+                                             add_span_prompt: bool = False) -> Dataset:
+    text_ls = []
+    prompt_ls = []
+    spans_ls = []
+    all_span_labels = set()
+    for doc in docs:
+        for rel in doc._.relations:
+            all_span_labels.add(rel.sub.label)
+            all_span_labels.add(rel.obj.label)
+    all_relation_labels = set([rel.label for doc in docs for rel in doc._.relations])
+    for doc in tqdm(docs):
+        if not sentence_level:
+            # 添加relation prompt数据
+            for rel in doc._.relations:
+                text_ls.append(doc.text)
+                if rel.label in alias_dict:
+                    rel_label = random.choice(alias_dict[rel.label]+[rel.label])
+                else:
+                    rel_label = rel.label
+                prompt_ls.append(rel.sub.text + '的' + rel_label)
+                spans_ls.append([{'text': rel.obj.text, 'offset':[rel.obj.start_char, rel.obj.end_char]}])
+            if add_negative_sample:
+                other_rel_labels = all_relation_labels - set([rel.label for rel in doc._.relations])
+                if len(other_rel_labels)>0:
+                    for rel in doc._.relations:
+                        rel_label = random.choice(list(other_rel_labels))
+                        if rel_label in alias_dict:
+                            rel_label = random.choice(alias_dict[rel_label]+[rel_label])
+                        text_ls.append(doc.text)
+                        prompt_ls.append(rel.sub.text + '的' + rel_label)
+                        spans_ls.append([])
+            # 添加span prompt数据
+            if add_span_prompt:
+                span_label_dict = {}
+                for rel in doc._.relations:
+                    if rel.sub.label not in span_label_dict:
+                        span_label_dict[rel.sub.label] = []
+                    span_label_dict[rel.sub.label].append({'text': rel.obj.text, 'offset':[rel.obj.start_char, rel.obj.end_char]})
+                    if rel.obj.label not in span_label_dict:
+                        span_label_dict[rel.obj.label] = []
+                    span_label_dict[rel.obj.label].append({'text': rel.obj.text, 'offset':[rel.obj.start_char, rel.obj.end_char]})
+                for span_label in span_label_dict:
+                    text_ls.append(doc.text)
+                    if span_label in span_alias_dict:
+                        span_label = random.choice(span_alias_dict[span_label]+[span_label])
+                    prompt_ls.append(span_label)
+                    spans_ls.append(span_label_dict[span_label])
+                if add_negative_sample:
+                    other_span_labels = all_span_labels - set(span_label_dict.keys())
+                    if len(other_span_labels)>0:
+                        span_label = random.choice(list(other_span_labels))
+                        if span_label in span_alias_dict:
+                            span_label = random.choice(span_alias_dict[span_label]+[span_label])
+                        text_ls.append(doc.text)
+                        prompt_ls.append(span_label)
+                        spans_ls.append([])
+        else:
+            rel_labels = set([rel.label for rel in doc._.relations])
+            for rel in doc._.relations:
+                text = ''.join([sent.text for sent in rel.sents])
+                text_ls.append(text)
+                rel_label = rel.label
+                if rel_label in alias_dict:
+                    rel_label = random.choice(alias_dict[rel_label]+[rel_label])
+                prompt_ls.append(rel.sub.text + '的' + rel_label)
+                spans_ls.append([{'text': rel.obj.text, 'offset':[rel.obj.start_char-rel.sents[0].start_char, rel.obj.end_char-rel.sents[0].start_char]}])
+                if add_negative_sample:
+                    other_rel_labels = all_relation_labels - rel_labels
+                    if len(other_rel_labels)>0:
+                        text_ls.append(text)
+                        rel_label = random.choice(list(other_rel_labels))
+                        if rel_label in alias_dict:
+                            rel_label = random.choice(alias_dict[rel_label]+[rel_label])
+                        prompt_ls.append(rel.sub.text + '的' + rel_label)
+                        spans_ls.append([])
+            if add_span_prompt:
+                span_label_dict = {}
+                for rel in doc._.relations:
+                    if rel.sub.label not in span_label_dict:
+                        span_label_dict[rel.sub.label] = []
+                    span_label_dict[rel.sub.label].append({'text': rel.sub.text, 'offset':[rel.sub.start_char, rel.sub.end_char]})
+                    if rel.obj.label not in span_label_dict:
+                        span_label_dict[rel.obj.label] = []
+                    span_label_dict[rel.obj.label].append({'text': rel.obj.text, 'offset':[rel.obj.start_char, rel.obj.end_char]})
+                for span_label in span_label_dict:
+                    left_idx = min([span['offset'][0] for span in span_label_dict[span_label]])
+                    right_idx = max([span['offset'][1] for span in span_label_dict[span_label]])
+                    sents = list(doc[left_idx:right_idx].sents)
+                    last = sents.pop()
+                    sents.append(last.sent)
+                    text = ''.join([sent.text for sent in sents])
+                    text_ls.append(text)
+                    spans_ls.append(span_label_dict[span_label])
+                    if span_label in span_alias_dict:
+                        alias_label = random.choice(span_alias_dict[span_label]+[span_label])
+                        prompt_ls.append(alias_label)
+                    else:
+                        prompt_ls.append(span_label)
+                    if add_negative_sample:
+                        other_span_labels = all_span_labels - set(span_label_dict.keys())
+                        if len(other_span_labels)>0:
+                            span_label = random.choice(list(other_span_labels))
+                            if span_label in span_alias_dict:
+                                span_label = random.choice(span_alias_dict[span_label]+[span_label])
+                            text_ls.append(text)
+                            prompt_ls.append(span_label)
+                            spans_ls.append([])           
+    print('转换数据中...')
+    ds = Dataset.from_dict({'text': text_ls, 'prompt': prompt_ls, 'spans': spans_ls})
+    print('转换数据完成')
+    return ds
+                                       
