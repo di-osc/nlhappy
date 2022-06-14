@@ -1,5 +1,8 @@
 from spacy.tokens import Token, Span, Doc
 from typing import Dict, List 
+import srsly
+from spacy.language import Language
+from tqdm import tqdm 
 
 
 Doc.set_extension('events', default=[])
@@ -100,7 +103,60 @@ class Relation:
     
     
     
+def make_docs_from_doccano_jsonl(file_path: str, 
+                                 nlp: Language, 
+                                 set_ent: bool = True,
+                                 set_span: bool = False,
+                                 set_relation: bool = True) -> List[Doc]:
+    """make docs and add entities from doccano jsonl file
+
+    Args:
+        file_path (str): the path of the doccano jsonl file
+        nlp (Language): the spacy language processing pipeline
+        set_ent (bool, optional): whether to set the entities in the doc. Defaults to True.
+        set_span (bool, optional): whether to set the spans with a 'all' key in the doc. uses for overlap spans. Defaults to False.
+        set_relation (bool, optional): whether to set the relations in the doc. Defaults to True.
+
+    Returns:
+        List[Doc]: the list of doc with tags
+    """
+    docs = []
+    for d in tqdm(srsly.read_jsonl(file_path)):
+        doc = nlp(d['text'])
+        if len(d['entities']) > 0:
+            ents = {}
+            for ent in d['entities']:
+                ents[ent['id']] = doc.char_span(ent['start_offset'], ent['end_offset'], label=ent['label'])
+            
+            if set_ent:
+                try:
+                    doc.set_ents(list(ents.values()))
+                except:
+                    pass
+            if set_span:
+                doc.spans['all'] = list(ents.values())
+            if set_relation:
+                if len(d['relations']) > 0:
+                    rels = {}
+                    for rel in d['relations']:
+                        if rel['from_id'] not in rels:
+                            rels[rel['from_id']] = {}
+                        if rel['type'] not in rels[rel['from_id']]:
+                            rels[rel['from_id']][rel['type']] = []
+                        rels[rel['from_id']][rel['type']].append(rel['to_id'])
+                    for sub_id in rels:
+                        for rel_type in rels[sub_id]:
+                            sub = ents[sub_id]
+                            objs = [ents[obj_id] for obj_id in rels[sub_id][rel_type]]
+                            label = rel_type
+                            doc._.relations.append(Relation(label, sub, objs))
+            
+            docs.append(doc)
         
+    return docs
+            
+            
+           
         
         
 
