@@ -23,8 +23,8 @@ class Event:
         
     @property
     def sents(self):
-        left_idx = min([span.start for val in self.roles.values() for span in val])
-        right_idx = max([span.end for val in self.roles.values() for span in val])
+        left_idx = min([span.start_char for val in self.roles.values() for span in val])
+        right_idx = max([span.end_char for val in self.roles.values() for span in val])
         # return self.doc[left_idx:right_idx].sents  ##################### 这个有个bug 暂时不能这样返回
         sents = list(self.doc[left_idx:right_idx].sents)
         last = sents.pop()
@@ -63,9 +63,8 @@ class Relation:
     def __init__(self,
                  label: str,
                  sub: Span,
-                 obj: Span) -> None:
+                 objs: List[Span]) -> None:
         """
-
         Args:
             label (str): the relation label
             sub (Span): the subject of the relation
@@ -73,13 +72,13 @@ class Relation:
         """
         self.label = label
         self.sub = sub
-        self.obj = obj
+        self.objs = objs
         
         
     @property
     def sents(self) -> List[Span]:
-        left_idx = min([self.sub.start, self.obj.start])
-        right_idx = max([self.sub.end, self.obj.end])
+        left_idx = min([self.sub.start_char, min([obj.start_char for obj in self.objs])])
+        right_idx = max([self.sub.end_char, max([obj.end_char for obj in self.objs])])
         # return self.doc[left_idx:right_idx].sents
         sents = list(self.doc[left_idx:right_idx].sents)
         last = sents.pop()
@@ -89,16 +88,20 @@ class Relation:
     
     @property
     def doc(self) -> Doc:
-        assert self.sub.doc == self.obj.doc
         return self.sub.doc
         
         
     def __repr__(self) -> str:
-        return f'Relation({self.label})'
+        return f'Relation({self.sub},{self.label})'
     
     
     def __eq__(self, rel) -> bool:
         return self.label == rel.label and self.sub == rel.sub and self.obj == rel.obj
+    
+    
+    
+        
+        
         
 
 
