@@ -34,6 +34,7 @@ pipx install poetry
 pipx ensurepath 
 # 需要重新打开命令行
 poetry build
+# 安装包 在dist文件夹
 
 ```
 
@@ -56,6 +57,7 @@ seed=123
 # 多卡运行
 nlhappy \
 trainer=ddp \
+trainer.gpus=4 \
 datamodule=prompt_span_extraction \
 datamodule.dataset=CLUENER_PSE \
 datamodule.plm=chinese-roberta-wwm-ext \
