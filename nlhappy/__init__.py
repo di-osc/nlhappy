@@ -36,4 +36,11 @@ def explain(key: str):
     else:
         return 'No explanation for this key.'
     
+def nlp(tokenizer: str = 'char'):
+    import spacy
+    from nlhappy.components.tokenizer import CharTokenizer
+    nlp = spacy.blank('zh')
+    nlp.tokenizer = CharTokenizer(nlp.vocab)
+    return nlp
+    
     
