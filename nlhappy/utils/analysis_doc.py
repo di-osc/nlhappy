@@ -32,15 +32,6 @@ def analysis_ent_type(docs: List[Doc], return_ent_per_type: bool=True, ent_lt:in
         for ent in doc.ents:
             type_dict[ent.label_]+=1
     type_dict = {k:v for k,v  in sorted(type_dict.items(), key=lambda item: item[1])}
-    # if plot: 
-    #     fig = plt.figure()
-    #     types = type_dict.keys()
-    #     nums = type_dict.values()
-    #     s = len(types) // 5
-    #     ax = fig.add_axes([0,0,s,s])
-    #     ax.bar(range(len(types)), nums, width=0.5, label='num')
-    #     plt.xticks(range(len(types)), types)
-    #     plt.show()
     return_types = [k for k,v in type_dict.items() if v < ent_lt]
     return_docs = {k:[] for k in return_types}
     for doc in docs:
