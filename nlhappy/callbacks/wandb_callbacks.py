@@ -44,7 +44,8 @@ class WatchModel(Callback):
     @rank_zero_only
     def on_train_start(self, trainer, pl_module):
         logger = get_wandb_logger(trainer=trainer)
-        logger.watch(model=trainer.model, log=self.log, log_freq=self.log_freq, log_graph=True)
+        logger.watch(model=trainer.model, log=self.log,
+                     log_freq=self.log_freq, log_graph=True)
 
 
 class UploadCodeAsArtifact(Callback):
@@ -71,7 +72,8 @@ class UploadCodeAsArtifact(Callback):
         if self.use_git:
             # get .git folder path
             git_dir_path = Path(
-                subprocess.check_output(["git", "rev-parse", "--git-dir"]).strip().decode("utf8")
+                subprocess.check_output(
+                    ["git", "rev-parse", "--git-dir"]).strip().decode("utf8")
             ).resolve()
 
             for path in Path(self.code_dir).resolve().rglob("*"):
@@ -85,11 +87,13 @@ class UploadCodeAsArtifact(Callback):
                 not_git = not str(path).startswith(str(git_dir_path))
 
                 if path.is_file() and not_git and not_ignored:
-                    code.add_file(str(path), name=str(path.relative_to(self.code_dir)))
+                    code.add_file(str(path), name=str(
+                        path.relative_to(self.code_dir)))
 
         else:
             for path in Path(self.code_dir).resolve().rglob("*.py"):
-                code.add_file(str(path), name=str(path.relative_to(self.code_dir)))
+                code.add_file(str(path), name=str(
+                    path.relative_to(self.code_dir)))
 
         experiment.log_artifact(code)
 
@@ -155,7 +159,8 @@ class LogConfusionMatrix(Callback):
             preds = torch.cat(self.preds).cpu().numpy()
             targets = torch.cat(self.targets).cpu().numpy()
 
-            confusion_matrix = metrics.confusion_matrix(y_true=targets, y_pred=preds)
+            confusion_matrix = metrics.confusion_matrix(
+                y_true=targets, y_pred=preds)
 
             # set figure size
             plt.figure(figsize=(14, 8))
@@ -164,10 +169,12 @@ class LogConfusionMatrix(Callback):
             sn.set(font_scale=1.4)
 
             # set font size
-            sn.heatmap(confusion_matrix, annot=True, annot_kws={"size": 8}, fmt="g")
+            sn.heatmap(confusion_matrix, annot=True,
+                       annot_kws={"size": 8}, fmt="g")
 
             # names should be uniqe or else charts from different experiments in wandb will overlap
-            experiment.log({f"confusion_matrix/{experiment.name}": wandb.Image(plt)}, commit=False)
+            experiment.log(
+                {f"confusion_matrix/{experiment.name}": wandb.Image(plt)}, commit=False)
 
             # according to wandb docs this should also work but it crashes
             # experiment.log(f{"confusion_matrix/{experiment.name}": plt})
@@ -233,7 +240,8 @@ class LogF1PrecRecHeatmap(Callback):
             )
 
             # names should be uniqe or else charts from different experiments in wandb will overlap
-            experiment.log({f"f1_p_r_heatmap/{experiment.name}": wandb.Image(plt)}, commit=False)
+            experiment.log(
+                {f"f1_p_r_heatmap/{experiment.name}": wandb.Image(plt)}, commit=False)
 
             # reset plot
             plt.clf()
