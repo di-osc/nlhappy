@@ -30,6 +30,9 @@ dataset_dir: ${work_dir}/datasets/
 # path to pretrained models
 plm_dir: ${work_dir}/plms/
 
+# path to checkpoint for updating model
+ckpt_path: null
+
 # pretty print config at the start of the run using Rich library
 print_config: True
 
