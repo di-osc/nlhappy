@@ -1,8 +1,8 @@
 [tool.poetry]
 name = "nlhappy"
-version = "2022.06.12"
-description = "复现收录一些常用的NLP模型"
-authors = ["wangmengdi <790990241@qq.com>"]
+version = "2022.06.15"
+description = "😄让你爱上自然语言处理😄"
+authors = ["wangmengdi <ddream_ai@163.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.7"
