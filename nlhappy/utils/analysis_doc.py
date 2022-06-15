@@ -24,7 +24,8 @@ def analysis_ent_type(docs: List[Doc], return_ent_per_type: bool=True, ent_lt:in
     参数:
     - docs: doc列表
     - return_ent_per_type: 是否返回实体类型数量对应字典,默认返回
-    - return_ent_lt: 数量, 返回小于这个数量的实体的doc"""
+    - return_ent_lt: 数量, 返回小于这个数量的实体的doc
+    """
     
     ent_types = set([ent.label_ for doc in docs for ent in doc.ents])
     type_dict = dict(zip(ent_types, [0]*len(ent_types)))
@@ -47,7 +48,8 @@ def analysis_ent_badcase(preds: List[Doc], docs:List[Doc], return_prf:bool=False
     """寻找badcase
     - preds: 预测的doc
     - docs: 真实的doc
-    - return_prf: 是否返回每个实体类别的prf值"""
+    - return_prf: 是否返回每个实体类别的prf值
+    """
     badcases = []
     for pred, doc  in zip(preds, docs):
         if is_badcase(pred, doc):
