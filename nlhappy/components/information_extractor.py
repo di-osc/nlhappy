@@ -90,7 +90,7 @@ class PSEONNXExtractor:
         offset_mapping = inputs['offset_mapping']
         del inputs['offset_mapping']
         logits = self.infer.run(None, dict(inputs))[0]
-        res = np.nonzero(logits>0.5)
+        res = np.nonzero(logits>self.threshold)
         idxs, _, starts, ends = res[0].tolist(), res[1].tolist(), res[2].tolist(), res[3].tolist()
         starts = [offset_mapping[0][start][0] for start in starts]
         ends = [offset_mapping[0][end][1] for end in ends]
@@ -110,7 +110,8 @@ class PSEONNXExtractor:
         
 default_config = {'threshold': 0.5, 
                   'set_ents': True, 
-                  'num_sentences': 0, 
+                  'num_sentences': 0,
+                  'stride': -1, 
                   'model': 'pse.onnx',
                   'use_onnx': True}
         
@@ -121,7 +122,8 @@ def make_ie(nlp: Language,
             schemas: Dict, 
             model:str, 
             ckpt:str, 
-            num_sentences:bool, 
+            num_sentences:bool,
+            stride:int, 
             threshold:float, 
             set_ents: bool,
             use_onnx: bool = True):
@@ -146,7 +148,8 @@ def make_ie(nlp: Language,
                                 schemas=schemas,
                                 model=model, 
                                 ckpt=ckpt, 
-                                num_sentences=num_sentences, 
+                                num_sentences=num_sentences,
+                                stride=stride, 
                                 threshold=threshold, 
                                 set_ents=set_ents)
     else:
