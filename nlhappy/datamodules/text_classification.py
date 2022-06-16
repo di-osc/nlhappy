@@ -1,7 +1,7 @@
 import pytorch_lightning as pl
 from typing import Tuple, List, Dict
 from transformers import AutoTokenizer, AutoConfig
-from ..utils.storer import OSSStorer
+from ..utils.make_datamodule import OSSStorer
 from torch.utils.data import DataLoader
 from ..utils.preprocessing import fine_grade_tokenize
 from datasets import load_from_disk

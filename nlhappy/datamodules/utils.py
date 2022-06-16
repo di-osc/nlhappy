@@ -1,6 +1,6 @@
 import os
 from ..utils import utils
-from ..utils.storer import OSSStorer
+from ..utils.make_datamodule import OSSStorer
 from typing import List
 
 log = utils.get_logger(__name__)

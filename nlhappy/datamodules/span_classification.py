@@ -1,5 +1,5 @@
 import pytorch_lightning as pl
-from ..utils.storer import OSSStorer
+from ..utils.make_datamodule import OSSStorer
 import os
 import torch
 from datasets import load_from_disk

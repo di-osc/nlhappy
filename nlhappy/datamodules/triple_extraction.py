@@ -1,5 +1,5 @@
 import pytorch_lightning as pl
-from ..utils.storer import OSSStorer
+from ..utils.make_datamodule import OSSStorer
 from ..utils.preprocessing import fine_grade_tokenize
 import torch
 from datasets import load_from_disk

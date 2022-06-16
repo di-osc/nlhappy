@@ -1,5 +1,5 @@
 import pytorch_lightning as pl
-from ..utils.storer import OSSStorer
+from ..utils.make_datamodule import OSSStorer
 from datasets import load_from_disk
 from transformers import BertTokenizer, BertConfig, AutoTokenizer, AutoConfig
 from torch.utils.data import DataLoader

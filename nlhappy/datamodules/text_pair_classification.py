@@ -1,7 +1,7 @@
 import pytorch_lightning as pl
 from typing import Optional,  Tuple, List, Union
 from transformers import AutoConfig, AutoTokenizer
-from ..utils.storer import OSSStorer
+from ..utils.make_datamodule import OSSStorer
 from torch.utils.data import DataLoader
 import torch
 import os

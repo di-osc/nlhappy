@@ -1,7 +1,7 @@
 import imp
 import pytorch_lightning as pl
 from typing import Any
-from ..utils.storer import OSSStorer
+from ..utils.make_datamodule import OSSStorer
 from torch.utils.data import DataLoader
 from datasets import load_from_disk
 import os

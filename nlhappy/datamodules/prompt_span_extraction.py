@@ -1,5 +1,5 @@
 import pytorch_lightning as pl
-from .utils import prepare_data_from_oss, char_idx_to_token
+from ..utils.make_datamodule import prepare_data_from_oss, char_idx_to_token
 import torch
 from datasets import load_from_disk
 import os
@@ -35,7 +35,7 @@ class PromptSpanExtractionDataModule(pl.LightningDataModule):
             max_length (int): 文本最大长度
             batch_size (int): 批次大小
             pin_memory (bool, optional): 锁页内存. Defaults to True.
-            num_workers (int, optional): 多进程. Defaults to 1.
+            num_workers (int, optional): 多进程. Defaults to 0.
             dataset_dir (str, optional): 数据集目录. Defaults to './datasets/'.
             plm_dir (str, optional): 预训练模型目录. Defaults to './plms/'.
         """
@@ -101,7 +101,6 @@ class PromptSpanExtractionDataModule(pl.LightningDataModule):
         self.dataset = load_from_disk(dataset_path)
         plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
         self.tokenizer = AutoTokenizer.from_pretrained(plm_path)
-        # self.hparams['vocab'] = dict(self.tokenizer.vocab)
         self.hparams['vocab'] = dict(sorted(self.tokenizer.vocab.items(), key=lambda x: x[1]))
         trf_config = AutoConfig.from_pretrained(plm_path)
         self.hparams['trf_config'] = trf_config
