@@ -1,8 +1,8 @@
-from .base import PLMDataModule
+import pytorch_lightning as pl
 
 
 
-class EventExtractionDataModule(PLMDataModule):
+class EventExtractionDataModule(pl.LightningDataModule):
     def __init__(self, 
                 dataset: str, 
                 plm: str, 
@@ -10,8 +10,8 @@ class EventExtractionDataModule(PLMDataModule):
                 batch_size: int, 
                 pin_memory: bool, 
                 num_workers: int, 
-                data_dir: str = './datasets', 
-                pretrained_dir: str = './plms'):
+                dataset_dir: str = './datasets', 
+                plm_dir: str = './plms'):
         super().__init__()
         self.save_hyperparameters()
 
