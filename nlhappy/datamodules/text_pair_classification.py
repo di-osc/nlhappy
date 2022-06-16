@@ -1,19 +1,19 @@
 import pytorch_lightning as pl
 from typing import Optional,  Tuple, List, Union
 from transformers import AutoConfig, AutoTokenizer
-from ..utils.make_datamodule import OSSStorer
+from ..utils.make_datamodule import prepare_data_from_oss
 from torch.utils.data import DataLoader
 import torch
 import os
 from datasets import load_from_disk, Dataset, DatasetDict 
 from ..utils import utils
 
-log = utils.get_logger(__name__)
 
-example = """{'text_a': '肺结核','text_b': '关节炎','label': 不是一种病}"""
 
 class TextPairClassificationDataModule(pl.LightningDataModule):
-    '''句子对数据模块,用来构建pytorch_lightning的数据模块
+    '''句子对数据模块,用来构建pytorch_lightning的数据模块.
+    dataset_example:
+        {'text_a': '肺结核','text_b': '关节炎','label': 不是一种病}
     '''
     def __init__(self,
                 dataset: str,
@@ -47,21 +47,10 @@ class TextPairClassificationDataModule(pl.LightningDataModule):
         '''
         下载数据集.这个方法只会在一个GPU上执行一次.
         '''
-        oss = OSSStorer()
-        dataset_path = os.path.join(self.hparams.dataset_dir, self.hparams.dataset)
-        plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
-        if os.path.exists(dataset_path):
-            log.info(f'{dataset_path} already exists.')
-        else:
-            log.info('not exists dataset in {}'.format(dataset_path))
-            log.info('start downloading dataset from oss')
-            oss.download_dataset(self.hparams.dataset, self.hparams.dataset_dir)
-        if os.path.exists(plm_path):
-            log.info(f'{plm_path} already exists.') 
-        else : 
-            log.info('not exists plm in {}'.format(plm_path))
-            log.info('start downloading plm from oss')
-            oss.download_plm(self.hparams.plm, self.hparams.plm_dir)
+        prepare_data_from_oss(dataset=self.hparams.dataset,
+                              plm=self.hparams.plm,
+                              dataset_dir=self.hparams.dataset_dir,
+                              plm_dir=self.hparams.plm_dir)
         
     
     def setup(self, stage: str):
@@ -141,9 +130,6 @@ class TextPairClassificationDataModule(pl.LightningDataModule):
                           pin_memory=self.hparams.pin_memory,
                           shuffle=False)
         
-    @property
-    def example(self):
-        return example
 
 
         
