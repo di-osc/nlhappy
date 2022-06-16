@@ -2,11 +2,10 @@ import pytorch_lightning as pl
 from transformers import BertModel, BertTokenizer
 from ...layers import EfficientGlobalPointer
 from ...layers.loss import MultiLabelCategoricalCrossEntropy, SparseMultiLabelCrossEntropy
-from ...metrics.triple import TripleF1
+from ...metrics.triple import TripleF1, Triple
 import torch
 from torch import Tensor
 from typing import List, Set
-from ...utils.data import Triple
 from ...utils.preprocessing import fine_grade_tokenize
 import os
 
