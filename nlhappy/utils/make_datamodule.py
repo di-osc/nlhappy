@@ -2,6 +2,21 @@ import os
 import oss2
 import zipfile
 from .utils import zip_all_files
+from .utils import get_logger
+
+def char_idx_to_token(char_idx, offset_mapping):
+    """
+    将char级别的idx 转换为token级别的idx
+    例如:
+    text = '我是中国人'
+    tokens = ['我', '是', '中国', '人']
+    '国'的字符下标为3, token级别的下标为2
+    """
+    for index, span in enumerate(offset_mapping):
+        if span[0] <= char_idx < span[1]:
+            return index
+    return -1
+
 
 default_access_key_id = 'LTAI5tPsMSE5G3srWxB8j3yw'
 default_access_key_secret = 'z5jPdkfNq4WPtV4c7YaAJwH5Sj45gT'
@@ -27,12 +42,6 @@ class OSSStorer:
         self.model_bucket = oss2.Bucket(self.auth, endpoint, model_bucket)
         self.assets_bucket = oss2.Bucket(self.auth, endpoint, asset_bucket)
 
-    # def download(
-    #     self, 
-    #     filename : str, 
-    #     localfile : str
-    #     ):
-    #     self.data_bucket.get_object_to_file(key=filename, filename=localfile)
 
     def list_all_assets(self):
         """获取数据名称"""
@@ -106,7 +115,6 @@ class OSSStorer:
                     os.remove(path=file_path)
                 
 
-
     def download_asset(
         self, 
         asset:str, 
@@ -130,7 +138,6 @@ class OSSStorer:
                     os.remove(path=file_path)
                 
         
-
     def upload_dataset(
         self, 
         dataset:str, 
@@ -185,12 +192,35 @@ class OSSStorer:
         self.assets_bucket.put_object_from_file(key=file, filename=file_path)
         if os.path.exists(file_path):
             os.remove(path=file_path)
+  
+log = get_logger(__name__)  
+        
+def prepare_data_from_oss(dataset: str,
+                          plm: str,
+                          dataset_dir: str ='./datasets/',
+                          plm_dir: str = './plms/') -> None:
+        '''
+        下载数据集.这个方法只会在一个GPU上执行一次.
+        '''
+        oss = OSSStorer()
+        dataset_path = os.path.join(dataset_dir, dataset)
+        plm_path = os.path.join(plm_dir, plm)
+        # 检测数据
+        log.info('Checking all data ...' )
+        if os.path.exists(dataset_path):
+            log.info(f'{dataset_path} already exists.')
+        else:
+            log.info('not exists dataset in {}'.format(dataset_path))
+            log.info('start downloading dataset from oss')
+            oss.download_dataset(dataset, dataset_dir)
+            log.info('finish downloading dataset from oss')
+        if os.path.exists(plm_path):
+            log.info(f'{plm_path} already exists.') 
+        else : 
+            log.info('not exists plm in {}'.format(plm_path))
+            log.info('start downloading plm from oss')
+            oss.download_plm(plm, plm_dir)
+            log.info('finish downloading plm from oss')
+        log.info('all data are ready')
 
 
-    
-if __name__ == '__main__':
-    oss = OSSStorer()
-    assets = oss.list_all_assets()
-    datasets = oss.list_all_datasets()
-    print(assets)
-    print(datasets)
