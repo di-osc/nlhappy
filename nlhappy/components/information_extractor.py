@@ -129,8 +129,8 @@ def make_ie(nlp: Language,
 
     Args:
         nlp (Language): spacy nlp
-        name (str): name of the pipeline
-        schemas (Dict): schemas of the pipeline
+        name (str): name of the pipe
+        schemas (Dict): schemas of the pipe
         model (str): name of the model
         ckpt (str): path of the model
         num_sentences (bool): num of sentences every time to extract
