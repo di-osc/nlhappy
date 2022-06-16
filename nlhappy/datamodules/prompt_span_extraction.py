@@ -23,8 +23,8 @@ class PromptSpanExtractionDataModule(pl.LightningDataModule):
                 plm: str,
                 max_length: int,
                 batch_size: int,
-                pin_memory: bool=True,
-                num_workers: int=1,
+                pin_memory: bool=False,
+                num_workers: int=0,
                 dataset_dir: str ='./datasets/',
                 plm_dir: str = './plms/') :
         """基于模板提示的文本片段抽取数据模块
