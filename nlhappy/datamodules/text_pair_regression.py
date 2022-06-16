@@ -1,35 +1,39 @@
 import torch
 import pytorch_lightning as pl
-from typing import Optional,  Tuple, List
+from typing import List
 from transformers import AutoConfig, AutoTokenizer
 from torch.utils.data import DataLoader
 from datasets import load_from_disk
 import os
-from ..utils.make_datamodule import OSSStorer
+from ..utils.make_datamodule import prepare_data_from_oss
 
 
 
 class TextPairRegressionDataModule(pl.LightningDataModule):
     '''文本对相似度数据模块
-    参数:
-    - dataset: 数据集名称, 文件为datasets.DataSet  feature 必须包含 text_a, text_b, label
-    - plm: 预训练模型名称
-    - max_length: 单个句子的最大长度
-    - batch_size: 批次大小
-    - num_workers: 加载数据时的线程数
-    - pin_memory: 是否将数据加载到GPU
-    - dataset_dir: 数据集所在的目录
-    - plm_dir: 预训练模型所在的目录
+    dataset_exmaple:
+        {'text_a': '左膝退变伴游离体','text_b': '单侧膝关节骨性关节病','similarity': 0}
     '''
     def __init__(self,
                 dataset: str,
                 plm: str,
                 max_length: int,
                 batch_size: int,
-                num_workers: int = 2,
-                pin_memory: bool =True,
-                dataset_dir = 'datasets/',
-                plm_dir = 'plms/'):  
+                num_workers: int = 0,
+                pin_memory: bool =False,
+                dataset_dir = './datasets/',
+                plm_dir = './plms/'):
+        """
+        Args:
+            dataset (str): the name of the dataset.
+            plm (str): the name of the plm.
+            max_length (int): the max length of the text
+            batch_size (int): the batch size in training and validation.
+            num_workers (int, optional): num of workers for data loading. 0 means that the data will be loaded in the main process. Defaults to 0.
+            pin_memory (bool, optional): whether to use pin memory. Defaults to False.
+            dataset_dir (str, optional): the directory of the dataset. Defaults to './datasets'.
+            plm_dir (str, optional): the directory of the plm. Defaults to './plms'.
+        """
         super().__init__()
 
         # 这一行代码为了保存传入的参数可以当做self.hparams的属性
@@ -40,9 +44,10 @@ class TextPairRegressionDataModule(pl.LightningDataModule):
         '''
         下载数据集.这个方法只会在一个GPU上执行一次.
         '''
-        oss = OSSStorer()
-        oss.download_dataset(self.hparams.dataset, self.hparams.dataset_dir)
-        oss.download_plm(self.hparams.plm, self.hparams.plm_dir)
+        prepare_data_from_oss(dataset=self.hparams.dataset,
+                              plm=self.hparams.plm,
+                              dataset_dir=self.hparams.dataset_dir,
+                              plm_dir=self.hparams.plm_dir)
 
         
     def setup(self, stage: str):
@@ -107,6 +112,3 @@ class TextPairRegressionDataModule(pl.LightningDataModule):
                           num_workers=self.hparams.num_workers, 
                           pin_memory=self.hparams.pin_memory,
                           shuffle=False)
-    @property
-    def example(self):
-        return """{'text_a': '左膝退变伴游离体','text_b': '单侧膝关节骨性关节病','similarity': 0}"""
