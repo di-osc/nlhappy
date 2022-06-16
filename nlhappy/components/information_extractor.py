@@ -1,21 +1,16 @@
 import shutil
 from spacy.tokens import Doc
 import os
-from thinc.api import Config 
 from onnxruntime import InferenceSession
 from transformers import AutoTokenizer
 from typing import Dict, List
 from spacy.lang.zh import Chinese
 from spacy.language import Language
 import numpy as np
-from spacy.util import filter_spans
 from ..utils.make_doc import Event, Relation
 
 
-class InformationExtractor:
-    '''句子级别span分类spacy pipeline
-    - ckpt: 模型保存路径
-    '''
+class PSEONNXExtractor:
     def __init__(self, 
                  nlp: Language, 
                  name: str,  
@@ -87,8 +82,7 @@ class InformationExtractor:
                         idxs, starts, ends = self.predict(prompts, texts)
                         spans = [doc.char_span(starts[i], ends[i], label=prompts[0]) for i in range(len(idxs))]
                         args_dict[arg] = spans
-                    doc._.events.append(Event(event, args_dict))
-                     
+                    doc._.events.append(Event(event, args_dict))            
         return doc
     
     def predict(self, prompts: List[str], texts: List[str]):
@@ -107,14 +101,19 @@ class InformationExtractor:
         # path : save_path/information_extractor
         shutil.copytree(self.ckpt, path)
         
-
     def from_disk(self, path:str, exclude):
         # path: load_path/information_extractor
         infer_path = os.path.join(path, self.model_name)
         self.infer = InferenceSession(infer_path)
         self.tokenizer = AutoTokenizer.from_pretrained(path)
         
-default_config = {'threshold': 0.5, 'set_ents': True, 'num_sentences': 0, 'model': 'pse.onnx'}
+        
+default_config = {'threshold': 0.5, 
+                  'set_ents': True, 
+                  'num_sentences': 0, 
+                  'model': 'pse.onnx',
+                  'use_onnx': True}
+        
         
 @Chinese.factory('information_extractor',assigns=['doc.spans','doc.ents','doc._.relations','doc._.events'],default_config=default_config)
 def make_ie(nlp: Language,
@@ -124,7 +123,8 @@ def make_ie(nlp: Language,
             ckpt:str, 
             num_sentences:bool, 
             threshold:float, 
-            set_ents: bool):
+            set_ents: bool,
+            use_onnx: bool = True):
     """the information extractor pipe
 
     Args:
@@ -138,9 +138,10 @@ def make_ie(nlp: Language,
         set_ents (bool): whether to set the doc.ents
 
     Returns:
-        InformationExtractor: information extractor
+        PSEExtractor: extractor based on the prompt-span-extraction model
     """
-    return InformationExtractor(nlp=nlp, 
+    if use_onnx:
+        return PSEONNXExtractor(nlp=nlp, 
                                 name=name,
                                 schemas=schemas,
                                 model=model, 
@@ -148,3 +149,5 @@ def make_ie(nlp: Language,
                                 num_sentences=num_sentences, 
                                 threshold=threshold, 
                                 set_ents=set_ents)
+    else:
+        raise NotImplementedError
