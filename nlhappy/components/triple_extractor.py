@@ -29,7 +29,6 @@ class SO:
     def text(self) -> str:
         return self.span.text
     
-
     @property   
     def label_(self):
         """查找subject或者object的类型"""
@@ -70,7 +69,6 @@ class SO:
         return self.span[index]
 
 
-
 class SPO(tuple):
     """主谓宾三元组"""
     
@@ -105,6 +103,7 @@ class SPO(tuple):
     def object(self):
         return self.spo[2]
 
+
 def get_spoes(doc):
     spoes = []
     for triple in doc._.triples:
@@ -118,7 +117,6 @@ def get_spoes(doc):
 models = {'bert_gplinker': BertGPLinker}
 Doc.set_extension('triples', default=[])
 Doc.set_extension('spoes', getter=get_spoes)
-
 
 
 class TripleExtractor(object):
@@ -143,7 +141,6 @@ class TripleExtractor(object):
         except Exception:
             pass
         
-        
     def __call__(self, doc: Doc) -> Doc:
         triples = self.model.predict(doc.text, self.device, threshold=self.threshold)
         doc._.triples.extend(triples)
@@ -152,12 +149,6 @@ class TripleExtractor(object):
     def to_disk(self, path:str, exclude):
         # 复制原来模型参数到新的路径
         shutil.copy(self.ckpt, path)
-        # 重写NLP配置文件config.cfg 改变pipeline的ckpt路径
-        # nlp_path = str(path).split('/')[0]
-        # config_path = os.path.join(nlp_path, 'config.cfg')
-        # config = Config().from_disk(config_path)
-        # config['components'][self.pipe_name]['ckpt'] = str(path)
-        # config.to_disk(config_path)
 
     def from_disk(self, path:str, exclude):
         nlp_path = str(path).split(self.pipe_name)[0]
@@ -167,6 +158,7 @@ class TripleExtractor(object):
         ckpt_path = os.path.join(path, ckpt_name)
         self.model = models[self.model_name].load_from_checkpoint(ckpt_path)
         self.model.freeze()
+
 
 @Chinese.factory('triple_extractor',assigns=['doc._.triples'],default_config={'model':'bert_gplinker', 'device':'cpu', 'threshold':None})
 def make_triple_extractor(nlp, name:str, model:str, ckpt:str, device:str, threshold):
