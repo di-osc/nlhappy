@@ -24,7 +24,6 @@ class PSEONNXExtractor:
                  num_sentences: int =0,
                  stride: int =-1,
                  model:str = 'pse.onnx'):
-        self.nlp = nlp
         self.pipe_name = name
         self.ckpt = ckpt
         self.set_ents = set_ents
@@ -99,8 +98,8 @@ class PSEONNXExtractor:
         logits = self.infer.run(None, dict(inputs))[0]
         res = np.nonzero(logits>self.threshold)
         idxs, _, starts, ends = res[0].tolist(), res[1].tolist(), res[2].tolist(), res[3].tolist()
-        starts = [offset_mapping[0][start][0] for start in starts]
-        ends = [offset_mapping[0][end][1] for end in ends]
+        starts = [offset_mapping[idxs[i]][starts[i]][0] for i in range(len(starts))]
+        ends = [offset_mapping[idxs[i]][ends[i]][1] for i in range(len(ends))]
         return idxs, starts, ends
 
     def to_disk(self, path:str, exclude):
