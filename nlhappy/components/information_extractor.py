@@ -8,6 +8,9 @@ from spacy.lang.zh import Chinese
 from spacy.language import Language
 import numpy as np
 from ..utils.make_doc import Event, Relation
+from ..utils.utils import get_logger
+
+log = get_logger()
 
 
 class PSEONNXExtractor:
@@ -32,9 +35,13 @@ class PSEONNXExtractor:
         self.schemas = schemas
         try:
             self.infer = InferenceSession(os.path.join(self.ckpt, self.model_name))
+        except:
+            pass
+        try:
             self.tokenizer = AutoTokenizer.from_pretrained(self.ckpt)
         except:
             pass
+        
         
         
     def __call__(self, doc: Doc) -> Doc:
@@ -46,18 +53,18 @@ class PSEONNXExtractor:
                 ent_prompts = self.schemas['entity']
                 texts = [doc.text for _ in range(len(ent_prompts))]
                 label_idxs, starts, ends = self.predict(ent_prompts, texts)
-                ent_dict = {}
                 doc.spans['all'] = []
-                for i in range(len(label_idxs)):
-                    label = ent_prompts[label_idxs[i]]
-                    start = starts[i]
-                    end = ends[i]
-                    if label not in ent_dict:
-                        ent_dict[label] = []
-                    ent_dict[label].append(doc.char_span(start, end, label=label))
-                    doc.spans['all'].append(doc.char_span(start, end, label=label))
-                if self.set_ents:
-                    doc.set_ents(doc.spans['all'])
+                if len(label_idxs) > 0:
+                    for i in range(len(label_idxs)):
+                        label = ent_prompts[label_idxs[i]]
+                        start = starts[i]
+                        end = ends[i]
+                        try:
+                            doc.spans['all'].append(doc.char_span(start, end, label=label))
+                        except:
+                            log.warning(f'found bad span ({start}, {end}). skip set entity')     
+                    if self.set_ents:
+                        doc.set_ents(doc.spans['all'])
             if 'relation' in self.schemas:
                 for sub_type in self.schemas['relation']:
                     sub_prompt = [sub_type]
