@@ -16,7 +16,7 @@ oss2 = "^2.15.0"
 onnx = "^1.11.0"
 onnxruntime = "^1.10.0"
 spacy = "^3.3.0"
-rich = "12.4.3"
+rich = "^12.4.3"
 
 [tool.poetry.dev-dependencies]
 
