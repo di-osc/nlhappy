@@ -1,12 +1,10 @@
 import pytorch_lightning as pl
-from transformers import AutoModel,  AutoTokenizer
+from transformers import AutoModel
 import torch.nn as nn
 import torch
-import os
 from ...metrics.span import SpanF1
 from ...layers import MultiLabelCategoricalCrossEntropy, EfficientGlobalPointer
-
-
+from ...utils.make_model import get_hf_tokenizer
 
 
 class BERTGlobalSpan(pl.LightningModule):
@@ -45,7 +43,7 @@ class BERTGlobalSpan(pl.LightningModule):
         self.train_metric = SpanF1()
         self.val_metric = SpanF1()
         self.test_metric = SpanF1()
-        self.tokenizer = self._init_tokenizer()
+        self.tokenizer = get_hf_tokenizer(config=self.hparams.trf_config, vocab=self.hparams.vocab)
 
     def forward(self, input_ids, token_type_ids, attention_mask=None):
         x = self.plm(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask).last_hidden_state
@@ -104,17 +102,6 @@ class BERTGlobalSpan(pl.LightningModule):
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 1.0 / (epoch + 1.0))
         return [optimizer], [scheduler]
 
-
-    def _init_tokenizer(self):
-        with open('./vocab.txt', 'w') as f:
-            for k in self.hparams.vocab.keys():
-                f.writelines(k + '\n')
-        self.hparams.trf_config.to_json_file('./config.json')
-        tokenizer = AutoTokenizer.from_pretrained('./')
-        os.remove('./vocab.txt')
-        os.remove('./config.json')
-        return tokenizer
-    
     
     def predict(self, prompt: str, text: str, device: str='cpu', threshold = None):
         if threshold is None:
