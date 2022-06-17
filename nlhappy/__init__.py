@@ -38,9 +38,34 @@ def explain(key: str):
     
 def nlp(tokenizer: str = 'char'):
     import spacy
-    from nlhappy.components.tokenizer import CharTokenizer
+    from nlhappy.components.tokenizer import all_tokenizers
+    tokenizer = all_tokenizers[tokenizer]
     nlp = spacy.blank('zh')
-    nlp.tokenizer = CharTokenizer(nlp.vocab)
+    nlp.tokenizer = tokenizer(nlp.vocab)
+    return nlp
+
+
+def load(path: str):
+    """load spacy nlp pipeline from path
+
+    Args:
+        path (str): path to the pipeline
+
+    Returns:
+        nlp: spacy nlp pipeline
+    """
+    import spacy
+    nlp = spacy.load(path)
+    return nlp
+
+def chinese():
+    """a blank chinese spacy pipeline 
+
+    Returns:
+        nlp: spacy chinese pipeline
+    """
+    import spacy
+    nlp = spacy.blank('zh')
     return nlp
     
     
