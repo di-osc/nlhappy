@@ -28,7 +28,7 @@ class BERTGlobalSpan(pl.LightningModule):
         """
         super().__init__()
         
-        self.save_hyperparameters()   
+        self.save_hyperparameters(logger=False)   
 
 
         self.plm = AutoModel.from_config(self.hparams.trf_config)
@@ -67,22 +67,25 @@ class BERTGlobalSpan(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         loss, pred, true = self.shared_step(batch)
-        self.train_metric(pred, true)
-        self.log('train/f1', self.train_metric, on_step=True, on_epoch=True, prog_bar=True)
+        f1 = self.train_metric(pred, true)
+        self.log('train/f1', self.train_metric, on_step=True, on_epoch=False)
+        # self.logger.log_metrics({'train/loss': loss, 'train/f1': f1}, step=self.global_step)
         return {'loss': loss}
 
 
     def validation_step(self, batch, batch_idx):
         loss, pred, true = self.shared_step(batch)
-        self.val_metric(pred, true)
+        f1 = self.val_metric(pred, true)
         self.log('val/f1', self.val_metric, on_step=False, on_epoch=True, prog_bar=True)
+        # self.logger.log_metrics({'val/loss': loss, 'val/f1': f1}, step=self.global_step)
         return {'loss': loss}
 
 
     def test_step(self, batch, batch_idx):
         loss, pred, true = self.shared_step(batch)
-        self.test_metric(pred, true)
-        self.log('test/f1', self.test_metric, on_step=False, on_epoch=True, prog_bar=True)
+        f1 = self.test_metric(pred, true)
+        self.log('test/f1', f1, on_step=False, on_epoch=True, prog_bar=True)
+        # self.logger.log_metrics({'test/loss': loss, 'test/f1': f1}, step=self.global_step)
         return {'loss': loss}
 
 
