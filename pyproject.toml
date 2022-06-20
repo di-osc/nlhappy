@@ -17,6 +17,7 @@ onnx = "^1.11.0"
 onnxruntime = "^1.10.0"
 spacy = "^3.3.0"
 rich = "^12.4.3"
+wandb = "0.12.18"
 
 [tool.poetry.dev-dependencies]
 
