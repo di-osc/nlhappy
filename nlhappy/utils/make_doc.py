@@ -3,6 +3,7 @@ from typing import Dict, List
 import srsly
 from spacy.language import Language
 from tqdm import tqdm 
+import random
 
 
 Doc.set_extension('events', default=[])
@@ -19,7 +20,8 @@ class Event:
             roles (Dict[str, List[Span]]): 事件中的角色包括触发词
             
         """
-        
+        assert isinstance(label, str) and label != '', 'label must be a string, and not empty, but got {}'.format(label)
+        assert isinstance(roles, dict) and len(roles) > 0, 'roles must be a dict, and not empty, but got {}'.format(roles)
         self.label = label
         self.roles = roles
         
@@ -73,6 +75,9 @@ class Relation:
             sub (Span): the subject of the relation
             obj (Span): the object of the relation
         """
+        assert type(label) == str, 'label must be a string, but got {}'.format(type(label))
+        assert type(sub) == Span, 'sub must be a Span, but got {}'.format(type(sub))
+        assert type(objs) == list, 'objs must be a list of Span, but got {}'.format(type(objs))
         self.label = label
         self.sub = sub
         self.objs = objs
@@ -153,6 +158,25 @@ def make_docs_from_doccano_jsonl(file_path: str,
             
             docs.append(doc)
         
+    return docs
+
+
+def extend_inverse_relations(docs: List[Doc], 
+                             inverse_relations: Dict[str, List[str]]) -> List[Doc]:
+    """extend the relations in the docs with inverse relations
+
+    Args:
+        docs (List[Doc]): the list of docs
+        inverse_relations (Dict[str, List[str]]): the inverse relations, key is the relation label, value is the list of inverse relation labels
+
+    Returns:
+        List[Doc]: the list of docs with extended relations
+    """
+    for doc in tqdm(docs):
+        for rel in doc._.relations:
+            if rel.label in inverse_relations:
+                for obj in rel.objs:
+                    doc._.relations.append(Relation(random.sample(inverse_relations[rel.label], k=1)[0], obj, [rel.sub]))
     return docs
             
             
