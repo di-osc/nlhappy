@@ -220,7 +220,9 @@ def convert_events_to_prompt_span_dataset(docs: List[Doc],
                 if add_negative_sample:
                     other_roles = all_roles - set(event.roles.keys())
                     if len(other_roles)>0:
-                        other_roles = random.shuffle(list(other_roles))
+                        other_roles = list(other_roles)
+                        random.shuffle(other_roles)
+                        other_roles = list(filter(None, other_roles))
                         for role in other_roles[:num_samples]:
                             if role in synonym_dict:
                                 role = random.choice(synonym_dict[role]+[role])
@@ -230,7 +232,9 @@ def convert_events_to_prompt_span_dataset(docs: List[Doc],
                     if add_span_prompt:
                         other_span_labels = all_span_labels - set(span_label_dict.keys())
                         if len(other_span_labels)>0:
-                            other_span_labels = random.shuffle(list(other_span_labels))
+                            other_span_labels = list(other_span_labels)
+                            random.shuffle(other_span_labels)
+                            other_span_labels = list(filter(None, other_span_labels))
                             for span_label in other_span_labels[:num_samples]:
                                 if span_label in span_synonym_dict:
                                     span_label = random.choice(span_synonym_dict[span_label]+[span_label])
@@ -263,7 +267,9 @@ def convert_events_to_prompt_span_dataset(docs: List[Doc],
                 if add_negative_sample:
                     other_roles = all_roles - set(event.roles.keys())
                     if len(other_roles)>0:
-                        other_roles = random.shuffle(list(other_roles))
+                        other_roles = list(other_roles)
+                        random.shuffle(other_roles)
+                        other_roles = list(filter(None, other_roles))
                         for role in other_roles[:num_samples]:
                             if role in synonym_dict:
                                 role = random.choice(synonym_dict[role]+[role])
@@ -273,7 +279,9 @@ def convert_events_to_prompt_span_dataset(docs: List[Doc],
                     if add_span_prompt:
                         other_span_labels = all_span_labels - set(span_label_dict.keys())
                         if len(other_span_labels)>0:
-                            other_span_labels = random.shuffle(list(other_span_labels))
+                            other_span_labels = list(other_span_labels)
+                            random.shuffle(other_span_labels)
+                            other_span_labels = list(filter(None, other_span_labels))
                             for span_label in other_span_labels[:num_samples]:
                                 if span_label in span_synonym_dict:
                                     span_label = random.choice(span_synonym_dict[span_label]+[span_label])
