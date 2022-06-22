@@ -4,6 +4,7 @@ import srsly
 from spacy.language import Language
 from tqdm import tqdm 
 import random
+from nlhappy import chinese
 
 
 Doc.set_extension('rel_data', default=[])
@@ -78,15 +79,14 @@ class EventData(dict):
                 assert type(value[role]) == list
                 for offset in value[role]:
                     assert offset[0]<offset[1], 'offset start must less than end'
-                
-            
         super().__setitem__(key, value)
         
 def get_events(doc: Doc) -> List[Event]:
     events=[]
     for event in doc._.event_data:
         label = event['label']
-        roles = {k:[ doc.char_span(s[0], s[1]) for s in v] for k, v in event.items()}
+        roles = event['roles']
+        roles = {k:[ doc.char_span(s[0], s[1]) for s in v] for k, v in roles.items()}
         events.append(Event(label=label, roles=roles))
     return events
     
@@ -253,6 +253,23 @@ def extend_inverse_relations(docs: List[Doc],
                                                   sub=(obj[0], obj[1]), 
                                                   objs=[(rel.sub[0], rel.sub[1])]))
     return docs
+
+
+
+def get_docs_from_docbin(db_path: str,
+                         nlp: Language = None):
+    """get all docs for docbin 
+
+    Args:
+        db_path (str): the path to docbin
+        nlp (Language, optional): nlp that uses to get vocab. Defaults to None.
+    """
+    if not nlp:
+        nlp = chinese()
+    db = DocBin().from_disk(db_path)
+    docs = list(db.get_docs(nlp.vocab))
+    return docs
+
             
             
            
