@@ -1,16 +1,16 @@
-from spacy.tokens import Token, Span, Doc
-from typing import Dict, List 
+from spacy.tokens import Token, Span, Doc, DocBin
+from typing import Dict, List
 import srsly
 from spacy.language import Language
 from tqdm import tqdm 
 import random
 
 
-Doc.set_extension('events', default=[])
-Doc.set_extension('relations', default=[])
+Doc.set_extension('rel_data', default=[])
+Doc.set_extension('event_data',default=[])
 
 
-class Event:
+class Event():
     def __init__(self,
                  label: str,
                  roles: Dict[str, List[Span]]) -> None:
@@ -60,9 +60,41 @@ class Event:
                 return False
         return True
     
+class EventData(dict):
+    def __init__(self,
+                 label: str='',
+                 roles: dict = {}):
+        super().__init__(label=label, roles=roles)
+        self.label = label
+        self.roles = roles
+        
+    def __setitem__(self, key, value):
+        assert key in ['label', 'roles'], 'key must be sub, label or objs'
+        if key == 'label':
+            assert type(value) == str, 'label must be str type'
+        if key == 'roles':
+            assert type(key) == dict, 'roles must be dict type'
+            for role in value:
+                assert type(value[role]) == list
+                for offset in value[role]:
+                    assert offset[0]<offset[1], 'offset start must less than end'
+                
+            
+        super().__setitem__(key, value)
+        
+def get_events(doc: Doc) -> List[Event]:
+    events=[]
+    for event in doc._.event_data:
+        label = event['label']
+        roles = {k:[ doc.char_span(s[0], s[1]) for s in v] for k, v in event.items()}
+        events.append(Event(label=label, roles=roles))
+    return events
     
-    
-class Relation:
+        
+Doc.set_extension('events', getter=get_events)
+        
+ 
+class Relation():
     """used to store the relation in the doc
     """
     def __init__(self,
@@ -75,14 +107,14 @@ class Relation:
             sub (Span): the subject of the relation
             obj (Span): the object of the relation
         """
+        super().__init__()
         assert type(label) == str, 'label must be a string, but got {}'.format(type(label))
         assert type(sub) == Span, 'sub must be a Span, but got {}'.format(type(sub))
         assert type(objs) == list, 'objs must be a list of Span, but got {}'.format(type(objs))
         self.label = label
         self.sub = sub
-        self.objs = objs
-        
-        
+        self.objs = objs   
+          
     @property
     def sents(self) -> List[Span]:
         left_idx = min([self.sub.start_char, min([obj.start_char for obj in self.objs])])
@@ -93,21 +125,60 @@ class Relation:
         sents.append(last.sent)
         return sents
     
-    
     @property
     def doc(self) -> Doc:
         return self.sub.doc
-        
-        
+    
     def __repr__(self) -> str:
         return f'Relation({self.sub},{self.label})'
     
-    
     def __eq__(self, rel) -> bool:
-        return self.label == rel.label and self.sub == rel.sub and self.obj == rel.obj
+        return self.label == rel.label and self.sub == rel.sub and self.objs == rel.objs
+
+
+class RelationData(dict):
+    """存放关系offset数据
     
-    
-    
+    args:
+        sub(tuple): offset of subject
+        label(str): label of relation
+        objs(List): offsets of objs
+    """
+        
+    def __init__(self, sub=(), label='', objs=[]):
+        super().__init__(sub=sub,label=label,objs=objs)
+        self.sub= sub
+        self.label = label
+        self.objs = objs
+
+    def __setitem__(self, key, value):
+        assert key in ['sub', 'label', 'objs'], 'key must be sub, label or objs'
+        if key == 'sub':
+            assert type(value)== tuple, 'sub must be type tuple'
+            assert value[0] < value[1], 'offset start must less than end'
+        elif key == 'label':
+            assert type(value) == str, 'label must be str type'
+        elif key == "objs":
+            assert type(value) == list
+            for obj in value:
+                assert obj[0] < obj[1], 'offset start must less than end'     
+        super().__setitem__(key, value)
+ 
+ 
+def get_relations(doc: Doc) -> List[Relation]:
+    """get the relations in the docs"""
+    rels = []
+    for rel in doc._.rel_data:
+        sub = doc.char_span(rel['sub'][0], rel['sub'][1])
+        objs = [doc.char_span(obj[0],obj[1]) for obj in rel['objs']]
+        label = rel['label']
+        rels.append(Relation(label=label, sub=sub, objs=objs))
+    return rels 
+
+
+Doc.set_extension('relations', getter=get_relations)
+   
+   
 def make_docs_from_doccano_jsonl(file_path: str, 
                                  nlp: Language, 
                                  set_ent: bool = True,
@@ -154,7 +225,9 @@ def make_docs_from_doccano_jsonl(file_path: str,
                             sub = ents[sub_id]
                             objs = [ents[obj_id] for obj_id in rels[sub_id][rel_type]]
                             label = rel_type
-                            doc._.relations.append(Relation(label, sub, objs))
+                            doc._.rel_data.append(RelationData(sub=(sub.start_char, sub.end_char),
+                                                          label=label,
+                                                          objs=[(obj.start_char, obj.end_char) for obj in objs]))
             
             docs.append(doc)
         
@@ -173,10 +246,12 @@ def extend_inverse_relations(docs: List[Doc],
         List[Doc]: the list of docs with extended relations
     """
     for doc in tqdm(docs):
-        for rel in doc._.relations:
+        for rel in doc._.rel_data:
             if rel.label in inverse_relations:
                 for obj in rel.objs:
-                    doc._.relations.append(Relation(random.sample(inverse_relations[rel.label], k=1)[0], obj, [rel.sub]))
+                    doc._.rel_data.append(RelationData(label=random.sample(inverse_relations[rel.label], k=1)[0], 
+                                                  sub=(obj[0], obj[1]), 
+                                                  objs=[(rel.sub[0], rel.sub[1])]))
     return docs
             
             
