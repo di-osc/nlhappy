@@ -18,6 +18,7 @@ explain_dict = {
     'CHIP-STS': '平安医疗科技疾病问答迁移学习, https://tianchi.aliyun.com/dataset/dataDetail?dataId=95414#1',
     'IMCS': '该数据集收集了真实的在线医患对话，并进行了多层次（Multi-Level）的人工标注，包含命名实体、对话意图、症状标签、医疗报告等，并在CCL 2021会议上举办了第一届智能对话诊疗评测比赛 （http://www.fudan-disc.com/sharedtask/imcs21/index.html）',
     'EMR_NER-PSE': '基于ccks2019医疗电子病历实体识别数据集制作的prompt-span-extraction数据集',
+    'DuEE-Fin': '金融领域篇章级别事件抽取数据集， 共包含13个已定义好的事件类型约束和1.15万中文篇章（存在部分非目标篇章作为负样例），其中6900训练集，1150验证集和3450测试集，'
 }
 
 
