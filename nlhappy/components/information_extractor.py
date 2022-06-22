@@ -9,6 +9,7 @@ from spacy.language import Language
 import numpy as np
 from ..utils.make_doc import Event, Relation
 from ..utils.utils import get_logger
+from spacy.util import filter_spans
 
 log = get_logger()
 
@@ -23,7 +24,8 @@ class PSEONNXExtractor:
                  set_ents: bool =True,
                  num_sentences: int =0,
                  stride: int =-1,
-                 model:str = 'pse.onnx'):
+                 model:str = 'pse.onnx',
+                 tokenizer:str = 'tokenizer'):
         self.pipe_name = name
         self.ckpt = ckpt
         self.set_ents = set_ents
@@ -32,14 +34,18 @@ class PSEONNXExtractor:
         self.threshold = threshold
         self.model_name = model
         self.schemas = schemas
-        try:
-            self.infer = InferenceSession(os.path.join(self.ckpt, self.model_name))
-        except:
-            pass
-        try:
-            self.tokenizer = AutoTokenizer.from_pretrained(self.ckpt)
-        except:
-            pass
+        self.tokenizer = tokenizer
+        infer_path = os.path.join(self.ckpt, self.model_name)
+        if not os.path.exists(infer_path):
+            log.warning(f'cannot load infer model from {infer_path}')
+        else:
+            self.infer = InferenceSession(infer_path)
+        tokenizer_path = os.path.join(self.ckpt, self.tokenizer)
+        if not os.path.exists(tokenizer_path):
+            log.warning(f"cannot load tokenizer from {tokenizer_path}")
+        else:
+            self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+        
         
         
         
@@ -63,7 +69,7 @@ class PSEONNXExtractor:
                         except:
                             log.warning(f'found bad span ({start}, {end}). skip set entity')     
                     if self.set_ents:
-                        doc.set_ents(doc.spans['all'])
+                        doc.set_ents(filter_spans(doc.spans['all']))
             if 'relation' in self.schemas:
                 for sub_type in self.schemas['relation']:
                     sub_prompt = [sub_type]
