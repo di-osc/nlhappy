@@ -5,6 +5,7 @@ import torch
 from ...metrics.span import SpanF1
 from ...layers import MultiLabelCategoricalCrossEntropy, EfficientGlobalPointer
 from ...utils.make_model import get_hf_tokenizer
+import wandb
 
 
 class BERTGlobalSpan(pl.LightningModule):
@@ -68,24 +69,22 @@ class BERTGlobalSpan(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         loss, pred, true = self.shared_step(batch)
         f1 = self.train_metric(pred, true)
-        self.log('train/f1', self.train_metric, on_step=True, on_epoch=False)
-        # self.logger.log_metrics({'train/loss': loss, 'train/f1': f1}, step=self.global_step)
+        self.log('train/f1', self.train_metric, on_step=True, prog_bar=True)
+        self.log('train/loss', loss)
         return {'loss': loss}
 
 
     def validation_step(self, batch, batch_idx):
         loss, pred, true = self.shared_step(batch)
         f1 = self.val_metric(pred, true)
-        self.log('val/f1', self.val_metric, on_step=False, on_epoch=True, prog_bar=True)
-        # self.logger.log_metrics({'val/loss': loss, 'val/f1': f1}, step=self.global_step)
+        self.log('val/f1', self.val_metric, on_epoch=True)
         return {'loss': loss}
 
 
     def test_step(self, batch, batch_idx):
         loss, pred, true = self.shared_step(batch)
         f1 = self.test_metric(pred, true)
-        self.log('test/f1', f1, on_step=False, on_epoch=True, prog_bar=True)
-        # self.logger.log_metrics({'test/loss': loss, 'test/f1': f1}, step=self.global_step)
+        self.log('test/f1', self.test_metric, on_epoch=True, prog_bar=True)
         return {'loss': loss}
 
 
