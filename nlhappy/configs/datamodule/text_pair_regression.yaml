@@ -1,6 +1,6 @@
 _target_: nlhappy.datamodules.TextPairRegressionDataModule
-dataset_dir: ${data_dir} 
-plm_dir: ${pretrained_dir}
+dataset_dir: ${dataset_dir} 
+plm_dir: ${plm_dir}
 
 dataset: 
 plm: chinese-roberta-wwm-ext
