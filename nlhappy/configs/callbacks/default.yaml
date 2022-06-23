@@ -23,5 +23,4 @@ early_stopping:
 rich_progress_bar:
   _target_: pytorch_lightning.callbacks.RichProgressBar
 
-load_plm_state_dict:
-  _target_: nlhappy.callbacks.ckpt_callbacks.LoadPLMStateDict
+
