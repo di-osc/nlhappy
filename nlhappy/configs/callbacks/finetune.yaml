@@ -1,0 +1,5 @@
+defaults:
+  - default.yaml
+  
+load_plm_state_dict:
+  _target_: nlhappy.callbacks.ckpt_callbacks.LoadPLMStateDict
