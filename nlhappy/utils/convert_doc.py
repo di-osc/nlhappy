@@ -172,6 +172,7 @@ def convert_events_to_prompt_span_dataset(docs: List[Doc],
                                         span_synonym_dict : Dict[str, List[str]] = {},
                                         add_negative_sample: bool =False,
                                         num_samples: int = 1,
+                                        negative_events: int = 1,
                                         sentence_level: bool = False,
                                         add_span_prompt: bool = False) -> Dataset:
 
@@ -181,7 +182,8 @@ def convert_events_to_prompt_span_dataset(docs: List[Doc],
         synonym_dict (Dict[str, List[str]], optional): synonym dict like {'姓名':[名称]}. Defaults to {}.
         span_synonym_dict (Dict[str, List[str]], optional): span synonym dict like {'姓名':[名称]}. Defaults to {}.
         add_negative_sample (bool, optional): add negative sample. Defaults to False.
-        num_samples (int, optional): the num of negative samples. Defaults to 1.
+        num_samples (int, optional): the num of negative role samples. Defaults to 1.
+        negative_events: (int, optinal): the num of negative event samples. affects if set add_negative_samples True. Defaults to 1
         sentence_level (bool, optional): if cut into sentence-level text. the text contains all sentences the event belongs to. Defaults to False.
         add_span_prompt (bool, optional): if add span prompt to dataset. Defaults to False.
 
@@ -190,6 +192,15 @@ def convert_events_to_prompt_span_dataset(docs: List[Doc],
     """
     all_roles = set([role for doc in docs for event in doc._.events for role in event.roles])
     all_span_labels = set([span.label_ for doc in docs for event in doc._.events for role in event.roles for span in event.roles[role]])
+    all_event_labels = set([event.label for doc in docs for event in doc._.events])
+    schema = {}
+    for doc in docs:
+        for event in doc._.events:
+            if event.label not in schema:
+                schema[event.label] = []
+            for role in event.roles:
+                if role not in schema[event.label]:
+                    schema[event.label].append(role)      
     text_ls = []
     prompt_ls = []
     spans_ls = []
@@ -229,6 +240,26 @@ def convert_events_to_prompt_span_dataset(docs: List[Doc],
                             text_ls.append(doc.text)
                             prompt_ls.append(event.label + '的' + role)
                             spans_ls.append([])
+                    other_event_labels = all_event_labels - set(event.label)
+                    if len(other_event_labels)>0:
+                        other_event_labels = list(other_event_labels)
+                        random.shuffle(other_event_labels)
+                        for label in other_event_labels[:negative_events]:
+                            for i, role in enumerate(event.roles):
+                                if i == num_samples:
+                                    break
+                                if role in synonym_dict:
+                                    role = random.choice(synonym_dict[role]+[role])
+                                text_ls.append(doc.text)
+                                prompt_ls.append(label + '的' + role)
+                                spans_ls.append([]) 
+                            for role in schema[label][:num_samples]:
+                                if role in synonym_dict:
+                                    role = random.choice(synonym_dict[role]+[role])
+                                text_ls.append(doc.text)
+                                prompt_ls.append(label + '的' + role)
+                                spans_ls.append([])
+                                      
                     if add_span_prompt:
                         other_span_labels = all_span_labels - set(span_label_dict.keys())
                         if len(other_span_labels)>0:
@@ -270,12 +301,34 @@ def convert_events_to_prompt_span_dataset(docs: List[Doc],
                         other_roles = list(other_roles)
                         random.shuffle(other_roles)
                         other_roles = list(filter(None, other_roles))
-                        for role in other_roles[:num_samples]:
+                        for i,role in enumerate(other_roles):
+                            if i == num_samples:
+                                break
                             if role in synonym_dict:
                                 role = random.choice(synonym_dict[role]+[role])
                             text_ls.append(text)
                             prompt_ls.append(event.label + '的' + role)
                             spans_ls.append([])
+                    other_event_labels = all_event_labels - set(event.label)
+                    if len(other_event_labels)>0:
+                        other_event_labels = list(other_event_labels)
+                        random.shuffle(other_event_labels)
+                        for label in other_event_labels[:negative_events]:
+                            # 添加其他事件的当前事件角色负样本
+                            for role in event.roles:
+                                if role in synonym_dict:
+                                    role = random.choice(synonym_dict[role]+[role])
+                                text_ls.append(text)
+                                prompt_ls.append(label + '的' + role)
+                                spans_ls.append([]) 
+                            # 添加其他事件角色负样本
+                            for role in schema[label][:num_samples]:
+                                if role in synonym_dict:
+                                    role = random.choice(synonym_dict[role]+[role])
+                                text_ls.append(text)
+                                prompt_ls.append(label + '的' + role)
+                                spans_ls.append([])
+                                
                     if add_span_prompt:
                         other_span_labels = all_span_labels - set(span_label_dict.keys())
                         if len(other_span_labels)>0:
@@ -295,14 +348,14 @@ def convert_events_to_prompt_span_dataset(docs: List[Doc],
     return ds
 
 
-
 def convert_relations_to_prompt_span_dataset(docs: List[Doc],
                                              synonym_dict: Dict[str, List[str]]={},
                                              span_synonym_dict: Dict[str, List[str]]={},
                                              sentence_level: bool = False,
                                              add_negative_sample: bool = False,
                                              num_samples: int = 1,
-                                             add_span_prompt: bool = False) -> Dataset:
+                                             add_span_prompt: bool = False,
+                                             add_reverse_negative: bool = True) -> Dataset:
     text_ls = []
     prompt_ls = []
     spans_ls = []
@@ -342,6 +395,16 @@ def convert_relations_to_prompt_span_dataset(docs: List[Doc],
                             text_ls.append(doc.text)
                             prompt_ls.append(rel.sub.text + '的' + rel_label)
                             spans_ls.append([])
+                if add_reverse_negative:
+                    for obj in rel.objs:
+                        text_ls.append(doc.text)
+                        if rel.label in synonym_dict:
+                            rel_label = random.choice(synonym_dict[rel.label]+[rel.label])
+                        else:
+                            rel_label = rel.label
+                        prompt_ls.append(obj.text + '的' + rel_label)
+                        spans_ls.append([])
+
             # 添加span prompt数据
             if add_span_prompt:
                 span_label_dict = {}
@@ -394,6 +457,15 @@ def convert_relations_to_prompt_span_dataset(docs: List[Doc],
                             text_ls.append(text)
                             prompt_ls.append(rel.sub.text + '的' + rel_label)
                             spans_ls.append([])
+                if add_reverse_negative:
+                    for obj in rel.objs:
+                        text_ls.append(text)
+                        if rel.label in synonym_dict:
+                            rel_label = random.choice(synonym_dict[rel.label]+[rel.label])
+                        else:
+                            rel_label = rel.label
+                        prompt_ls.append(obj.text + '的' + rel_label)
+                        spans_ls.append([])
                         
             if add_span_prompt:
                 span_label_dict = {}
