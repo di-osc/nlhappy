@@ -7,7 +7,7 @@ from typing import Dict, List
 from spacy.lang.zh import Chinese
 from spacy.language import Language
 import numpy as np
-from ..utils.make_doc import Event, Relation
+from ..utils.make_doc import EventData, RelationData
 from ..utils.utils import get_logger
 from spacy.util import filter_spans
 
@@ -83,7 +83,9 @@ class PSEONNXExtractor:
                             idxs, starts, ends = self.predict(prompts, texts)
                             obj_spans = [doc.char_span(starts[i], ends[i], label=prompts[0]) for i in range(len(idxs))]
                             if len(obj_spans) >0:
-                                doc._.relations.append(Relation(rel_type,span, obj_spans))
+                                sub = (span.start_char[0], span.start_char[1])
+                                obj_offsets = [(obj.start_char, obj.end_char) for obj in obj_spans]
+                                doc._.rel_data.append(RelationData(sub, label=rel_type, objs=obj_offsets))
             if 'event' in self.schemas:
                 for event in self.schemas['event']:
                     args = self.schemas['event'][event]
@@ -92,9 +94,10 @@ class PSEONNXExtractor:
                         prompts = [event+'事件的'+arg]
                         texts = [doc.text]
                         idxs, starts, ends = self.predict(prompts, texts)
-                        spans = [doc.char_span(starts[i], ends[i], label=prompts[0]) for i in range(len(idxs))]
+                        spans = [(starts[i], ends[i]) for i in range(len(idxs))]
                         args_dict[arg] = spans
-                    doc._.events.append(Event(event, args_dict))            
+                    if len(args_dict)>0:
+                        doc._.event_data.append(EventData(label=event, roles=args_dict))         
         return doc
     
     def predict(self, prompts: List[str], texts: List[str]):
