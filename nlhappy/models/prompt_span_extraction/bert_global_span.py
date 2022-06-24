@@ -1,11 +1,11 @@
 import pytorch_lightning as pl
 from transformers import AutoModel
+from torch.optim.lr_scheduler import OneCycleLR
 import torch.nn as nn
 import torch
 from ...metrics.span import SpanF1
 from ...layers import MultiLabelCategoricalCrossEntropy, EfficientGlobalPointer
 from ...utils.make_model import get_hf_tokenizer
-import wandb
 
 
 class BERTGlobalSpan(pl.LightningModule):
@@ -24,7 +24,6 @@ class BERTGlobalSpan(pl.LightningModule):
             weight_decay (float): 权重衰减
             dropout (float): dropout比例
             threshold (float, optional): 抽取阈值. Defaults to 0.5.
-            load_plm (bool, optional): 是否加载plm的参数. Defaults to False.
             kwargs: 其他参数包括trf_config, vocab
         """
         super().__init__()
@@ -52,8 +51,6 @@ class BERTGlobalSpan(pl.LightningModule):
         logits = self.classifier(x, mask=attention_mask)
         return logits
 
-
-
     def shared_step(self, batch):
         span_ids = batch['span_ids']
         inputs = batch['inputs']
@@ -65,28 +62,24 @@ class BERTGlobalSpan(pl.LightningModule):
         loss = self.criterion(y_pred, y_true)
         return loss, pred, span_ids
 
-
     def training_step(self, batch, batch_idx):
         loss, pred, true = self.shared_step(batch)
-        f1 = self.train_metric(pred, true)
+        self.train_metric(pred, true)
         self.log('train/f1', self.train_metric, on_step=True, prog_bar=True)
         self.log('train/loss', loss)
         return {'loss': loss}
 
-
     def validation_step(self, batch, batch_idx):
         loss, pred, true = self.shared_step(batch)
-        f1 = self.val_metric(pred, true)
+        self.val_metric(pred, true)
         self.log('val/f1', self.val_metric, on_epoch=True)
         return {'loss': loss}
 
-
     def test_step(self, batch, batch_idx):
         loss, pred, true = self.shared_step(batch)
-        f1 = self.test_metric(pred, true)
+        self.test_metric(pred, true)
         self.log('test/f1', self.test_metric, on_epoch=True, prog_bar=True)
         return {'loss': loss}
-
 
     def configure_optimizers(self):
         no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
@@ -101,10 +94,12 @@ class BERTGlobalSpan(pl.LightningModule):
              'lr': self.hparams.lr * 5, 'weight_decay': 0.0}
         ]
         optimizer = torch.optim.AdamW(grouped_parameters)
-        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 1.0 / (epoch + 1.0))
-        return [optimizer], [scheduler]
+        # scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 1.0 / (epoch + 1.0))
+        steps_per_epoch = len(self.trainer.datamodule.train_dataloader()) // self.trainer.datamodule.hparams.batch_size
+        total_steps = self.trainer.max_epochs * steps_per_epoch
+        scheduler_config = {'scheduler': OneCycleLR(optimizer=optimizer, max_lr=self.hparams.lr, total_steps=total_steps), 'interval':'step'}
+        return [optimizer], [scheduler_config]
 
-    
     def predict(self, prompt: str, text: str, device: str='cpu', threshold = None):
         if threshold is None:
             threshold = self.hparams.threshold

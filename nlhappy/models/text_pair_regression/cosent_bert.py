@@ -24,7 +24,7 @@ class CoSentBERT(pl.LightningModule):
             weight_decay (float): 权重衰减,默认为0
         """
         super().__init__()
-        self.save_hyperparameters()
+        self.save_hyperparameters(logger=False)
 
         self.bert = BertModel(self.hparams.trf_config)
         self.tokenizer = self._init_tokenizer()
@@ -55,14 +55,15 @@ class CoSentBERT(pl.LightningModule):
     
     def training_step(self, batch, batch_idx):
         loss, preds, targs = self.step(batch)
-        self.train_meric(preds, targs)
-        self.log('train/spearman', self.train_meric, on_step=True, on_epoch=True, prog_bar=True)
+        score = self.train_meric(preds, targs)
+        self.log('train/spearman', self.train_meric, on_step=True, prog_bar=True)
+        self.log('train/loss', loss)
         return {'loss': loss}
 
     def validation_step(self, batch, batch_idx):
         loss, preds, targs = self.step(batch)
-        self.val_metric(preds, targs)
-        self.log('val/spearman', self.val_metric, on_step=False, on_epoch=True, prog_bar=True)
+        score = self.val_metric(preds, targs)
+        self.log('val/spearman', self.val_metric, on_epoch=True, prog_bar=True)
         return {'loss': loss}
     
     def test_step(self, batch, batch_idx):
