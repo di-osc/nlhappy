@@ -61,6 +61,9 @@ class Event():
                 return False
         return True
     
+    def __hash__(self) -> int:
+        return hash(self.__class__)
+    
 class EventData(dict):
     def __init__(self,
                  label: str='',
@@ -85,9 +88,10 @@ def get_events(doc: Doc) -> List[Event]:
     events=[]
     for event in doc._.event_data:
         label = event['label']
-        roles = event['roles']
-        roles = {k:[ doc.char_span(s[0], s[1]) for s in v] for k, v in roles.items()}
-        events.append(Event(label=label, roles=roles))
+        roles = event['roles']  
+        roles = {k:[ doc.char_span(s[0], s[1]) for s in v ] for k, v in roles.items() if len(v)>0}
+        if len(roles)>0:
+            events.append(Event(label=label, roles=roles))
     return events
     
         
@@ -134,6 +138,9 @@ class Relation():
     
     def __eq__(self, rel) -> bool:
         return self.label == rel.label and self.sub == rel.sub and self.objs == rel.objs
+    
+    def __hash__(self) -> int:
+        return hash(self.__class__)
 
 
 class RelationData(dict):
