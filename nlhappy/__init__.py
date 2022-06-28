@@ -38,7 +38,7 @@ def explain(key: str):
     else:
         return 'No explanation for this key.'
     
-def nlp(tokenizer: str = 'char'):
+def chinese(tokenizer: str = 'char'):
     import spacy
     from nlhappy.components.tokenizer import all_tokenizers
     tokenizer = all_tokenizers[tokenizer]
@@ -47,27 +47,19 @@ def nlp(tokenizer: str = 'char'):
     return nlp
 
 
-def load(path: str):
+def load(path: str, disable: list):
     """load spacy nlp pipeline from path
 
     Args:
         path (str): path to the pipeline
+        disable(list): a list of pipe names to disable
 
     Returns:
         nlp: spacy nlp pipeline
     """
     import spacy
-    nlp = spacy.load(path)
+    nlp = spacy.load(name=path, disable=disable)
     return nlp
 
-def chinese():
-    """a blank chinese spacy pipeline 
-
-    Returns:
-        nlp: spacy chinese pipeline
-    """
-    import spacy
-    nlp = spacy.blank('zh')
-    return nlp
     
     
