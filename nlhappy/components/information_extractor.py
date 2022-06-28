@@ -88,16 +88,19 @@ class PSEONNXExtractor:
                                 doc._.rel_data.append(RelationData(sub, label=rel_type, objs=obj_offsets))
             if 'event' in self.schemas:
                 for event in self.schemas['event']:
-                    args = self.schemas['event'][event]
-                    args_dict = {}
-                    for arg in args:
-                        prompts = [event+'事件的'+arg]
-                        texts = [doc.text]
-                        idxs, starts, ends = self.predict(prompts, texts)
-                        spans = [(starts[i], ends[i]) for i in range(len(idxs))]
-                        args_dict[arg] = spans
-                    if len(args_dict)>0:
-                        doc._.event_data.append(EventData(label=event, roles=args_dict))         
+                    idxs, starts, ends = self.predict([f'{event}的触发词'], [doc.text])
+                    trigger_spans = [(starts[i], ends[i]) for i in range(len(idxs))]
+                    if len(trigger_spans) == 1:
+                        args = self.schemas['event'][event]
+                        args_dict = {}
+                        for arg in args:
+                            prompts = [event+'事件的'+arg]
+                            texts = [doc.text]
+                            idxs, starts, ends = self.predict(prompts, texts)
+                            spans = [(starts[i], ends[i]) for i in range(len(idxs))]
+                            args_dict[arg] = spans
+                        if len(args_dict)>0:
+                            doc._.event_data.append(EventData(label=event, roles=args_dict))         
         return doc
     
     def predict(self, prompts: List[str], texts: List[str]):
