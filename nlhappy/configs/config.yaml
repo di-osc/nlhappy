@@ -7,12 +7,9 @@ defaults:
   - model: 
   - datamodule: 
   - callbacks: finetune
-  - logger: null # set logger here or use command line (e.g. `python run.py logger=wandb`)
-
+  - logger: wandb # set logger here or use command line (e.g. `python run.py logger=wandb`)
   - mode: exp
-
   - experiment: null
-  - hparams_search: null
 
   # enable color logging
   - override hydra/hydra_logging: colorlog
