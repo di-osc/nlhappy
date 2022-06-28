@@ -5,13 +5,10 @@
 
 experiment_mode: True
 
-# allows for custom naming of the experiment
-name: ${datamodule.dataset}
-
 hydra:
   # sets output paths for all file logs to `logs/experiment/name'
   run:
-    dir: logs/experiments/${name}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: logs/experiments/${datamodule.dataset}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
   sweep:
-    dir: logs/experiments/${name}/multiruns/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: logs/experiments/${datamodule.dataset}/multiruns/${now:%Y-%m-%d}/${now:%H-%M-%S}
     subdir: ${hydra.job.num}
