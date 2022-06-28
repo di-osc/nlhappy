@@ -1,8 +1,8 @@
 # https://wandb.ai
 
 _target_: pytorch_lightning.loggers.wandb.WandbLogger
-project: ${name}
-name: null
+project: ${datamodule.dataset}
+name: ${name}
 save_dir: "."
 offline: False # set True to store all logs only locally
 id: null # pass correct id to resume experiment!
