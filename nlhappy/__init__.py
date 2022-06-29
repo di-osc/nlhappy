@@ -46,8 +46,12 @@ def chinese(tokenizer: str = 'char'):
     nlp.tokenizer = tokenizer(nlp.vocab)
     return nlp
 
+def nlp():
+    import spacy
+    return spacy.blank('zh')
 
-def load(path: str, disable: list):
+
+def load(path: str, disable: list=[]):
     """load spacy nlp pipeline from path
 
     Args:
