@@ -94,11 +94,10 @@ class BERTGlobalSpan(pl.LightningModule):
              'lr': self.hparams.lr * 5, 'weight_decay': 0.0}
         ]
         optimizer = torch.optim.AdamW(grouped_parameters)
-        # scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 1.0 / (epoch + 1.0))
-        steps_per_epoch = len(self.trainer.datamodule.train_dataloader()) // self.trainer.datamodule.hparams.batch_size
-        total_steps = self.trainer.max_epochs * steps_per_epoch
-        scheduler_config = {'scheduler': OneCycleLR(optimizer=optimizer, max_lr=self.hparams.lr, total_steps=total_steps), 'interval':'step'}
-        return [optimizer], [scheduler_config]
+        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 1.0 / (epoch + 1.0))
+        # total_steps = self.trainer.max_epochs * len(self.trainer.datamodule.train_dataloader()) // self.trainer.gpus
+        # scheduler_config = {'scheduler': OneCycleLR(optimizer=optimizer, max_lr=self.hparams.lr, total_steps=total_steps), 'interval':'step'}
+        return [optimizer], [scheduler]
 
     def predict(self, prompt: str, text: str, device: str='cpu', threshold = None):
         if threshold is None:
