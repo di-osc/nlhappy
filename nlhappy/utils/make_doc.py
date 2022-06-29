@@ -9,6 +9,7 @@ from nlhappy import chinese
 
 Doc.set_extension('rel_data', default=[])
 Doc.set_extension('event_data',default=[])
+Span.set_extension('norm_name', default='')
 
 
 class Event():
