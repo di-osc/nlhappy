@@ -3,6 +3,7 @@ from typing import List
 import numpy as np
 import unicodedata
 from torch.nn.utils.rnn import pad_sequence
+import collections
 
 
 
@@ -65,3 +66,18 @@ def sequence_padding(inputs, length=None, value=0, seq_dims=1, mode='post'):
         return pad_sequence(inputs, padding_value=value, batch_first=True)
     else:
         raise ValueError('"input" argument must be tensor/list/ndarray.')
+    
+    
+def load_vocab(vocab_file):
+    """加载词典文件到dict"""
+    vocab = collections.OrderedDict()
+    index = 0
+    with open(vocab_file, "r", encoding="utf-8") as reader:
+        while True:
+            token = reader.readline()
+            if not token:
+                break
+            token = token.strip()
+            vocab[token] = index
+            index += 1
+    return vocab
