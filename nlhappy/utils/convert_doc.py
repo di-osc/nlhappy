@@ -526,4 +526,23 @@ def convert_relations_to_prompt_span_dataset(docs: List[Doc],
     ds = Dataset.from_dict({'text': text_ls, 'prompt': prompt_ls, 'spans': spans_ls})
     print('转换数据完成')
     return ds
+
+
+def convert_relation_to_triple_extraction_dataset(docs: List[Doc]): 
+    text_ls = []
+    triple_ls = []
+    for doc in tqdm(docs):
+        text_ls.append(doc.text)
+        triples = []
+        for rel in doc._.relations:
+            sub = rel.sub
+            pred = rel.label
+            for obj in rel.objs:
+                triples.append({'subject':{'offset':(sub.start_char, sub.end_char), 'text':sub.text},
+                                'predicate': pred,
+                                'object':{'offset':(obj.start_char, obj.end_char), 'text':obj.text}})
+        triple_ls.append(triples)
+    ds = Dataset.from_dict({'text':text_ls, 'triples':triple_ls})
+    return ds
+            
                                        
