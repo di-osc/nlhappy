@@ -4,7 +4,7 @@ dataset:
 max_length: 
 batch_size: 
 plm: chinese-roberta-wwm-ext
-pin_memory: True
-num_workers: 2
-data_dir: ${data_dir}
-pretrained_dir: ${pretrained_dir}
+pin_memory: False
+num_workers: 0
+dataset_dir: ${dataset_dir}
+plm_dir: ${plm_dir}
