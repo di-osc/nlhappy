@@ -23,7 +23,7 @@ class BM25(object):
             idf的下限值
         tokenizer (:obj:`object`, optional, defaults to None):
             分词器，用于对文档进行分词操作，默认为None，按字颗粒对文档进行分词
-        is_retain_docs (:obj:`bool`, optional, defaults to False):
+        is_retain_docs (:obj:`bool`, optional, defaults to True):
             是否保持原始文档
 
     Reference:
@@ -37,7 +37,7 @@ class BM25(object):
         b=0.75,
         epsilon=0.25,
         tokenizer=None,
-        is_retain_docs=False
+        is_retain_docs=True
     ):
         self.k1 = k1
         self.b = b
@@ -136,10 +136,3 @@ class BM25(object):
         
         
         
-if __name__ == "__main__":
-    from nlhappy.tokenizers import BasicTokenizer
-    tokenizer = BasicTokenizer(do_lower_case=True)
-    corpus = ['这个是第一个corpus', '这是第二个corpus', '这是第三个corpus', '这个不是第一个corpus']
-    bm25 = BM25(corpus=corpus, tokenizer=tokenizer, is_retain_docs=True)
-    print(bm25.recall('这是第一个corpus'))
-    print(tokenizer.tokenize('双乳实性结节BI-RADS3级'))
