@@ -93,8 +93,9 @@ class PSEONNXExtractor:
                     if len(trigger_spans) == 1:
                         args = self.schemas['event'][event]
                         args_dict = {}
+                        args_dict[f'{event}的触发词'] = [trigger_spans[0]]
                         for arg in args:
-                            prompts = [event+'事件的'+arg]
+                            prompts = [event+'的'+arg]
                             texts = [doc.text]
                             idxs, starts, ends = self.predict(prompts, texts)
                             spans = [(starts[i], ends[i]) for i in range(len(idxs))]
@@ -104,7 +105,13 @@ class PSEONNXExtractor:
         return doc
     
     def predict(self, prompts: List[str], texts: List[str]):
-        inputs = self.tokenizer(prompts, texts, return_tensors='np', return_offsets_mapping=True, padding=True)
+        max_length = min(max([len(p+t)+3 for p, t in zip(prompts, texts)]), 512)
+        inputs = self.tokenizer(prompts, 
+                                texts, 
+                                return_tensors='np', 
+                                return_offsets_mapping=True, 
+                                padding='max_length',
+                                max_length=max_length)
         offset_mapping = inputs['offset_mapping']
         del inputs['offset_mapping']
         logits = self.infer.run(None, dict(inputs))[0]
