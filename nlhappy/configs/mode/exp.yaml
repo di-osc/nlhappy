@@ -4,6 +4,7 @@
 # `python run.py mode=exp name=experiment_name`
 
 experiment_mode: True
+name: ${name}
 
 hydra:
   # sets output paths for all file logs to `logs/experiment/name'
