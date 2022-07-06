@@ -159,8 +159,9 @@ class TripleExtractor(object):
         self.model = models[self.model_name].load_from_checkpoint(ckpt_path)
         self.model.freeze()
 
+default_config = {'model':'bert_gplinker', 'device':'cpu', 'threshold':None}
 
-@Chinese.factory('triple_extractor',assigns=['doc._.triples'],default_config={'model':'bert_gplinker', 'device':'cpu', 'threshold':None})
+@Chinese.factory('triple_extractor',assigns=['doc._.triples'],default_config=default_config)
 def make_triple_extractor(nlp, name:str, model:str, ckpt:str, device:str, threshold):
     """三元组抽取组件"""
     if not model in models:
