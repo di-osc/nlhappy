@@ -277,14 +277,3 @@ def get_docs_from_docbin(db_path: str,
     db = DocBin().from_disk(db_path)
     docs = list(db.get_docs(nlp.vocab))
     return docs
-
-            
-            
-           
-        
-        
-
-
-    
-
-    
