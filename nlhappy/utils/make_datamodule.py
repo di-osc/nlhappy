@@ -1,8 +1,8 @@
 import os
 import oss2
 import zipfile
-from .utils import zip_all_files
-from .utils import get_logger
+from .utils import zip_all_files, get_logger
+from typing import List
 
 def char_idx_to_token(char_idx, offset_mapping):
     """
@@ -222,5 +222,33 @@ def prepare_data_from_oss(dataset: str,
             oss.download_plm(plm, plm_dir)
             log.info('finish downloading plm from oss')
         log.info('all data are ready')
+        
+        
+def align_char_span(char_span_offset: List, token_offset_mapping, special_offset=(0,0)) -> List:
+    '''对齐字符级别的span标签与bert的子词切分的标签
+    参数:
+    - char_span_offset: 字符级别的文本片段下标,例如(0,1)
+    - token_offset_mapping: 词符与字符下标映射例如[(0,1), (1,2), (2,3) ...]
+    输出
+    token_span_offset: 词符级别的文本片段下标,例如(0,2)
+    '''
+    token_span_offset = []
+    for i, offset in enumerate(token_offset_mapping):
+        if offset != special_offset:
+            if offset[0] == char_span_offset[0]:
+                start = i
+                if offset[1] == char_span_offset[1]:
+                    end = i+1
+                    break
+                else: next
+            elif offset[1] == char_span_offset[1]:
+                end = i+1
+                break
+    try:
+        if start and end:
+            token_span_offset = [start, end]
+    except Exception:
+        pass
+    return token_span_offset
 
 
