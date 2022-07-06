@@ -109,7 +109,11 @@ def convert_ents_to_prompt_span_dataset(docs: list,
                     label_dict[ent.label_] = []
                 label_dict[ent.label_].append({'text': ent.text, 'offset':[ent.start_char, ent.end_char]})
             if len(label_dict) == 0:
-                continue
+                labels = random.choices(list(all_labels),k=num_samples)
+                for l in labels:
+                    text_ls.append(doc.text)
+                    prompt_ls.append(l)
+                    spans_ls.append([])
             else:
                 for label in label_dict:
                     text_ls.append(doc.text)
@@ -138,7 +142,11 @@ def convert_ents_to_prompt_span_dataset(docs: list,
                         label_dict[ent.label_] = []
                     label_dict[ent.label_].append({'text': ent.text, 'offset':[ent.start_char-sent.start_char, ent.end_char-sent.start_char]})
                 if len(label_dict) == 0:
-                    continue
+                    labels = random.choices(list(all_labels),k=num_samples)
+                    for l in labels:
+                        text_ls.append(sent.text)
+                        prompt_ls.append(l)
+                        spans_ls.append([])
                 else:
                     for label in label_dict:
                         text_ls.append(sent.text)
