@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "nlhappy"
-version = "2022.06.27"
+version = "2022.07.06"
 description = "😄让你爱上自然语言处理😄"
 authors = ["wangmengdi <ddream_ai@163.com>"]
 
