@@ -8,20 +8,9 @@ from spacy.tokens import Doc
 from collections import defaultdict
 from spacy.lang.zh import Chinese
 from spacy.language import Language
-import shutil
 import os
 import onnx
 
-class BM25Recaller():
-    
-    def __init__(self,
-                 model) -> None:
-        super().__init__()
-        self.model  = model
-        
-    def recall(self, query: str, topk: int =20) -> list:
-        recalls = self.model.recall(query, topk=topk)
-        return recalls
 
 
 
@@ -109,7 +98,6 @@ class EntityNormalizer:
                         b: float=0.75,
                         epsilon: float=0.25):
         """初始化bm25模型
-
         Args:
             norm_entities (List[str]): 标准实体列表
             synonym_dict (Dict[str, set], optional): 同义词字典key为别名, value为标准词. Defaults to {}.
@@ -131,13 +119,12 @@ class EntityNormalizer:
                     elif v in norm_entities:
                         self.map_dict[k].add(v)
         corpus = list(self.map_dict.keys())       
-        self._bm25 = BM25(corpus=corpus,
+        self.recall_model = BM25(corpus=corpus,
                     k1=k1,
                     b=b,
                     epsilon=epsilon,
                     tokenizer=tokenizer,
                     is_retain_docs=is_retrain_docs)
-        self.recall_model = BM25Recaller(self._bm25)
             
         
     def normalize(self, query):
@@ -151,7 +138,7 @@ class EntityNormalizer:
         if self.strategy == 'pre':
             recall_ls = [recall[0] for recall in recalls]
             for recall in recall_ls:
-                pred, score = self.match_model.match(query, recall)
+                pred, score = self.matcher.match(query, recall)
                 if pred[0] == self.positive_label and score > self.threshold:
                     result_ls.append(recall)
                     break
@@ -164,7 +151,7 @@ class EntityNormalizer:
                     if v not in recall_ls:
                         recall_ls.append(v)
             for recall in recall_ls:
-                pred, score = self.match_model.match(query, recall)
+                pred, score = self.matcher.match(query, recall)
                 if pred[0] == self.positive_label and score > self.threshold:
                     result_ls.append(recall)
                     break
@@ -190,9 +177,8 @@ class EntityNormalizer:
         match_path = os.path.join(path, 'match')
         if not os.path.exists(match_path):
             os.mkdir(match_path)
-        match_model = onnx.load(self._match_model_path)
         match_model_path = os.path.join(match_path, 'bert_tm.onnx')
-        onnx.save(match_model, match_model_path)
+        onnx.save(self.match_model, match_model_path)
         id2label_file = os.path.join(match_path, 'id2label.pkl')
         pickle.dump(self.match_id2label, open(id2label_file, 'wb'))
         match_tokenizer_path = os.path.join(match_path, 'tokenizer')
@@ -206,24 +192,24 @@ class EntityNormalizer:
             pickle.dump(self.map_dict, f)
         bm25_file = os.path.join(recall_path, 'bm25.pkl')
         with open(bm25_file, 'wb') as f:
-            pickle.dump(self._bm25, f)
+            pickle.dump(self.recall_model, f)
         
     def from_disk(self, path:str, exclude):
         # path: load_path/entity_normalizer
         match_path = os.path.join(path, 'match')
         match_model_path = os.path.join(path, 'match', 'bert_tm.onnx')
-        match_model = InferenceSession(match_model_path)
+        self.match_model = onnx.load(match_model_path)
+        infer = InferenceSession(self.match_model.SerializeToString())
         match_tokenizer_path = os.path.join(match_path, 'tokenizer')
-        tokenizer = AutoTokenizer.from_pretrained(match_tokenizer_path)
+        self.match_tokenizer = AutoTokenizer.from_pretrained(match_tokenizer_path)
         match_id2label_path = os.path.join(match_path, 'id2label.pkl')
-        id2label = pickle.load(open(match_id2label_path, 'rb'))
-        self.match_model = Matcher(model=match_model,tokenizer=tokenizer,id2label=id2label)
+        self.match_id2label = pickle.load(open(match_id2label_path, 'rb'))
+        self.matcher = Matcher(model=infer,tokenizer=self.match_tokenizer,id2label=self.match_id2label)
         recall_path = os.path.join(path, 'recall')
         map_dict_path = os.path.join(recall_path, 'map_dict.pkl')
         self.map_dict = pickle.load(open(map_dict_path, 'rb'))
         bm25_path = os.path.join(recall_path, 'bm25.pkl')
-        bm25 = pickle.load(open(bm25_path,'rb'))
-        self.recall_model = BM25Recaller(bm25)
+        self.recall_model = pickle.load(open(bm25_path,'rb'))
         
 
 
