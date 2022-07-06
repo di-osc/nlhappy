@@ -17,6 +17,22 @@ def is_badcase(pred: Doc, true: Doc):
     elif len(true._.triples) >0:
         return true._.triples != pred._.triples
     else: print("未能检查到标注数据")
+    
+def is_triple_badcase(pred: Doc, true: Doc):
+    """判断两个文档中的triple是否相等
+
+    Args:
+        pred (Doc): 预测的doc
+        true (Doc): 真实的doc
+    """
+    if len(true._.triples) == len(true._.triples):
+        for triple in true._.triples:
+            if triple in pred._.triples:
+                continue
+            else:
+                return True
+        return False         
+    else: return True
 
 
 def analysis_ent_type(docs: List[Doc], return_ent_per_type: bool=True, ent_lt:int =100):
@@ -59,3 +75,13 @@ def analysis_ent_badcase(preds: List[Doc], docs:List[Doc], return_prf:bool=False
         prf = get_ner_prf(examples=examples)
         return badcases, prf
     else: return badcases
+    
+def analysis_triple_badcase(preds: List[Doc], docs:List[Doc], return_prf:bool=False):
+    """spo三元组错误分析
+
+    Args:
+        preds (List[Doc]): 预测的文档
+        docs (List[Doc]): 真实标签文档
+        return_prf (bool, optional): 是否返回prf字典. Defaults to False.
+    """
+    pass
