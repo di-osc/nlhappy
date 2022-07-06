@@ -49,9 +49,6 @@ class BERTBiEncoder(LightningModule):
         preds = torch.argmax(logits, dim=-1)
         return loss, preds, labels
 
-    def on_train_start(self) -> None:
-        state_dict = torch.load(self.trainer.datamodule.hparams.pretrained_dir + self.trainer.datamodule.hparams.plm + '/pytorch_model.bin')
-        self.bert.load_state_dict(state_dict)
 
     def training_step(self, batch, batch_idx):
         loss, preds, labels = self.shared_step(batch)
