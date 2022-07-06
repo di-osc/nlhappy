@@ -13,6 +13,11 @@ class CharTokenizer:
         words = [s for s in text]
         spaces = [False] * len(words)
         return Doc(self.vocab, words=words, spaces=spaces)
+    def to_disk(self, path):
+        pass
+    
+    def from_disk(self, path):
+        pass 
     
 
     
@@ -248,6 +253,12 @@ class BasicTokenizer(object):
         tokens = self.tokenize(text)
         spaces = [False] * len(tokens)
         return Doc(self.vocab, words=tokens, spaces=spaces)
+    
+    def to_disk(self, path):
+        pass
+    
+    def from_disk(self, path):
+        pass
     
     
 all_tokenizers = {'char':CharTokenizer, 
