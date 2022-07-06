@@ -6,8 +6,8 @@ from ...metrics.triple import TripleF1, Triple
 import torch
 from torch import Tensor
 from typing import List, Set
-from ...utils.preprocessing import fine_grade_tokenize
 import os
+from ...utils.make_model import get_hf_tokenizer, align_token_span
 
 
 
@@ -29,11 +29,11 @@ class BertGPLinker(pl.LightningModule):
         **data_params
     ):
         super(BertGPLinker, self).__init__()
-        self.save_hyperparameters()
+        self.save_hyperparameters(logger=False)
         
-        self.tokenizer = self._init_tokenizer()
+        self.tokenizer = get_hf_tokenizer(config=self.hparams.trf_config, vocab=self.hparams.vocab)
         
-        self.bert = BertModel(data_params['bert_config'])
+        self.bert = BertModel(data_params['trf_config'])
         self.dropout = torch.nn.Dropout(dropout)
         
         # span 分类器 
@@ -88,14 +88,11 @@ class BertGPLinker(pl.LightningModule):
         loss = so_loss + head_loss + tail_loss
         return loss, so_logits, head_logits, tail_logits
 
-    def on_train_start(self) -> None:
-        state_dict = torch.load(self.hparams.pretrained_dir + self.hparams.plm + '/pytorch_model.bin')
-        self.bert.load_state_dict(state_dict)
-
         
     def training_step(self, batch, batch_idx) -> dict:
         # 训练阶段不进行解码, 会比较慢
         loss, so_logits, head_logits, tail_logits = self.shared_step(batch)
+        self.log('train/loss', loss)
         return {'loss': loss}
 
 
@@ -186,19 +183,10 @@ class BertGPLinker(pl.LightningModule):
             batch_triples.append(triples)
         return batch_triples
 
-    
-    def _init_tokenizer(self):
-        with open('./vocab.txt', 'w') as f:
-            for k in self.hparams.token2id.keys():
-                f.writelines(k + '\n')
-        self.hparams.bert_config.to_json_file('./config.json')
-        tokenizer = BertTokenizer.from_pretrained('./')
-        os.remove('./vocab.txt')
-        os.remove('./config.json')
-        return tokenizer
 
 
-    def predict(self, text: str, device:str, threshold = None) -> Set[Triple]:
+
+    def predict(self, text: str, device:str='cpu', threshold = None) -> Set[Triple]:
         """模型预测
         参数:
         - text: 要预测的单条文本
@@ -207,21 +195,33 @@ class BertGPLinker(pl.LightningModule):
         返回
         - 预测的三元组
         """
-        tokens = fine_grade_tokenize(text, self.tokenizer)
-        inputs = self.tokenizer.encode_plus(
-            tokens,
-            add_special_tokens=True,
-            max_length=self.hparams.max_length,
-            truncation=True,
-            return_tensors='pt'
-        )
+        max_length = min(len(text), self.hparams.max_length)
+        inputs = self.tokenizer(
+                text, 
+                padding='max_length',  
+                max_length=max_length,
+                return_tensors='pt',
+                truncation=True)
         inputs.to(torch.device(device))
         so_logits, head_logits, tail_logits = self(**inputs)
         if threshold == None:
             batch_triples = self.extract_triple(so_logits, head_logits, tail_logits, threshold=self.hparams.threshold)
         else:
             batch_triples = self.extract_triple(so_logits, head_logits, tail_logits, threshold=threshold)
-        return [(triple[0]-1, triple[1], triple[2], triple[3]-1, triple[4])  for triple in batch_triples[0]]
+        rels = []
+        if len(batch_triples) >0:
+            triples = [(triple[0]-1, triple[1], triple[2], triple[3]-1, triple[4])  for s in batch_triples for triple in s]
+            offset_mapping = self.tokenizer(
+                text,
+                max_length=max_length,
+                padding='max_length',
+                truncation=True,
+                return_offsets_mapping=True)['offset_mapping']
+            for triple in triples:
+                sub = align_token_span((triple[0], triple[1]), offset_mapping)
+                obj = align_token_span((triple[3], triple[4]), offset_mapping)
+                rels.append((sub[0],sub[1],triple[2],obj[0],obj[1]))
+        return rels
 
 
         
