@@ -5,7 +5,7 @@ from googletrans import Translator
 
 
 
-def augument_text_from_youdao_translator(text: str):
+def augment_text_from_youdao_translator(text: str):
     """通过调用有道翻译接口增加文本数据,最多可以扩充三条文本
 
     Args:
@@ -33,7 +33,7 @@ def augument_text_from_youdao_translator(text: str):
             pass
     return results
 
-def augument_text_from_google_translator(text: str, num_augs: int=2):
+def augment_text_from_google_translator(text: str, num_augs: int=2):
     translator = Translator(service_urls=['translate.google.cn'])
     res_ls = []
     langs = list(googletrans.LANGUAGES.keys())
@@ -49,8 +49,8 @@ def augument_text_from_google_translator(text: str, num_augs: int=2):
 
 if __name__ == "__main__":
     text = '我今天感冒了,有点头疼.'
-    res = augument_text_from_youdao_translator(text)
+    res = augment_text_from_youdao_translator(text)
     print("有道:",res)
-    res = augument_text_from_google_translator(text, 10)
+    res = augment_text_from_google_translator(text, 10)
     print("google:",res)
         
