@@ -1,5 +1,5 @@
 from spacy.tokens import Token, Span, Doc, DocBin
-from typing import Dict, List
+from typing import Dict, List, Tuple
 import srsly
 from spacy.language import Language
 from tqdm import tqdm 
@@ -10,6 +10,7 @@ from nlhappy import chinese
 Doc.set_extension('rel_data', default=[])
 Doc.set_extension('event_data',default=[])
 Span.set_extension('norm_name', default='')
+
 
 
 class Event():
@@ -51,8 +52,6 @@ class Event():
         
         
     def __eq__(self, event) -> bool:
-        if not isinstance(event, Event):
-            return False
         if self.label != event.label:
             return False
         if self.roles.keys() != event.roles.keys():
@@ -138,7 +137,16 @@ class Relation():
         return f'Relation({self.sub},{self.label})'
     
     def __eq__(self, rel) -> bool:
-        return self.label == rel.label and self.sub == rel.sub and self.objs == rel.objs
+        if rel.label != self.label:
+            return False
+        if self.sub.start_char != rel.sub.start_char or self.sub.end_char != rel.sub.end_char:
+            return False
+        if len(self.objs) != len(rel.objs):
+            return False 
+        for i in range(len(self.objs)):
+            if self.objs[i].start_char != rel.objs[i].start_char or self.objs[i].end_char != rel.objs[i].end_char:
+                return False
+        return True
     
     def __hash__(self) -> int:
         return hash(self.__class__)
