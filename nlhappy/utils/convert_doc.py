@@ -385,9 +385,11 @@ def convert_relations_to_prompt_span_dataset(docs: List[Doc],
         all_span_labels = set()
         for doc in docs:
             for rel in doc._.relations:
-                all_span_labels.add(rel.sub.label_)
+                if len(rel.sub.ents)==1:
+                    all_span_labels.add(rel.sub.ents[0].label_)
                 for obj in rel.objs:
-                    all_span_labels.add(obj.label_)
+                    if len(obj.ents) == 1:
+                        all_span_labels.add(obj.ents[0].label_)
     all_relation_labels = set([rel.label for doc in docs for rel in doc._.relations])
     for doc in tqdm(docs):
         if not sentence_level:
@@ -430,27 +432,33 @@ def convert_relations_to_prompt_span_dataset(docs: List[Doc],
             if add_span_prompt:
                 span_label_dict = {}
                 for rel in doc._.relations:
-                    if rel.sub.label_ not in span_label_dict:
-                        span_label_dict[rel.sub.label_] = []
-                    span_label_dict[rel.sub.label_].append({'text': rel.sub.text, 'offset':[rel.sub.start_char, rel.sub.end_char]})
-                    for obj in rel.objs:
-                        if obj.label_ not in span_label_dict:
-                            span_label_dict[obj.label_] = []
-                        span_label_dict[obj.label_].append({'text': obj.text, 'offset':[obj.start_char, obj.end_char]})
+                    if len(rel.sub.ents)==1:
+                        sub_label = rel.sub.ents[0].label_
+                        if sub_label not in span_label_dict:
+                            span_label_dict[sub_label] = []
+                        span_label_dict[sub_label].append({'text': rel.sub.text, 'offset':[rel.sub.start_char, rel.sub.end_char]})
+                        for obj in rel.objs:
+                            if len(obj.ents)==1:
+                                obj_label = obj.ents[0].label_
+                                if obj_label not in span_label_dict:
+                                    span_label_dict[obj_label] = []
+                                span_label_dict[obj_label].append({'text': obj.text, 'offset':[obj.start_char, obj.end_char]})
                 for span_label in span_label_dict:
                     text_ls.append(doc.text)
+                    spans_ls.append(span_label_dict[span_label])
                     if span_label in span_synonym_dict:
                         span_label = random.choice(span_synonym_dict[span_label]+[span_label])
                     prompt_ls.append(span_label)
-                    spans_ls.append(span_label_dict[span_label])
+                    
                 if add_negative_sample:
-                    other_span_labels = all_span_labels - set(span_label_dict.keys())
+                    other_span_labels = list(all_span_labels - set(span_label_dict.keys()))
                     if len(other_span_labels)>0:
-                        other_span_labels = random.shuffle(list(other_span_labels))
+                        random.shuffle(other_span_labels)
                         for span_label in other_span_labels[:num_samples]:
+                            text_ls.append(doc.text)
                             if span_label in span_synonym_dict:
                                 span_label = random.choice(span_synonym_dict[span_label]+[span_label])
-                            text_ls.append(doc.text)
+                            
                             prompt_ls.append(span_label)
                             spans_ls.append([])
         else:
