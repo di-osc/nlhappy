@@ -1,12 +1,15 @@
-import shutil
-from ..models import BertGlobalPointer, BertGPLinker
+import pickle
+from ..models import BertGPLinker
+from ..utils.make_doc import RelationData
 from spacy.lang.zh import Chinese
 import torch
 from spacy.tokens import Doc, Span
 from thinc.api import Config
 import os
 from typing import Union, Optional, List, Tuple
+import logging
 
+log = logging.getLogger(__name__)
 
 class SO:
     """subject和object类"""
@@ -119,7 +122,7 @@ Doc.set_extension('triples', default=[])
 Doc.set_extension('spoes', getter=get_spoes)
 
 
-class TripleExtractor(object):
+class GPLinkerExtractor(object):
     '''spacy组件 三元组抽取
     参数:
     - name: 组件名称
@@ -127,47 +130,77 @@ class TripleExtractor(object):
     - model: pl模型名称
     - device: 设备
     '''
-    def __init__(self, nlp, name:str, model:str, ckpt:str, device:str, threshold:float):
+    def __init__(self, 
+                 nlp, 
+                 name:str, 
+                 device:str, 
+                 threshold:float,
+                 set_rels:bool):
         self.nlp = nlp
         self.pipe_name = name
-        self.ckpt = ckpt
         self.threshold = threshold
-        self.device = torch.device(device)
-        self.model_name = model
-        try:
-            self.model = models[model].load_from_checkpoint(ckpt)
-            self.model.to(self.device)
-            self.model.freeze()
-        except Exception:
-            pass
+        self.device = device
+        self.set_rels = set_rels
         
     def __call__(self, doc: Doc) -> Doc:
         triples = self.model.predict(doc.text, self.device, threshold=self.threshold)
         doc._.triples.extend(triples)
+        if self.set_rels:
+            for triple in triples:
+                sub_offset = (triple[0], triple[1])
+                doc._.rel_data.append(RelationData(sub=sub_offset, label=triple[2], objs=[(triple[3], triple[4])]))
         return doc
+    
+    def init_model(self, model_or_path):
+        if isinstance(model_or_path, BertGPLinker):
+            self.model = model_or_path
+            self.model.freeze()
+            self.model.to(self.device)
+            
+        else:
+            self.model= BertGPLinker.load_from_checkpoint(model_or_path)
+            self.model.freeze()
+            self.model.to(self.device)
     
     def to_disk(self, path:str, exclude):
         # 复制原来模型参数到新的路径
-        shutil.copy(self.ckpt, path)
-
+        # path : save_path/information_extractor
+        if not os.path.exists(path):
+            os.mkdir(path=path)
+        model = 'te.pkl'
+        model_path = os.path.join(path, model)
+        with open(model_path, 'wb') as f:
+            pickle.dump(self.model, f)
+        
     def from_disk(self, path:str, exclude):
-        nlp_path = str(path).split(self.pipe_name)[0]
-        config_path = os.path.join(nlp_path, 'config.cfg')
-        config = Config().from_disk(config_path)
-        ckpt_name = config['components'][self.pipe_name]['ckpt'].split('/')[-1]
-        ckpt_path = os.path.join(path, ckpt_name)
-        self.model = models[self.model_name].load_from_checkpoint(ckpt_path)
+        model_path = os.path.join(path, 'te.pkl')
+        with open(model_path, 'rb') as f:
+            self.model = pickle.load(f)
         self.model.freeze()
+        try:
+            self.model.to(self.device)
+        except:
+            log.info(f' to device {self.device} failed')
 
-default_config = {'model':'bert_gplinker', 'device':'cpu', 'threshold':None}
+default_config = {'threshold':0.5,
+                  'device':'cpu',
+                  'set_rels': 'True',
+                  'model':'GPLinker'}
 
-@Chinese.factory('triple_extractor',assigns=['doc._.triples'],default_config=default_config)
-def make_triple_extractor(nlp, name:str, model:str, ckpt:str, device:str, threshold):
+@Chinese.factory('triple_extractor',assigns=['doc._.triples', 'doc._.relations'],default_config=default_config)
+def make_triple_extractor(nlp, 
+                          name:str, 
+                          device:str, 
+                          threshold:float,
+                          set_rels:bool,
+                          model:str):
     """三元组抽取组件"""
-    if not model in models:
-        raise ValueError(f"model must in {models.keys()}")
-    else:
-        return TripleExtractor(nlp=nlp, name=name, model=model, ckpt=ckpt, device=device, threshold=threshold)
+    if model == 'GPLinker':
+        return GPLinkerExtractor(nlp=nlp, 
+                                 name=name, 
+                                 device=device, 
+                                 threshold=threshold,
+                                 set_rels= set_rels)
 
 
 
