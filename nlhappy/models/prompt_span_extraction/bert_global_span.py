@@ -6,6 +6,7 @@ import torch
 from ...metrics.span import SpanF1
 from ...layers import MultiLabelCategoricalCrossEntropy, EfficientGlobalPointer
 from ...utils.make_model import get_hf_tokenizer
+from typing import List
 
 
 class BERTGlobalSpan(pl.LightningModule):
@@ -99,22 +100,20 @@ class BERTGlobalSpan(pl.LightningModule):
         # scheduler_config = {'scheduler': OneCycleLR(optimizer=optimizer, max_lr=self.hparams.lr, total_steps=total_steps), 'interval':'step'}
         return [optimizer], [scheduler]
 
-    def predict(self, prompt: str, text: str, device: str='cpu', threshold = None):
+    def predict(self, prompts: List[str], texts: List[str], device: str='cpu', threshold = None):
+        max_length = min(max([len(p+t)+3 for p, t in zip(prompts, texts)]), 512)
         if threshold is None:
             threshold = self.hparams.threshold
         inputs = self.tokenizer(
-            prompt,
-            text,
-            max_length=self.hparams.max_length,
+            prompts,
+            texts,
+            max_length=max_length,
             truncation=True,
-            return_tensors='pt')
-        offset_ls = self.tokenizer(
-            prompt,
-            text,
-            max_length=self.hparams.max_length,
-            truncation=True,
-            return_offsets_mapping=True)['offset_mapping']
-        
+            return_tensors='pt',
+            padding='max_length',
+            return_offsets_mapping=True)
+        mapping = inputs['offset_mapping'].tolist()
+        del inputs['offset_mapping']
         inputs.to(device)
         logits = self(**inputs)
         spans_ls = torch.nonzero(logits>threshold).tolist()
@@ -122,9 +121,10 @@ class BERTGlobalSpan(pl.LightningModule):
         for span in spans_ls :
             start = span[2]
             end = span[3]
-            start_text = offset_ls[start][0]
-            end_text = offset_ls[end][1]
-            spans.append([start_text, end_text, text[start_text:end_text]])
+            label = prompts[span[0]]
+            start_text = mapping[span[0]][start][0]
+            end_text = mapping[span[0]][end][1]
+            spans.append([start_text, end_text, label, texts[span[0]][start_text:end_text]])
         return spans
 
     def to_onnx(self, file_path: str):
