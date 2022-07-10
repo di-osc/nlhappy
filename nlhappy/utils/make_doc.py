@@ -1,3 +1,4 @@
+from __future__ import annotations
 from spacy.tokens import Token, Span, Doc, DocBin
 from typing import Dict, List, Tuple
 import srsly
@@ -7,10 +8,35 @@ import random
 from nlhappy import chinese
 
 
-Doc.set_extension('rel_data', default=[])
-Doc.set_extension('event_data',default=[])
+def get_events(doc: Doc) -> List[Event]:
+    events=[]
+    for event in doc._.event_data:
+        label = event['label']
+        roles = event['roles']  
+        roles = {k:[ doc.char_span(s[0], s[1]) for s in v ] for k, v in roles.items() if len(v)>0}
+        if len(roles)>0:
+            events.append(Event(label=label, roles=roles))
+    return events
+
+
+def get_relations(doc: Doc) -> List[Relation]:
+    """get the relations in the docs"""
+    rels = []
+    for rel in doc._.rel_data:
+        sub = doc.char_span(rel['sub'][0], rel['sub'][1])
+        objs = [doc.char_span(obj[0],obj[1]) for obj in rel['objs']]
+        label = rel['label']
+        rels.append(Relation(label=label, sub=sub, objs=objs))
+    return rels 
+
+
+Doc.set_extension('relations', getter=get_relations)
+Doc.set_extension('events', getter=get_events)
 Span.set_extension('norm_name', default='')
 
+# 数据
+Doc.set_extension('rel_data', default=[])
+Doc.set_extension('event_data',default=[])
 
 
 class Event():
@@ -28,7 +54,6 @@ class Event():
         self.label = label
         self.roles = roles
         
-        
     @property
     def sents(self):
         left_idx = min([span.start_char for val in self.roles.values() for span in val])
@@ -39,7 +64,6 @@ class Event():
         sents.append(last.sent)
         return sents
 
-        
     @property
     def doc(self) -> Doc:
         for spans in self.roles.values():
@@ -49,7 +73,6 @@ class Event():
 
     def __repr__(self) -> str:
         return f'Event({self.label})'
-        
         
     def __eq__(self, event) -> bool:
         if self.label != event.label:
@@ -63,6 +86,7 @@ class Event():
     
     def __hash__(self) -> int:
         return hash(self.__class__)
+    
     
 class EventData(dict):
     def __init__(self,
@@ -84,20 +108,7 @@ class EventData(dict):
                     assert offset[0]<offset[1], 'offset start must less than end'
         super().__setitem__(key, value)
         
-def get_events(doc: Doc) -> List[Event]:
-    events=[]
-    for event in doc._.event_data:
-        label = event['label']
-        roles = event['roles']  
-        roles = {k:[ doc.char_span(s[0], s[1]) for s in v ] for k, v in roles.items() if len(v)>0}
-        if len(roles)>0:
-            events.append(Event(label=label, roles=roles))
-    return events
     
-        
-Doc.set_extension('events', getter=get_events)
-        
- 
 class Relation():
     """used to store the relation in the doc
     """
@@ -179,22 +190,8 @@ class RelationData(dict):
             for obj in value:
                 assert obj[0] < obj[1], 'offset start must less than end'     
         super().__setitem__(key, value)
- 
- 
-def get_relations(doc: Doc) -> List[Relation]:
-    """get the relations in the docs"""
-    rels = []
-    for rel in doc._.rel_data:
-        sub = doc.char_span(rel['sub'][0], rel['sub'][1])
-        objs = [doc.char_span(obj[0],obj[1]) for obj in rel['objs']]
-        label = rel['label']
-        rels.append(Relation(label=label, sub=sub, objs=objs))
-    return rels 
-
-
-Doc.set_extension('relations', getter=get_relations)
-   
-   
+        
+        
 def make_docs_from_doccano_jsonl(file_path: str, 
                                  nlp: Language, 
                                  set_ent: bool = True,
