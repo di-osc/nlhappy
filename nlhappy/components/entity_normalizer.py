@@ -69,10 +69,10 @@ class EntityNormalizer:
         self.threshold = threshold
         self.norm_labels = norm_labels
     
-    def initialize_match(self,
-                        match_model_path, 
-                        match_tokenizer_path, 
-                        match_id2label_path):
+    def init_match(self,
+                    match_model_path, 
+                    match_tokenizer_path, 
+                    match_id2label_path):
         """初始化匹配模型
 
         Args:
@@ -83,20 +83,21 @@ class EntityNormalizer:
         self._match_model_path = match_model_path
         self._match_tokenizer_path = match_tokenizer_path
         self._match_id2label_path = match_id2label_path
-        match_model = InferenceSession(match_model_path)
+        self.match_model = onnx.load(match_model_path)
+        self.match_infer = InferenceSession(self.match_model.SerializeToString())
         self.match_tokenizer = AutoTokenizer.from_pretrained(match_tokenizer_path)
         self.match_id2label = pickle.load(open(match_id2label_path, 'rb'))
-        self.match_model = Matcher(model=match_model,tokenizer=self.match_tokenizer,id2label=self.match_id2label)
+        self.matcher = Matcher(model=self.match_infer,tokenizer=self.match_tokenizer,id2label=self.match_id2label)
         
         
-    def initialize_bm25(self,
-                        norm_entities: List[str],
-                        synonym_dict: Dict[str, set]={},
-                        tokenizer= None,
-                        is_retrain_docs:bool=True,
-                        k1: float= 1.5,
-                        b: float=0.75,
-                        epsilon: float=0.25):
+    def init_bm25(self,
+                norm_entities: List[str],
+                synonym_dict: Dict[str, set]={},
+                tokenizer= None,
+                is_retrain_docs:bool=True,
+                k1: float= 1.5,
+                b: float=0.75,
+                epsilon: float=0.25):
         """初始化bm25模型
         Args:
             norm_entities (List[str]): 标准实体列表
