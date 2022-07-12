@@ -90,8 +90,8 @@ class EntityNormalizer:
         self.matcher = Matcher(model=self.match_infer,tokenizer=self.match_tokenizer,id2label=self.match_id2label)
         
         
-    def init_bm25(self,
-                norm_entities: List[str],
+    def init_recall(self,
+                norm_names: List[str],
                 synonym_dict: Dict[str, set]={},
                 tokenizer= None,
                 is_retrain_docs:bool=True,
@@ -100,7 +100,7 @@ class EntityNormalizer:
                 epsilon: float=0.25):
         """初始化bm25模型
         Args:
-            norm_entities (List[str]): 标准实体列表
+            norm_names (List[str]): 标准实体列表
             synonym_dict (Dict[str, set], optional): 同义词字典key为别名, value为标准词. Defaults to {}.
             tokenizer (_type_, optional): 分词器,如果为None则为字符切分. Defaults to None.
             is_retrain_docs (bool, optional): 是否保存文档. Defaults to True.
@@ -110,14 +110,14 @@ class EntityNormalizer:
         """
         
         self.map_dict = defaultdict(set)
-        for ent in norm_entities:
+        for ent in norm_names:
             self.map_dict[ent].add(ent)
         for k, values in synonym_dict.items():
             for v in values:
                 if k != v:
-                    if k in norm_entities:
+                    if k in norm_names:
                         self.map_dict[v].add(k)
-                    elif v in norm_entities:
+                    elif v in norm_names:
                         self.map_dict[k].add(v)
         corpus = list(self.map_dict.keys())       
         self.recall_model = BM25(corpus=corpus,
