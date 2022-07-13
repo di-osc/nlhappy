@@ -1,6 +1,6 @@
 import pytorch_lightning as pl
-from transformers import BertModel, BertTokenizer
-from ...layers import EfficientGlobalPointer
+from transformers import AutoModel, AutoTokenizer
+from ...layers import EfficientGlobalPointer, MultiDropout
 from ...layers.loss import MultiLabelCategoricalCrossEntropy, SparseMultiLabelCrossEntropy
 from ...metrics.triple import TripleF1, Triple
 import torch
@@ -26,15 +26,14 @@ class BertGPLinker(pl.LightningModule):
         dropout: float,
         weight_decay: float,
         threshold: float,
-        **data_params
-    ):
+        **data_params):
         super(BertGPLinker, self).__init__()
         self.save_hyperparameters(logger=False)
         
         self.tokenizer = get_hf_tokenizer(config=self.hparams.trf_config, vocab=self.hparams.vocab)
         
-        self.bert = BertModel(data_params['trf_config'])
-        self.dropout = torch.nn.Dropout(dropout)
+        self.bert = AutoModel.from_config(data_params['trf_config'])
+        self.dropout = MultiDropout()
         
         # span 分类器 
         # self.span_classifier = EfficientGlobalPointer(self.bert.config.hidden_size, hidden_size, len(data_params['s_label2id'])) 
