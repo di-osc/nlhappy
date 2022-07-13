@@ -32,14 +32,12 @@ class BasicTokenizer(object):
     - """
 
     def __init__(self,
-                 vocab: spacy.Vocab,
                  do_lower_case=False,
                  return_offset=False,
                  never_split=[]):
         self.do_lower_case = do_lower_case
         self.never_split = never_split
         self.return_offset = return_offset
-        self.vocab = vocab
 
     def tokenize(self, text):
         """文本切分成token"""
@@ -236,16 +234,16 @@ class BasicTokenizer(object):
 
         text, token_mapping, offset = normalized_text, [], 0
         for token in tokens:
-            # if self._is_special(token):
-            #     token_mapping.append([])
-            # else:
-            if self.do_lower_case:
-                token = token.lower()
-            start = text[offset:].index(token) + offset
-            end = start + len(token)
-            # token_mapping.append(char_mapping[start:end])
-            token_mapping.append((start, end))
-            offset = end
+            if self._is_special(token):
+                token_mapping.append(())
+            else:
+                if self.do_lower_case:
+                    token = token.lower()
+                start = text[offset:].index(token) + offset
+                end = start + len(token)
+                # token_mapping.append(char_mapping[start:end])
+                token_mapping.append((start, end))
+                offset = end
 
         return token_mapping
     
