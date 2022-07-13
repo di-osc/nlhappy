@@ -1,0 +1,10 @@
+_target_: nlhappy.datamodules.RelationExtractionDataModule
+
+dataset: 
+max_length: 
+batch_size: 
+plm: chinese-roberta-wwm-ext
+pin_memory: False
+num_workers: 0
+dataset_dir: ${dataset_dir}
+plm_dir: ${plm_dir}
