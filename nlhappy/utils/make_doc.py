@@ -6,6 +6,7 @@ from spacy.language import Language
 from tqdm import tqdm 
 import random
 from nlhappy import chinese
+import nlhappy
 
 
 def get_events(doc: Doc) -> List[Event]:
@@ -25,8 +26,9 @@ def get_relations(doc: Doc) -> List[Relation]:
     for rel in doc._.rel_data:
         sub = doc.char_span(rel['sub'][0], rel['sub'][1])
         objs = [doc.char_span(obj[0],obj[1]) for obj in rel['objs']]
-        label = rel['label']
-        rels.append(Relation(label=label, sub=sub, objs=objs))
+        if sub is not None and len(objs) > 0 and None not in objs:
+            label = rel['label']
+            rels.append(Relation(label=label, sub=sub, objs=objs))
     return rels 
 
 
@@ -193,7 +195,7 @@ class RelationData(dict):
         
         
 def make_docs_from_doccano_jsonl(file_path: str, 
-                                 nlp: Language, 
+                                 nlp: Language = None, 
                                  set_ent: bool = True,
                                  set_span: bool = False,
                                  set_relation: bool = True) -> List[Doc]:
@@ -209,6 +211,8 @@ def make_docs_from_doccano_jsonl(file_path: str,
     Returns:
         List[Doc]: the list of doc with tags
     """
+    if not nlp:
+        nlp = nlhappy.nlp()
     docs = []
     for d in tqdm(srsly.read_jsonl(file_path)):
         doc = nlp(d['text'])
