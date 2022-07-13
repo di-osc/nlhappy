@@ -37,13 +37,13 @@ class GPLinkerExtractor(object):
     def init_model(self, model_or_path):
         if isinstance(model_or_path, BertGPLinker):
             self.model = model_or_path
-            self.model.freeze()
             self.model.to(self.device)
+            self.model.freeze()
             
         else:
             self.model= BertGPLinker.load_from_checkpoint(model_or_path)
-            self.model.freeze()
             self.model.to(self.device)
+            self.model.freeze()
     
     def to_disk(self, path:str, exclude):
         # 复制原来模型参数到新的路径
@@ -59,13 +59,13 @@ class GPLinkerExtractor(object):
         model_path = os.path.join(path, 'te.pkl')
         with open(model_path, 'rb') as f:
             self.model = pickle.load(f)
-        self.model.freeze()
         try:
             self.model.to(self.device)
         except:
             log.info(f' to device {self.device} failed')
+        self.model.freeze()
 
-default_config = {'threshold':0.5,
+default_config = {'threshold':0.0,
                   'device':'cpu',
                   'model':'GPLinker'}
 
