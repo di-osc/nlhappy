@@ -50,4 +50,11 @@ name: ${datamodule.plm}_lr-${model.lr}_bs-${datamodule.batch_size}
 # monitor of all callbacks
 monitor: val/f1
 
+hydra:
+  run:
+    dir: logs/experiments/runs/${datamodule.dataset}/${now:%Y-%m-%d}_${now:%H-%M-%S}
+  sweep:
+    dir: logs/experiments/multiruns/${datamodule.dataset}/${now:%Y-%m-%d}_${now:%H-%M-%S}
+    subdir: ${hydra.job.num}
+
 
