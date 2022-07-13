@@ -8,7 +8,7 @@ defaults:
   - datamodule: 
   - callbacks: finetune
   - logger: wandb # set logger here or use command line (e.g. `python run.py logger=wandb`)
-  - mode: exp
+  - log_dir: default.yaml
   - experiment: null
 
   # enable color logging
@@ -45,7 +45,7 @@ seed: null
 
 # name of the run is accessed by loggers
 # should be used along with experiment mode
-name: null
+name: ${datamodule.plm}_lr-${model.lr}_bs-${datamodule.batch_size}
 
 # monitor of all callbacks
 monitor: val/f1
