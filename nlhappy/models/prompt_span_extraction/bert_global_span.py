@@ -4,7 +4,7 @@ from torch.optim.lr_scheduler import OneCycleLR
 import torch.nn as nn
 import torch
 from ...metrics.span import SpanF1
-from ...layers import MultiLabelCategoricalCrossEntropy, EfficientGlobalPointer
+from ...layers import MultiLabelCategoricalCrossEntropy, EfficientGlobalPointer, MultiDropout
 from ...utils.make_model import get_hf_tokenizer
 from typing import List
 
@@ -38,7 +38,7 @@ class BERTGlobalSpan(pl.LightningModule):
                         hidden_size=hidden_size,
                         output_size=1)
 
-        self.dropout = nn.Dropout(dropout)
+        self.dropout = MultiDropout()
         self.criterion = MultiLabelCategoricalCrossEntropy()
 
         self.train_metric = SpanF1()
