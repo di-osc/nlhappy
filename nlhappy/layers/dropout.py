@@ -1,6 +1,6 @@
-from turtle import forward
 from torch import dropout
 import torch.nn as nn
+import torch
 
 
 class MultiDropout(nn.Module):
@@ -20,4 +20,4 @@ class MultiDropout(nn.Module):
         output_2 = self.dropout_2(x)
         output_3 = self.dropout_3(x)
         output_4 = self.dropout_4(x)
-        return [output_0,output_1,output_2,output_3,output_4]
+        return torch.mean(torch.stack([output_0,output_1,output_2,output_3,output_4], dim=0), dim=0)
