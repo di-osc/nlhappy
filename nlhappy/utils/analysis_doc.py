@@ -5,36 +5,15 @@ from spacy.scorer import get_ner_prf
 
 
 
-def is_badcase(pred: Doc, true: Doc):
+def is_ent_badcase(pred: Doc, true: Doc):
     """判断两个doc是否相等"""
     assert pred.text == true.text
-    if len(true._.labels) >0:
-        return pred._.labels != true._.labels
-    elif len(true.ents) >0:
-        return [ent.text for ent in true.ents] != [ent.text for ent in pred.ents]
-    elif len(true.spans['all']) > 0:
-        return true.spans['all'] != pred.spans['all']
-    elif len(true._.triples) >0:
-        return true._.triples != pred._.triples
-    elif len(true._.relations) >0:
-        return true._.relations != pred._.relations
-    else: print("未能检查到标注数据")
-    
-def is_triple_badcase(pred: Doc, true: Doc):
-    """判断两个文档中的triple是否相等
-
-    Args:
-        pred (Doc): 预测的doc
-        true (Doc): 真实的doc
-    """
-    if len(true._.triples) == len(true._.triples):
-        for triple in true._.triples:
-            if triple in pred._.triples:
-                continue
-            else:
-                return True
-        return False         
-    else: return True
+    if len(pred.ents) != len(true.ents):
+        return True
+    else: 
+        pred_offsets = set([(ent.start, ent.end, ent.label_) for ent in pred.ents])
+        true_offsets = set([(ent.start, ent.end, ent.label_) for ent in true.ents])
+        return len(pred_offsets - true_offsets) != 0 
 
 
 def analysis_ent_type(docs: List[Doc], return_ent_per_type: bool=True, ent_lt:int =100):
@@ -70,7 +49,7 @@ def analysis_ent_badcase(preds: List[Doc], docs:List[Doc], return_prf:bool=False
     """
     badcases = []
     for pred, doc  in zip(preds, docs):
-        if is_badcase(pred, doc):
+        if is_ent_badcase(pred, doc):
             badcases.append((doc, pred))
     if return_prf:
         examples = [Example(pred, true) for (pred, true) in zip(preds, docs)]
@@ -78,15 +57,6 @@ def analysis_ent_badcase(preds: List[Doc], docs:List[Doc], return_prf:bool=False
         return badcases, prf
     else: return badcases
     
-def analysis_triple_badcase(preds: List[Doc], docs:List[Doc], return_prf:bool=False):
-    """spo三元组错误分析
-
-    Args:
-        preds (List[Doc]): 预测的文档
-        docs (List[Doc]): 真实标签文档
-        return_prf (bool, optional): 是否返回prf字典. Defaults to False.
-    """
-    pass
 
 def analysis_relation_badcase(examples: List[Example] , return_prf:bool=True):
     """错误分析,并且返回细粒度的指标
