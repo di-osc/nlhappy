@@ -5,6 +5,9 @@ from datasets import load_from_disk
 import os
 from transformers import AutoTokenizer, AutoConfig
 from torch.utils.data import DataLoader
+import logging
+
+log = logging.getLogger()
 
 
 class PromptSpanExtractionDataModule(pl.LightningDataModule):
@@ -88,6 +91,7 @@ class PromptSpanExtractionDataModule(pl.LightningDataModule):
                 try:
                     span_ids[0, start, end] = 1.0
                 except Exception:
+                    log.warning(f'set span {(start, end)} out of boudry')
                     pass 
             del inputs['offset_mapping']
             inputs = dict(zip(inputs.keys(), map(torch.tensor, inputs.values())))
