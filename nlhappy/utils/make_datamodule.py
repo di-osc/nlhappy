@@ -1,7 +1,7 @@
 import os
 import oss2
 import zipfile
-from .utils import zip_all_files, get_logger
+from .utils import get_logger
 from typing import List
 
 def char_idx_to_token(char_idx, offset_mapping):
@@ -23,7 +23,6 @@ default_access_key_secret = 'z5jPdkfNq4WPtV4c7YaAJwH5Sj45gT'
 default_endpoint = 'http://oss-cn-beijing.aliyuncs.com'
 default_data_bucket = 'deepset'
 default_model_bucket = 'pretrained-model'
-default_asset_bucket = 'deepasset'
 
 class OSSStorer:
     '''阿里云oss对象存储'''
@@ -34,22 +33,12 @@ class OSSStorer:
         endpoint :str = default_endpoint, 
         data_bucket : str = default_data_bucket,
         model_bucket : str = default_model_bucket,
-        asset_bucket : str = default_asset_bucket
         ):
         super().__init__()
         self.auth = oss2.Auth(access_key_id, access_key_secret)
         self.data_bucket = oss2.Bucket(self.auth, endpoint, data_bucket)
         self.model_bucket = oss2.Bucket(self.auth, endpoint, model_bucket)
-        self.assets_bucket = oss2.Bucket(self.auth, endpoint, asset_bucket)
 
-
-    def list_all_assets(self):
-        """获取数据名称"""
-        all_asset = []
-        for obj in oss2.ObjectIterator(self.assets_bucket):
-            asset = obj.key.split('.')[0]
-            all_asset.append(asset)
-        return all_asset
 
 
     def list_all_datasets(self):
@@ -115,84 +104,6 @@ class OSSStorer:
                     os.remove(path=file_path)
                 
 
-    def download_asset(
-        self, 
-        asset:str, 
-        localpath: str = './assets/'):
-        """下载assets
-        - asset: 资产名称
-        - localpath: 下载到本地的路径 默认为./assets/
-        """
-        if not os.path.exists(localpath):
-            os.makedirs(localpath)
-        file = asset + '.zip'
-        file_path = localpath + file
-        asset_path = localpath + asset
-        if not os.path.exists(asset_path):
-            try:
-                self.assets_bucket.get_object_to_file(key=file, filename=file_path)
-                with zipfile.ZipFile(file=file_path, mode='r') as zf:
-                    zf.extractall(path=localpath)
-            finally:
-                if os.path.exists(file_path):
-                    os.remove(path=file_path)
-                
-        
-    def upload_dataset(
-        self, 
-        dataset:str, 
-        localpath: str = 'datasets/'):
-        """上传数据集
-        - dataset: 数据集名称
-        - localpath: 数据集路径, 默认为datasets/
-        """
-        file = dataset + '.zip'
-        file_path = localpath + file
-        dataset_path = localpath + dataset
-        with zipfile.ZipFile(file=file_path, mode='w') as z:
-            zip_all_files(dataset_path, z, pre_dir=dataset)
-        self.data_bucket.put_object_from_file(key=file, filename=file_path)
-        if os.path.exists(file_path):
-            os.remove(path=file_path)
-
-
-    def upload_pretrained(
-        self, 
-        model, 
-        localpath: str = 'plms/'):
-        """上传预训练模型
-        - model: 模型名称
-        - localpath: 预训练模型路径, 默认为plms/
-        """
-        file = model + '.zip'
-        file_path = localpath + file
-        model_path = localpath + model
-        # 注意如果不用with 语法, 如果没有关闭zip文件则解压会报错
-        with zipfile.ZipFile(file=file_path, mode='w') as z:
-            zip_all_files(model_path, z, model)
-        self.model_bucket.put_object_from_file(key=file, filename=file_path)
-        if os.path.exists(file_path):
-            os.remove(path=file_path)
-
-
-    def upload_asset(
-        self,
-        asset,
-        localpath: str = './assets/'
-    ):
-        """上传原始数据
-        - asset: 数据名称
-        - localpath: 数据的路径, 默认为./assets/
-        """
-        file = asset + '.zip'
-        file_path = localpath + file
-        asset_path = localpath + asset
-        with zipfile.ZipFile(file=file_path, mode='w') as z:
-            zip_all_files(asset_path, z, asset)
-        self.assets_bucket.put_object_from_file(key=file, filename=file_path)
-        if os.path.exists(file_path):
-            os.remove(path=file_path)
-  
 log = get_logger(__name__)  
         
 def prepare_data_from_oss(dataset: str,
