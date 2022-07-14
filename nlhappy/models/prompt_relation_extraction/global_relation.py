@@ -185,7 +185,7 @@ class GlobalRelation(pl.LightningModule):
 
 
 
-    def predict(self,prompt:str, text: str, device:str='cpu', threshold: float = None) -> Set[Triple]:
+    def predict(self,prompts:List[str], texts: List[str], device:str='cpu', threshold: float = None) -> Set[Triple]:
         """模型预测
         参数:
         - text: 要预测的单条文本
@@ -194,17 +194,17 @@ class GlobalRelation(pl.LightningModule):
         返回
         - 预测的三元组
         """
-        max_length = min(len(text)+len(prompt)+3, 512)
+        max_length = min(max([len(prompt+text)+3 for prompt, text in zip(prompts, texts)]), 512)
         inputs = self.tokenizer(
-            prompt,
-            text,
+            prompts,
+            texts,
             max_length=max_length,
             truncation=True,
             return_tensors='pt',
             padding='max_length')
         mapping = self.tokenizer(
-            prompt,
-            text,
+            prompts,
+            texts,
             max_length=max_length,
             truncation=True,
             padding='max_length',
@@ -216,9 +216,10 @@ class GlobalRelation(pl.LightningModule):
         batch_triples = self.extract_triple(so_logits, head_logits, tail_logits, threshold=threshold)
         rels = []
         if len(batch_triples) >0:
-            triples = [(triple[0], triple[1], prompt, triple[3], triple[4])  for s in batch_triples for triple in s]
-            for triple in triples:
-                sub = align_token_span((triple[0], triple[1]+1), mapping)
-                obj = align_token_span((triple[3], triple[4]+1), mapping)
-                rels.append((sub[0],sub[1],prompt,obj[0],obj[1]))
+            for i, triples_type in enumerate(batch_triples):
+                triples = [(triple[0], triple[1], prompts[i], triple[3], triple[4])  for triple in triples_type]
+                for triple in triples:
+                    sub = align_token_span((triple[0], triple[1]+1), mapping[i])
+                    obj = align_token_span((triple[3], triple[4]+1), mapping[i])
+                    rels.append((sub[0],sub[1],prompts[i],obj[0],obj[1]))
         return rels
