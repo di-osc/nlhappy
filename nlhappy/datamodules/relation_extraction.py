@@ -1,5 +1,5 @@
 import pytorch_lightning as pl
-from ..utils.make_datamodule import align_char_span, prepare_data_from_oss
+from ..utils.make_datamodule import prepare_data_from_oss, char_idx_to_token
 import torch
 from datasets import load_from_disk
 from transformers import AutoTokenizer, AutoConfig
@@ -59,13 +59,6 @@ class RelationExtractionDataModule(pl.LightningDataModule):
         p_id2label = {i: label for label, i in p_label2id.items()}
         self.hparams['p_label2id'] = p_label2id
         self.hparams['p_id2label'] = p_id2label
-        # 筛选实体类型
-        # sub_labels = set([triple['subject']['label'] for triples in self.dataset['train']['triples'] for triple in triples])
-        # obj_labels = set([triple['object']['label'] for triples in self.dataset['train']['triples'] for triple in triples])
-        # s_labels = sorted(sub_labels | obj_labels)
-        # s_label2id = {label: i for i, label in enumerate(s_labels)}
-        # self.hparams['s_label2id'] = s_label2id
-        # self.hparams['s_id2label'] = {i: label for label, i in s_label2id.items()}
         # 读取vocab 和 bert配置文件
         plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
         self.tokenizer = AutoTokenizer.from_pretrained(plm_path)
@@ -97,20 +90,21 @@ class RelationExtractionDataModule(pl.LightningDataModule):
             head_ids = torch.zeros(len(self.hparams['p_label2id']), self.hparams.max_length, self.hparams.max_length)
             tail_ids = torch.zeros(len(self.hparams['p_label2id']), self.hparams.max_length, self.hparams.max_length)
             for triple in triples:
-                #加1是因为有cls
                 try:
                     sub_start = triple['subject']['offset'][0]
-                    sub_end = triple['subject']['offset'][1]
-                    sub_start, sub_end = align_char_span((sub_start, sub_end), offset_mapping)
+                    sub_end = triple['subject']['offset'][1]-1
+                    sub_start = char_idx_to_token(sub_start, offset_mapping=offset_mapping)
+                    sub_end = char_idx_to_token(sub_end, offset_mapping=offset_mapping)
                     obj_start = triple['object']['offset'][0]
-                    obj_end = triple['object']['offset'][1]
-                    obj_start, obj_end = align_char_span((obj_start,obj_end), offset_mapping)
-                    so_ids[0][sub_start + 1][sub_end] = 1
-                    so_ids[1][obj_start + 1][obj_end] = 1
-                    head_ids[self.hparams['p_label2id'][triple['predicate']]][sub_start+1][obj_start+1] = 1
+                    obj_end = triple['object']['offset'][1]-1
+                    obj_start = char_idx_to_token(obj_start, offset_mapping=offset_mapping)
+                    obj_end = char_idx_to_token(obj_end, offset_mapping=offset_mapping)
+                    so_ids[0][sub_start][sub_end] = 1
+                    so_ids[1][obj_start][obj_end] = 1
+                    head_ids[self.hparams['p_label2id'][triple['predicate']]][sub_start][obj_start] = 1
                     tail_ids[self.hparams['p_label2id'][triple['predicate']]][sub_end][obj_end] = 1
                 except:
-                    log.warning('char offset align to token offset failed')
+                    log.warning(f'sub char offset {(sub_start, sub_end)} or obj char offset {(obj_start, obj_end)} align to token offset failed /n/t in {text}')
                     pass
             batch_inputs['so_ids'].append(so_ids)
             batch_inputs['head_ids'].append(head_ids)
