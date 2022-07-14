@@ -88,7 +88,8 @@ model=bert_global_span
 - text_classification (适用于单标签文本分类任务)
 - span_classification (适用于嵌套型实体识别等任务)
 - token_classification (适用于序列标注任务)
-- triple_extraction (适用于三元组抽取)
+- relation_extraction (适用于三元组抽取)
+- prompt_relation_extraction (适用于通用三元组抽取)
 - prompt_span_extraction (适用于通用信息抽取等任务)
 
 
