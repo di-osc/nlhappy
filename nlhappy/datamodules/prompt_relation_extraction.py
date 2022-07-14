@@ -1,5 +1,5 @@
 import pytorch_lightning as pl
-from ..utils.make_datamodule import prepare_data_from_oss, align_char_span
+from ..utils.make_datamodule import prepare_data_from_oss, align_char_span_text_b
 from torch.utils.data import DataLoader
 from datasets import load_from_disk
 from transformers import AutoConfig, AutoTokenizer
@@ -63,8 +63,8 @@ class PromptRelationExtractionDataModule(pl.LightningDataModule):
         for i, text in enumerate(batch_text):
             prompt = batch_prompts[i]
             inputs = self.tokenizer(
-                text, 
                 prompt,
+                text, 
                 padding='max_length',  
                 max_length=self.hparams.max_length,
                 truncation=True,
@@ -73,38 +73,27 @@ class PromptRelationExtractionDataModule(pl.LightningDataModule):
             batch_inputs['attention_mask'].append(inputs['attention_mask'])
             batch_inputs['token_type_ids'].append(inputs['token_type_ids'])
             offset_mapping = inputs['offset_mapping']
-            bias = 0
-            for index in range(len(offset_mapping)):
-                if index == 0:
-                    continue
-                mapping = offset_mapping[index]
-                if mapping[0] == 0 and mapping[1] == 0 and bias == 0:
-                    bias = index
-                if mapping[0] == 0 and mapping[1] == 0:
-                    continue
-                offset_mapping[index][0] += bias
-                offset_mapping[index][1] += bias
             so_ids = torch.zeros(2, self.hparams.max_length, self.hparams.max_length)
-            # span_ids = torch.zeros(len(self.hparams['s_label2id']), self.hparams.max_length, self.hparams.max_length)
             head_ids = torch.zeros(1, self.hparams.max_length, self.hparams.max_length)
             tail_ids = torch.zeros(1, self.hparams.max_length, self.hparams.max_length)
             triples = batch_triples[i]
             for triple in triples:
                 #加1是因为有cls
+                sub_start = triple['subject']['offset'][0] 
+                sub_end = triple['subject']['offset'][1]
+                obj_start = triple['object']['offset'][0] 
+                obj_end = triple['object']['offset'][1]
                 try:
-                    sub_start = triple['subject']['offset'][0] + bias
-                    sub_end = triple['subject']['offset'][1] + bias -1
-                    sub_start, sub_end = align_char_span((sub_start, sub_end), offset_mapping)
-                    obj_start = triple['object']['offset'][0] + bias
-                    obj_end = triple['object']['offset'][1] + bias -1
-                    obj_start, obj_end = align_char_span((obj_start,obj_end), offset_mapping)
-                    so_ids[0][sub_start][sub_end] = 1
-                    so_ids[1][obj_start][obj_end] = 1
-                    head_ids[0][sub_start][obj_start] = 1
-                    tail_ids[0][sub_end][obj_end] = 1
-                except:
-                    log.warning('char offset align to token offset failed')
-                    pass
+                    sub_start_, sub_end_ = align_char_span_text_b((sub_start, sub_end), offset_mapping) 
+                    obj_start_, obj_end_ = align_char_span_text_b((obj_start,obj_end), offset_mapping)
+                    so_ids[0][sub_start_][sub_end_-1] = 1
+                    so_ids[1][obj_start_][obj_end_-1] = 1
+                    head_ids[0][sub_start_][obj_start_] = 1
+                    tail_ids[0][sub_end_-1][obj_end_-1] = 1
+                except Exception as e:
+                    log.warning(e)
+                    log.warning(f'sub char offset {(sub_start, sub_end)} or obj char offset {(obj_start, obj_end)} align to token offset failed \n text: {text} \n mapping: {offset_mapping}')
+                    continue
             batch_inputs['so_ids'].append(so_ids)
             batch_inputs['head_ids'].append(head_ids)
             batch_inputs['tail_ids'].append(tail_ids)
