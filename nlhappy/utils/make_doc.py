@@ -282,7 +282,7 @@ def get_docs_from_docbin(db_path: str,
         nlp (Language, optional): nlp that uses to get vocab. Defaults to None.
     """
     if not nlp:
-        nlp = chinese()
+        nlp = nlhappy.nlp()
     db = DocBin().from_disk(db_path)
     docs = list(db.get_docs(nlp.vocab))
     return docs
