@@ -544,7 +544,9 @@ def convert_relations_to_prompt_span_dataset(docs: List[Doc],
     return ds
 
 
-def convert_relation_to_relation_extraction_dataset(docs: List[Doc], prompt_type: bool=False): 
+def convert_relation_to_relation_extraction_dataset(docs: List[Doc], 
+                                                    prompt_type: bool=False,
+                                                    num_negative: int = 2): 
     """将doc._.relations 转换为relation extraction任务数据
 
     Args:
@@ -574,6 +576,7 @@ def convert_relation_to_relation_extraction_dataset(docs: List[Doc], prompt_type
         text_ls = []
         triple_ls = []
         prompt_ls = []
+        all_labels = set([rel.label for doc in docs for rel in doc._.relations])
         for doc in tqdm(docs):
             triple_dict = {}
             for rel in doc._.relations:
@@ -589,6 +592,12 @@ def convert_relation_to_relation_extraction_dataset(docs: List[Doc], prompt_type
                 text_ls.append(doc.text)
                 triple_ls.append(triple_dict[p])
                 prompt_ls.append(p)
+            other_labels = list(all_labels - triple_dict.keys())
+            for l in other_labels[:num_negative]:
+                text_ls.append(doc.text)
+                triple_ls.append([])
+                prompt_ls.append(l)
+                
         ds = Dataset.from_dict({'text':text_ls, 'triples':triple_ls, 'prompts': prompt_ls})
         return ds
 
