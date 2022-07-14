@@ -1,10 +1,10 @@
 _target_: nlhappy.datamodules.PromptRelationExtractionDataModule
+dataset_dir: ${dataset_dir}
+plm_dir: ${plm_dir}
 
 dataset: 
-max_length: -1
+max_length: 
 batch_size: 
 plm: 
 pin_memory: False
 num_workers: 0
-dataset_dir: ${dataset_dir}
-plm_dir: ${plm_dir}
