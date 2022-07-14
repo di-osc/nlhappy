@@ -34,6 +34,7 @@ class BertGPLinker(pl.LightningModule):
         
         self.bert = AutoModel.from_config(data_params['trf_config'])
         self.dropout = MultiDropout()
+        # self.dropout = torch.nn.Dropout(p=dropout)
         
         # span 分类器 
         # self.span_classifier = EfficientGlobalPointer(self.bert.config.hidden_size, hidden_size, len(data_params['s_label2id'])) 
@@ -135,7 +136,7 @@ class BertGPLinker(pl.LightningModule):
             {'params': [p for n, p in self.tail_classifier.named_parameters() if any(nd in n for nd in no_decay)],
             'lr': self.hparams.lr* 10, 'weight_decay': 0.0}
         ]
-        self.optimizer = torch.optim.AdamW(grouped_parameters)
+        self.optimizer = torch.optim.AdamW(grouped_parameters, eps=1e-5)
         self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lambda epoch: 1.0 / (epoch + 1.0))
         return [self.optimizer], [self.scheduler]
 
@@ -209,7 +210,7 @@ class BertGPLinker(pl.LightningModule):
             batch_triples = self.extract_triple(so_logits, head_logits, tail_logits, threshold=threshold)
         rels = []
         if len(batch_triples) >0:
-            triples = [(triple[0]-1, triple[1], triple[2], triple[3]-1, triple[4])  for s in batch_triples for triple in s]
+            triples = [(triple[0], triple[1], triple[2], triple[3], triple[4])  for s in batch_triples for triple in s]
             offset_mapping = self.tokenizer(
                 text,
                 max_length=max_length,
@@ -217,8 +218,8 @@ class BertGPLinker(pl.LightningModule):
                 truncation=True,
                 return_offsets_mapping=True)['offset_mapping']
             for triple in triples:
-                sub = align_token_span((triple[0], triple[1]), offset_mapping)
-                obj = align_token_span((triple[3], triple[4]), offset_mapping)
+                sub = align_token_span((triple[0], triple[1]+1), offset_mapping)
+                obj = align_token_span((triple[3], triple[4]+1), offset_mapping)
                 rels.append((sub[0],sub[1],triple[2],obj[0],obj[1]))
         return rels
 
