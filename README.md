@@ -127,8 +127,8 @@ nohup bash scripts/train.sh >/dev/null 2>&1 &
 import nlhappy
 
 nlp = nlhappy.nlp()
-# 默认device cpu
-config = {'device':'cuda:0'}
+# 默认device cpu, 阈值0.8
+config = {'device':'cuda:0', 'threshold':0.9}
 tc = nlp.add_pipe('text_classifier', config=config)
 # logs文件夹里面训练的模型路径
 ckpt = 'logs/experiments/runs/TNEWS/date/checkpoints/epoch_score.ckpt/'
@@ -163,9 +163,9 @@ print(badcases[0].y, badcases[0].y._.label)
 - 直接用nlp开发接口部署
 - 转为onnx
 ```python
-from nlhappy.models import BertTC
+from nlhappy.models import BertTextClassification
 ckpt = 'logs/path/ckpt'
-model = BertTC.load_from_ckeckpoint(ckpt)
+model = BertTextClassification.load_from_ckeckpoint(ckpt)
 model.to_onnx('path/tc.onnx')
 model.tokenizer.save_pretrained('path/tokenizer')
 ```
