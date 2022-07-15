@@ -3,7 +3,8 @@ from pytorch_lightning import LightningModule
 from torchmetrics import F1Score
 from typing import List, Any
 from transformers import BertModel, BertTokenizer
-from ...layers.classifier import SimpleDense
+from ...layers import SimpleDense, MultiDropout
+from ...utils.make_model import get_hf_tokenizer
 from typing import List, Dict
 import os
 import torch.nn.functional as F
@@ -24,7 +25,7 @@ class BertTextClassification(LightningModule):
         # 模型架构
         self.bert = BertModel(self.hparams['trf_config'])
         self.classifier = SimpleDense(self.bert.config.hidden_size, hidden_size, len(self.hparams.label2id))
-        self.dropout = torch.nn.Dropout(dropout)
+        self.dropout = MultiDropout()
         
         # 损失函数
         self.criterion = torch.nn.CrossEntropyLoss()
@@ -35,7 +36,7 @@ class BertTextClassification(LightningModule):
         self.test_f1 = F1Score(num_classes=len(self.hparams.label2id), average='macro')
 
         # 预处理tokenizer
-        self.tokenizer = self._init_tokenizer()
+        self.tokenizer = get_hf_tokenizer(config=self.hparams.trf_config, vocab=self.hparams.vocab)
 
     def forward(self, input_ids, token_type_ids, attention_mask):
         x = self.bert(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask)
@@ -44,13 +45,6 @@ class BertTextClassification(LightningModule):
         logits = self.classifier(x)  # (batch_size, output_size)
         return logits
     
-
-
-    def on_train_start(self) -> None:
-        plm_path = os.path.join(self.hparams.plm_dir ,self.hparams.plm, 'pytorch_model.bin')
-        state_dict = torch.load(plm_path)
-        self.print(f'load pretrained model from {plm_path}')
-        self.bert.load_state_dict(state_dict)
         
     def shared_step(self, batch):
         inputs = batch['inputs']
@@ -64,6 +58,7 @@ class BertTextClassification(LightningModule):
         loss, pred_ids, label_ids = self.shared_step(batch)
         self.train_f1(pred_ids, label_ids)
         self.log('train/f1', self.train_f1, on_step=True, on_epoch=True, prog_bar=True)
+        self.log('train/loss',loss)
         return {'loss': loss}
     
     def validation_step(self, batch, batch_idx):
@@ -72,11 +67,13 @@ class BertTextClassification(LightningModule):
         self.log('val/f1', self.val_f1, on_step=False, on_epoch=True, prog_bar=True)
         return {'loss': loss}
 
+
     def test_step(self, batch, batch_idx):
         loss, pred_ids, label_ids = self.shared_step(batch)
         self.test_f1(pred_ids, label_ids)
         self.log('test/f1', self.test_f1, on_step=False, on_epoch=True, prog_bar=True)
         return {'loss': loss}
+    
     
     def configure_optimizers(self):
         no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
@@ -104,8 +101,6 @@ class BertTextClassification(LightningModule):
                 return_tensors='pt',
                 truncation=True)
         inputs.to(device)
-        # self.to(device)
-        # self.freeze()
         self.eval()
         with torch.no_grad():
             logits = self(**inputs)
@@ -115,15 +110,6 @@ class BertTextClassification(LightningModule):
                 cats[self.hparams.id2label[i]] = v
         return sorted(cats.items(), key=lambda x: x[1], reverse=True)
 
-    def _init_tokenizer(self):
-        with open('./vocab.txt', 'w') as f:
-            for k in self.hparams.vocab.keys():
-                f.writelines(k + '\n')
-        self.hparams.trf_config.to_json_file('./config.json')
-        tokenizer = BertTokenizer.from_pretrained('./')
-        os.remove('./vocab.txt')
-        os.remove('./config.json')
-        return tokenizer
     
     def to_onnx(self, file_path: str):
         text = '我是中国人'
