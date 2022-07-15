@@ -50,13 +50,13 @@ class GPLinkerExtractor(object):
         # path : save_path/information_extractor
         if not os.path.exists(path):
             os.mkdir(path=path)
-        model = 'te.pkl'
+        model = 're.pkl'
         model_path = os.path.join(path, model)
         with open(model_path, 'wb') as f:
             pickle.dump(self.model, f)
         
     def from_disk(self, path:str, exclude):
-        model_path = os.path.join(path, 'te.pkl')
+        model_path = os.path.join(path, 're.pkl')
         with open(model_path, 'rb') as f:
             self.model = pickle.load(f)
         try:
