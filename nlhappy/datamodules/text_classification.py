@@ -1,9 +1,8 @@
 import pytorch_lightning as pl
 from typing import Tuple, List, Dict
 from transformers import AutoTokenizer, AutoConfig
-from ..utils.make_datamodule import OSSStorer
+from ..utils.make_datamodule import prepare_data_from_oss
 from torch.utils.data import DataLoader
-from ..utils.preprocessing import fine_grade_tokenize
 from datasets import load_from_disk
 import torch
 import os
@@ -40,8 +39,8 @@ class TextClassificationDataModule(pl.LightningDataModule):
             batch_size (int): 批次大小
             num_workers (int, optional): _description_. Defaults to 0.
             pin_memory (bool, optional): _description_. Defaults to False.
-            pretrained_dir (str, optional): _description_. Defaults to './plms/'.
-            data_dir (str, optional): _description_. Defaults to './datasets/'.
+            plm_dir (str, optional): _description_. Defaults to './plms/'.
+            dataset_dir (str, optional): _description_. Defaults to './datasets/'.
         """
         
         super().__init__()
@@ -58,21 +57,10 @@ class TextClassificationDataModule(pl.LightningDataModule):
         '''
         下载数据集.这个方法只会在一个GPU上执行一次.
         '''
-        oss = OSSStorer()
-        dataset_path = os.path.join(self.hparams.dataset_dir, self.hparams.dataset)
-        plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
-        if os.path.exists(dataset_path):
-            log.info(f'{dataset_path} already exists.')
-        else:
-            log.info('not exists dataset in {}'.format(dataset_path))
-            log.info('start downloading dataset from oss')
-            oss.download_dataset(self.hparams.dataset, self.hparams.dataset_dir)
-        if os.path.exists(plm_path):
-            log.info(f'{plm_path} already exists.') 
-        else : 
-            log.info('not exists plm in {}'.format(plm_path))
-            log.info('start downloading plm from oss')
-            oss.download_plm(self.hparams.plm, self.hparams.plm_dir)
+        prepare_data_from_oss(dataset=self.hparams.dataset,
+                              plm=self.hparams.plm,
+                              dataset_dir=self.hparams.dataset_dir,
+                              plm_dir=self.hparams.plm_dir)
         
 
     def transform(self, examples) -> Dict:
@@ -142,11 +130,3 @@ class TextClassificationDataModule(pl.LightningDataModule):
             pin_memory=self.hparams.pin_memory,
             shuffle=False)
         
-    @property
-    def example(self):
-        return example
-        
-    
-
-
-
