@@ -127,7 +127,9 @@ nohup bash scripts/train.sh >/dev/null 2>&1 &
 import nlhappy
 
 nlp = nlhappy.nlp()
-tc = nlp.add_pipe('text_classifier')
+# 默认device cpu
+config = {'device':'cuda:0'}
+tc = nlp.add_pipe('text_classifier', config=config)
 # logs文件夹里面训练的模型路径
 ckpt = 'logs/experiments/runs/TNEWS/date/checkpoints/epoch_score.ckpt/'
 tc.init_model(ckpt)
