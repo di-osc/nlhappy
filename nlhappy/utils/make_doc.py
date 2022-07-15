@@ -35,6 +35,7 @@ def get_relations(doc: Doc) -> List[Relation]:
 Doc.set_extension('relations', getter=get_relations)
 Doc.set_extension('events', getter=get_events)
 Span.set_extension('norm_name', default='')
+Doc.set_extension('label', default='')
 
 # 数据
 Doc.set_extension('rel_data', default=[])
