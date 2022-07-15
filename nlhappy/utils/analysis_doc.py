@@ -1,7 +1,7 @@
 from spacy.tokens import Doc
 from typing import List
 from spacy.training import Example 
-from spacy.scorer import get_ner_prf
+from spacy.scorer import get_ner_prf, Scorer
 
 
 
@@ -107,6 +107,47 @@ def analysis_relation_badcase(examples: List[Example] , return_prf:bool=True):
         return badcases, scores
     else:
         return badcases
+    
+def analysis_text_badcase(examples: List[Example], return_prf: bool=True):
+    all_preds = 0
+    all_corrects = 0
+    all_trues = 0
+    per_types = {e.y._.label : {'preds':0, 'trues':0, 'corrects':0} for e in examples}
+    badcases = []
+    for e in examples:
+        if e.x._.label == e.y._.label and e.x._.label != '':
+            all_corrects += 1
+        else:
+            badcases.append(e)
+        if return_prf:
+            all_trues += 1
+            all_preds += 1
+            per_types[e.y._label]['trues'] +=1
+            if e.x._.label != '':
+                per_types[e.x._.label]['preds'] +=1
+                if e.x._.label == e.y._.label:
+                    per_types[e.x._.label]['corrects'] +=1
+    if return_prf:
+        rel_p = all_corrects/(all_preds + 1e-8)
+        rel_r = all_corrects/(all_trues + 1e-8)
+        rel_f = 2*rel_p*rel_r/(rel_p + rel_r + 1e-8)
+        rel_per_types = {l:{} for l in per_types}
+        for l, scores in per_types.items():
+            p = scores['corrects'] / (scores['preds'] + 1e-8)
+            r = scores['corrects'] / (scores['trues'] + 1e-8)
+            f = 2 * p * r / (p + r + 1e-8)
+            rel_per_types[l]['p'] = p
+            rel_per_types[l]['r'] = r
+            rel_per_types[l]['f'] = f
+            
+        scores = {'text_micro_p':rel_p, 
+                'text_micro_r': rel_r,
+                'text_micro_f': rel_f,
+                'text_per_types':rel_per_types}
+        return badcases, scores
+    else:
+        return badcases
+    
             
         
         
