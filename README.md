@@ -23,9 +23,10 @@ nlhappy是一款集成了数据处理,模型训练,文本处理流程构建等�
 
 
 # 🚀&nbsp;&nbsp; 安装
+<details>
+<summary><b>安装nlhappy</b></summary>
 
-1. 安装nlhappy
-推荐先去[pytorch官网](https://pytorch.org/get-started/locally/)安装pytorch和对应cuda
+> 推荐先去[pytorch官网](https://pytorch.org/get-started/locally/)安装pytorch和对应cuda
 ```bash
 # pip 安装
 pip install -upgrade pip
@@ -41,14 +42,23 @@ pipx ensurepath
 poetry build
 # 安装包 在dist文件夹
 ```
-2. wandb(用于可视化训练日志)
+</details>
+
+<details>
+<summary><b>注册wandb</b></summary>
+
+> wandb(用于可视化训练日志)
 - 注册: https://wandb.ai/
 - 获取认证: https://wandb.ai/authorize
 - 登陆:
 ```bash
 wandb login
 ```
-- 模型训练开始后去[官网](https://wandb.ai/)查看训练实况
+模型训练开始后去[官网](https://wandb.ai/)查看训练实况
+</details>
+
+
+
 
 # ⚡&nbsp;&nbsp; 模型开发
 
