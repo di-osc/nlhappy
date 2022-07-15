@@ -1,7 +1,7 @@
 
 <div align='center'>
 
-# NLHAPPY
+# NLHappy
 <a href="https://pytorch.org/get-started/locally/"><img alt="PyTorch" src="https://img.shields.io/badge/PyTorch-ee4c2c?logo=pytorch&logoColor=white"></a>
 <a href="https://pytorchlightning.ai/"><img alt="Lightning" src="https://img.shields.io/badge/-Lightning-792ee5?logo=pytorchlightning&logoColor=white"></a>
 <a href="https://hydra.cc/"><img alt="Config: Hydra" src="https://img.shields.io/badge/Config-Hydra-89b8cd"></a>
@@ -15,23 +15,21 @@
 
 nlhappy是一款集成了数据处理,模型训练,文本处理流程构建等各种功能的自然语言处理库,相信通过nlhappy可以让你更愉悦的做各种nlp任务
 > 它主要的依赖有
-- spacy: 用于自然语言处理流程和组件构建
-- pytorch-lightning: 用于模型的训练
-- datasets: 构建和分析训练数据
-- wandb: 训练日志以及训练结果统计
-- transformers: 预训练模型
+- [spacy](https://spacy.io/usage): 用于自然语言处理流程和组件构建
+- [pytorch-lightning](https://pytorch-lightning.readthedocs.io/en/latest/): 用于模型的训练
+- [datasets](https://huggingface.co/docs/datasets/index): 构建和分析训练数据
+- [wandb](https://wandb.ai/): 训练日志以及训练结果统计
+- [transformers](https://huggingface.co/docs/transformers/index): 预训练语言模型
 
 
-
-# 🚀 安装
+# 🚀&nbsp;&nbsp; 安装
 
 1. 安装nlhappy
-
+推荐先去[pytorch官网](https://pytorch.org/get-started/locally/)安装pytorch和对应cuda
 ```bash
 # pip 安装
 pip install -upgrade pip
 pip install -upgrade nlhappy
-
 
 # 通过poetry打包然后安装
 # 首先将文件下载到本地
@@ -50,9 +48,9 @@ poetry build
 ```bash
 wandb login
 ```
-- 模型训练开始后去官网查看训练实况
+- 模型训练开始后去[官网](https://wandb.ai/)查看训练实况
 
-# ⚡ 训练模型
+# ⚡&nbsp;&nbsp; 模型开发
 
 <details>
 <summary><b>文本分类</b></summary>
@@ -76,7 +74,7 @@ for d in data:
 # 保存corpus,方便后边badcase分析
 db = DocBin(docs=docs, store_user_data=True)
 # 新闻文本-Tag3为保存格式目录,需要更换为自己的形式
-db.to_disk('corpus/NewsTitle-Tag3/train.spacy')
+db.to_disk('corpus/TNEWS-Tag15/train.spacy')
 # 构建数据集,为了训练模型
 ds = convert_docs_to_tc_dataset(docs=docs)
 # 你可以将数据集转换为dataframe进行各种分析,比如获取文本最大长度
@@ -85,22 +83,40 @@ max_length = df['text'].str.len().max()
 # 数据集切分
 dsd = train_val_split(ds, val_frac=0.2)
 # 保存数据集,注意要保存到datasets/目录下
-dsd.save_to_disk('datasets/NewsTitle-TC-v1')
+dsd.save_to_disk('datasets/TNEWS')
 ```
-> 模型开发
-- 编写训练脚本,scripts/train.sh
+> 训练模型
+
+编写训练脚本,scripts/train.sh
+- 单卡
 ```
 nlhappy \
 datamodule=text_classification \
-datamodule.dataset=NewsTitle-TC-v1 \
+datamodule.dataset=TNEWS \
 datamodule.plm=roberta-wwm-base \
-datamodule.max_length=100 \
-datamodule.batch_size=24 \
+datamodule.max_length=150 \
+datamodule.batch_size=32 \
 model=bert_tc \
 model.lr=3e-5 \
+seed=1234
 # 默认为0号显卡,可以下代码可以修改显卡
 # trainer.gpus=[1]
 ```
+- 多卡
+```
+nlhappy \
+datamodule=text_classification \
+datamodule.dataset=TNEWS \
+datamodule.plm=roberta-wwm-base \
+datamodule.max_length=150 \
+datamodule.batch_size=32 \
+model=bert_tc \
+model.lr=3e-5 \
+trainer=ddp \
+trainer.gpus=4 \
+seed=123456
+```
+
 - 后台训练
 ```
 nohup bash scripts/train.sh >/dev/null 2>&1 &
@@ -113,12 +129,12 @@ import nlhappy
 nlp = nlhappy.nlp()
 tc = nlp.add_pipe('text_classifier')
 # logs文件夹里面训练的模型路径
-ckpt = 'logs/experiments/runs/NewsTitle/date/checkpoints/epoch_score.ckpt/'
+ckpt = 'logs/experiments/runs/TNEWS/date/checkpoints/epoch_score.ckpt/'
 tc.init_model(ckpt)
 text = '文本'
 doc = nlp(text)
 # 查看结果
-print(doc.text, doc._.label)
+print(doc.text, doc._.label, doc.cats)
 # 保存整个流程
 nlp.to_disk('path/nlp')
 # 加载
@@ -130,7 +146,7 @@ import nlhappy
 from nlhappy.utils.make_doc import get_docs_form_docbin
 from nlhappy.utils.analysis_doc import analysis_text_badcase, Example
 
-targs = get_docs_from_docbin('corpus/NewTitle/train.spacy')
+targs = get_docs_from_docbin('corpus/TNEWS-Tag15/train.spacy')
 nlp = nlhappy.load('path/nlp')
 preds = []
 for d in targs:
@@ -152,6 +168,33 @@ model.to_onnx('path/tc.onnx')
 model.tokenizer.save_pretrained('path/tokenizer')
 ```
 </details>
+
+<details>
+<summary><b>实体抽取</b></summary>
+TODO
+</details>
+
+<details>
+<summary><b>关系抽取</b></summary>
+TODO
+</details>
+
+<details>
+<summary><b>事件抽取</b></summary>
+TODO
+</details>
+
+<details>
+<summary><b>文本匹配</b></summary>
+TODO
+</details>
+
+<details>
+<summary><b>文本相似度</b></summary>
+TODO
+</details>
+
+
 
 
 
