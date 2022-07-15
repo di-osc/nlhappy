@@ -122,7 +122,7 @@ def analysis_text_badcase(examples: List[Example], return_prf: bool=True):
         if return_prf:
             all_trues += 1
             all_preds += 1
-            per_types[e.y._label]['trues'] +=1
+            per_types[e.y._.label]['trues'] +=1
             if e.x._.label != '':
                 per_types[e.x._.label]['preds'] +=1
                 if e.x._.label == e.y._.label:
