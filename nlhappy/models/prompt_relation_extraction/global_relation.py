@@ -34,10 +34,7 @@ class GlobalRelation(pl.LightningModule):
         
         self.plm = AutoModel.from_config(data_params['trf_config'])
         self.dropout = MultiDropout()
-        # self.dropout = torch.nn.Dropout(p=dropout)
         
-        # span 分类器 
-        # self.span_classifier = EfficientGlobalPointer(self.plm.config.hidden_size, hidden_size, len(data_params['s_label2id'])) 
         # 主语 宾语分类器
         self.so_classifier = EfficientGlobalPointer(self.plm.config.hidden_size, hidden_size, 2)
         # 主语 宾语 头对齐
@@ -45,7 +42,6 @@ class GlobalRelation(pl.LightningModule):
         # 主语 宾语 尾对齐
         self.tail_classifier = EfficientGlobalPointer(self.plm.config.hidden_size, hidden_size, 1, RoPE=False, tril_mask=False)
 
-        # self.span_criterion = MultiLabelCategoricalCrossEntropy()
         self.so_criterion = MultiLabelCategoricalCrossEntropy()
         self.head_criterion = MultiLabelCategoricalCrossEntropy()
         self.tail_criterion = MultiLabelCategoricalCrossEntropy()
