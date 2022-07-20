@@ -182,13 +182,139 @@ model.tokenizer.save_pretrained('path/tokenizer')
 </details>
 
 <details>
-<summary><b>文本匹配</b></summary>
-TODO
-</details>
-
-<details>
 <summary><b>实体抽取</b></summary>
-TODO
+
+nlhappy支持嵌套和非嵌套实体抽取任务
+> 数据处理
+```python
+from nlhappy.utils.convert_doc import convert_spans_to_dataset
+from nlhappy.utils.make_doc import get_docs_from_docbin
+from nlhappy.utils.make_dataset import train_val_split
+import nlhappy
+# 制作docs
+nlp = nlhappy.nlp()
+docs = []
+# data为你自己格式的原始数据,按需修改
+# 只需设置doc.ents 
+# 嵌套型实体设置doc.spans['all']
+for d in data:
+    doc = nlp(d['text'])
+    # 非嵌套实体
+    ents = []
+    for ent in d['spans']:
+        start = ent['start']
+        end = ent['end']
+        label = ent['label']
+        span = doc.char_span(start, end, label)
+        ents.append(span)
+    doc.set_ents(ents)
+    docs.append(doc)
+    # 嵌套型实体
+    for ent in d['spans']:
+        start = ent['start']
+        end = ent['end']
+        label = ent['label']
+        span = doc.char_span(start, end, label)
+        doc.spans['all'].append(span)
+    docs.append(doc)
+# 保存docs,方便后边badcase分析
+db = DocBin(docs=docs, store_user_data=True)
+# 制作数据集
+# 如果文本过长可以设置句子级别数据集
+ds = convert_spans_to_dataset(docs, sentence_level=False)
+dsd = train_val_split(ds, val_frac=0.2)
+# 可以转换为dataframe分析数据
+df = dsd.to_pandas()
+max_length = df['text'].str.len().max()
+# 保存数据集,注意要保存到datasets/目录下
+dsd.save_to_disk('datasets/your_dataset_name')
+```
+> 训练模型
+编写训练脚本
+- 单卡
+```bash
+nlhappy \
+datamodule=span_classification \
+datamodule.dataset=your_dataset_name \
+datamodule.max_length=2000 \
+datamodule.batch_size=2 \
+datamodule.plm=roberta-wwm-base \
+model=global_pointer \
+model.lr=3e-5 \
+seed=22222
+```
+- 多卡
+```
+nlhappy \
+trainer=ddp \
+datamodule=span_classification \
+datamodule.dataset=dataset_name \
+datamodule.max_length=350 \
+datamodule.batch_size=2 \
+datamodule.plm=roberta-wwm-base \
+model=global_pointer \
+model.lr=3e-5 \
+seed=22222
+```
+- 后台训练
+```
+nohup bash scripts/train.sh >/dev/null 2>&1 &
+```
+- 现在可以去[wandb官网](https://wandb.ai/)查看训练详情了, 并且会自动产生logs目录里面包含了训练的ckpt,日志等信息.
+> 构建自然语言处理流程,并添加组件
+```python
+import nlhappy
+
+nlp = nlhappy.nlp()
+# 默认device cpu, 阈值0.8
+config = {'device':'cuda:0', 'threshold':0.9, 'set_ents':True}
+tc = nlp.add_pipe('span_classifier', config=config)
+# logs文件夹里面训练的模型路径
+ckpt = 'logs/experiments/runs/your_best_ckpt_path'
+tc.init_model(ckpt)
+text = '文本'
+doc = nlp(text)
+# 查看结果
+# doc.ents 为非嵌套实体,如果有嵌套会选最大跨度实体
+# doc.spans['all'] 可以包含嵌套实体
+print(doc.text, doc.ents, doc.spans['all'])
+# 保存整个流程
+nlp.to_disk('path/nlp')
+# 加载
+nlp = nlhappy.load('path/nlp')
+```
+> badcase分析
+```python
+import nlhappy
+from nlhappy.utils.analysis_doc import analysis_ent_badcase, Example, analysis_span_badcase
+from nlhappy.utils.make_doc import get_docs_from_docbin
+
+targs = get_docs_from_docbin('corpus/dataset_name/train.spacy')
+nlp = nlhappy.load('path/nlp')
+preds = []
+for d in targs:
+    doc = nlp(d['text'])
+    preds.append(doc)
+eg = [Example(x,y) for x,y in zip(preds, targs)]
+# 非嵌套实体
+badcases, score = analysis_ent_badcase(eg, return_prf=True)
+print(badcases[0].x, badcases[0].x.ents)
+print(badcases[0].y, badcases[0].y.ents)
+# 嵌套实体
+badcases, score = analysis_span_badcase(eg, return_prf=True)
+print(badcases[0].x, badcases[0].x.spans['all'])
+print(badcases[0].y, badcases[0].y.spans['all'])
+```
+> 部署
+- 直接用nlp开发接口部署
+- 转为onnx
+```python
+from nlhappy.models import GlobalPointer
+ckpt = 'logs/path/ckpt'
+model = GlobalPointer.load_from_ckeckpoint(ckpt)
+model.to_onnx('path/tc.onnx')
+model.tokenizer.save_pretrained('path/tokenizer')
+```
 </details>
 
 <details>
