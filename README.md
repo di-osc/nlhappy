@@ -60,7 +60,7 @@ wandb login
 
 
 
-## ⚡&nbsp;&nbsp; 模型开发
+## ⚡&nbsp;&nbsp; 任务
 
 <details>
 <summary><b>文本分类</b></summary>
@@ -182,7 +182,17 @@ model.tokenizer.save_pretrained('path/tokenizer')
 </details>
 
 <details>
+<summary><b>文本匹配</b></summary>
+TODO
+</details>
+
+<details>
 <summary><b>实体抽取</b></summary>
+TODO
+</details>
+
+<details>
+<summary><b>实体标准化</b></summary>
 TODO
 </details>
 
@@ -197,12 +207,17 @@ TODO
 </details>
 
 <details>
-<summary><b>文本匹配</b></summary>
+<summary><b>通用信息抽取</b></summary>
 TODO
 </details>
 
 <details>
-<summary><b>文本相似度</b></summary>
+<summary><b>摘要</b></summary>
+TODO
+</details>
+
+<details>
+<summary><b>翻译</b></summary>
 TODO
 </details>
 
