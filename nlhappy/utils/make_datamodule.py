@@ -20,8 +20,8 @@ def char_idx_to_token(char_idx, offset_mapping):
     return -1
 
 
-default_access_key_id = 'LTAI5tPsMSE5G3srWxB8j3yw'
-default_access_key_secret = 'z5jPdkfNq4WPtV4c7YaAJwH5Sj45gT'
+default_access_key_id = 'LTAI5t6MP68LoaghwWStqxuC'
+default_access_key_secret = 'v0DSdRawIXcZnVCeq0eZ1cldAy5DQ1'
 default_endpoint = 'http://oss-cn-beijing.aliyuncs.com'
 default_data_bucket = 'deepset'
 default_model_bucket = 'pretrained-model'
@@ -40,24 +40,6 @@ class OSSStorer:
         self.auth = oss2.Auth(access_key_id, access_key_secret)
         self.data_bucket = oss2.Bucket(self.auth, endpoint, data_bucket)
         self.model_bucket = oss2.Bucket(self.auth, endpoint, model_bucket)
-
-
-
-    def list_all_datasets(self):
-        """获取所有数据集名称"""
-        all_data = []
-        for obj in oss2.ObjectIterator(self.data_bucket):
-            data = obj.key.split('.')[0]
-            all_data.append(data)
-        return all_data
-    
-    def list_all_plms(self):
-        """获取所有预模型名称"""
-        all_model = []
-        for obj in oss2.ObjectIterator(self.model_bucket):
-            model = obj.key.split('.')[0]
-            all_model.append(model)
-        return all_model
 
 
     def download_dataset(
