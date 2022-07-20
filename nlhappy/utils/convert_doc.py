@@ -7,12 +7,15 @@ import random
 
 
 
-def convert_docs_to_dataset(docs: List[Doc], sentence_level: bool =False) -> Dataset:
+def convert_spans_to_dataset(docs: List[Doc], 
+                             sentence_level: bool =False,
+                             user_ents_set_span: bool = True) -> Dataset:
     """
     Convert a document to a dataset.
     args:
         docs: a list of spacy.tokens.Doc
         sentence_level: whether to convert to sentence level dataset
+        user_ents_set_span: whether to set spans by using doc.ents
     """
 
     if sentence_level:
@@ -21,7 +24,7 @@ def convert_docs_to_dataset(docs: List[Doc], sentence_level: bool =False) -> Dat
         docs = [docs]
         
 
-    d = {'text':[], 'labels':[],  'spans':[], 'tokens':[], 'triples':[]}
+    d = {'text':[], 'labels':[],  'spans':[], 'tokens':[]}
     for doc in tqdm(docs, desc='处理数据....'):
         if not sentence_level:
             d['text'].append(doc.text)
@@ -31,8 +34,7 @@ def convert_docs_to_dataset(docs: List[Doc], sentence_level: bool =False) -> Dat
             if ('all' in doc.spans) and len(doc.spans['all']) > 0:
                 for span in doc.spans['all']:
                     spans.append({'offset': (span.start_char, span.end_char), 'label': span.label_, 'text': span.text})
-            d['spans'].append(spans)
-
+                
             tokens = []
             if len(doc.ents) > 0:
                 for token in doc:
@@ -40,15 +42,13 @@ def convert_docs_to_dataset(docs: List[Doc], sentence_level: bool =False) -> Dat
                     bio = token.ent_iob_ + '-' + token.ent_type_ if token.ent_iob_ != 'O' else token.ent_iob_
                     t['label'] = bio
                     tokens.append(t)
+                if user_ents_set_span:
+                    for span in doc.ents:
+                        spans.append({'offset': (span.start_char, span.end_char), 'label': span.label_, 'text': span.text})
+                    
             d['tokens'].append(tokens)
+            d['spans'].append(spans)
 
-            triples = []
-            for spo in doc._.spoes:
-                sub = spo.subject
-                pred = spo.predicate
-                obj = spo.object
-                triples.append({'subject': {'offset':(sub.start_char, sub.end_char), 'text':sub.text}, 'predicate': pred, 'object': {'offset':(obj.start_char, obj.end_char), 'text':obj.text}})
-            d['triples'].append(triples)
 
         else:
             for sent in doc.sents:
@@ -60,7 +60,6 @@ def convert_docs_to_dataset(docs: List[Doc], sentence_level: bool =False) -> Dat
                     for span in doc.spans['all']:
                         if span.sent == sent:
                             spans.append({'offset': (span.start_char - sent_start, span.end_char - sent_start), 'label': span.label_, 'text': span.text})
-                d['spans'].append(spans)
 
                 tokens = []
                 if len(doc.ents) > 0:
@@ -69,10 +68,13 @@ def convert_docs_to_dataset(docs: List[Doc], sentence_level: bool =False) -> Dat
                         bio = token.ent_iob_ + '-' + token.ent_type_ if token.ent_iob_ != 'O' else token.ent_iob_
                         t['label'] = bio
                         tokens.append(t)
+                    if user_ents_set_span:
+                        for span in doc.ents:
+                            if span.sent == sent:
+                                spans.append({'offset': (span.start_char - sent_start, span.end_char - sent_start), 'label': span.label_, 'text': span.text})
                 d['tokens'].append(tokens)
+                d['spans'].append(spans)
 
-                triples = []
-                d['triples'].append(triples)
     print("保存数据....")
     ds = Dataset.from_dict(d)
     return ds
