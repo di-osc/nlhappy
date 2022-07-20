@@ -1,1 +1,1 @@
-from .bert_global_pointer import BertGlobalPointer
+from .global_pointer import GlobalPointer

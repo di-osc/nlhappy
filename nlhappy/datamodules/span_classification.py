@@ -1,6 +1,5 @@
 import pytorch_lightning as pl
-from ..utils.make_datamodule import OSSStorer
-import os
+from ..utils.make_datamodule import prepare_data_from_oss
 import torch
 from datasets import load_from_disk
 from transformers import BertTokenizer, BertConfig
@@ -17,8 +16,8 @@ class SpanClassificationDataModule(pl.LightningDataModule):
                 plm: str,
                 max_length: int,
                 batch_size: int,
-                pin_memory: bool=True,
-                num_workers: int=1,
+                pin_memory: bool,
+                num_workers: int,
                 dataset_dir: str ='./datasets/',
                 plm_dir: str = './plms/') :
         super().__init__()
@@ -27,9 +26,10 @@ class SpanClassificationDataModule(pl.LightningDataModule):
 
     def prepare_data(self) -> None:
         '下载数据集和预训练模型'
-        oss = OSSStorer()
-        oss.download_dataset(self.hparams.dataset, self.hparams.dataset_dir)
-        oss.download_plm(self.hparams.plm, self.hparams.plm_dir)
+        prepare_data_from_oss(dataset=self.hparams.dataset,
+                              plm=self.hparams.plm,
+                              dataset_dir=self.hparams.dataset_dir,
+                              plm_dir=self.hparams.plm_dir)
 
     def transform(self, example):
         batch_text = example['text']
