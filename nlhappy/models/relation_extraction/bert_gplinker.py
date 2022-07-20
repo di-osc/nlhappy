@@ -1,5 +1,6 @@
 import pytorch_lightning as pl
 from transformers import AutoModel, AutoTokenizer
+from transformers.optimization import get_linear_schedule_with_warmup
 from ...layers import EfficientGlobalPointer, MultiDropout
 from ...layers.loss import MultiLabelCategoricalCrossEntropy, SparseMultiLabelCrossEntropy
 from ...metrics.triple import TripleF1, Triple
@@ -137,8 +138,12 @@ class BertGPLinker(pl.LightningModule):
             'lr': self.hparams.lr* 10, 'weight_decay': 0.0}
         ]
         self.optimizer = torch.optim.AdamW(grouped_parameters, eps=1e-5)
-        self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lambda epoch: 1.0 / (epoch + 1.0))
-        return [self.optimizer], [self.scheduler]
+        steps_per_epoch = len(self.trainer.datamodule.train_dataloader()) // self.trainer.gpus
+        total_steps = self.trainer.max_epochs * steps_per_epoch
+        scheduler = get_linear_schedule_with_warmup(optimizer=self.optimizer, num_training_steps=total_steps, num_warmup_steps=0.5 * steps_per_epoch)
+        scheduler_config = {'scheduler': scheduler, 'interval':'step'}
+        # self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lambda epoch: 1.0 / (epoch + 1.0))
+        return [self.optimizer], [scheduler_config]
 
 
     def extract_triple(
