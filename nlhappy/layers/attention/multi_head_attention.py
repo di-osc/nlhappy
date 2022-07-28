@@ -30,10 +30,10 @@ attentions = {
 
 class MultiHeadAttentionLayer(nn.Module):
     def __init__(self, 
-                hidden_size:int,
-                num_attention_heads: int,
-                attention_probs_dropout_prob: float,
-                return_attention_scores: bool,
+                hidden_size:int = 768,
+                num_attention_heads: int = 8,
+                attention_probs_dropout_prob: float = 0.1,
+                return_attention_scores: bool = False,
                 attention_scale: bool= True,
                 bias:bool =True,
                 **kwargs):
@@ -58,9 +58,9 @@ class MultiHeadAttentionLayer(nn.Module):
         self.attention_head_size  = int(hidden_size / num_attention_heads)
         self.attention_scale = attention_scale
         self.return_attention_scores = return_attention_scores
-        self.q = nn.Linear(hidden_size, hidden_size)
-        self.k = nn.Linear(hidden_size, hidden_size)
-        self.v = nn.Linear(hidden_size, hidden_size)
+        self.query = nn.Linear(hidden_size, hidden_size)
+        self.key = nn.Linear(hidden_size, hidden_size)
+        self.value= nn.Linear(hidden_size, hidden_size)
         self.dropout = nn.Dropout(attention_probs_dropout_prob)
 
         self.a_bias, self.p_bias = kwargs.get('a_bias'), kwargs.get('p_bias')
@@ -69,9 +69,9 @@ class MultiHeadAttentionLayer(nn.Module):
             pass
 
     def forward(self, query, key, value, attention_mask=None, head_mask=None):
-        mixed_query_layer = self.q(query)
-        mixed_key_layer = self.k(key)
-        mixed_value_layer = self.v(value)
+        mixed_query_layer = self.query(query)
+        mixed_key_layer = self.key(key)
+        mixed_value_layer = self.value(value)
         query_layer = self.transpose_for_scores(mixed_query_layer)
         key_layer = self.transpose_for_scores(mixed_key_layer)
         value_layer = self.transpose_for_scores(mixed_value_layer)

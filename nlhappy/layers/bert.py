@@ -21,7 +21,7 @@ class BertEmbeddings(nn.Module):
         ) -> None:
         super().__init__()
         self.word_embeddings = nn.Embedding(vocab_size, hidden_size)
-        self.positon_embeddings = nn.Embedding(max_position_embeddings, hidden_size)
+        self.position_embeddings = nn.Embedding(max_position_embeddings, hidden_size)
         self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
         self.dropout = nn.Dropout(hidden_dropout_prob)
         self.layer_norm = LayerNorm(hidden_size=hidden_size, eps=layer_norm_eps)
@@ -36,7 +36,7 @@ class BertEmbeddings(nn.Module):
         if token_type_ids is None:
             token_type_ids = torch.zeros_like(input_ids)
         word_embeddings = self.word_embeddings(input_ids)
-        position_embeddings = self.positon_embeddings(position_ids)
+        position_embeddings = self.position_embeddings(position_ids)
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
         embeddings = word_embeddings + position_embeddings + token_type_embeddings
         embeddings = self.layer_norm(embeddings)
@@ -75,11 +75,10 @@ class BertAttention(nn.Module):
         hidden_size, 
         num_attention_heads, 
         attention_probs_dropout_prob, 
-        return_attention_scores,
         hidden_dropout_prob,
         layer_norm_eps) -> None:
         super().__init__()
-        self.self = MultiHeadAttentionLayer(hidden_size, num_attention_heads, attention_probs_dropout_prob, return_attention_scores)
+        self.self = MultiHeadAttentionLayer(hidden_size, num_attention_heads, attention_probs_dropout_prob)
         self.output = BertAddNorm(
             intermediate_size=hidden_size,
             hidden_size=hidden_size,
@@ -128,19 +127,18 @@ class BertLayer(nn.Module):
 
 
 class BertEncoder(nn.Module):
-    def __init__(
-        self,
-        hidden_size,
-        num_attention_heads,
-        hidden_act,
-        intermediate_size,
-        hidden_dropout_prob,
-        layer_norm_eps,
-        output_attentions,
-        output_hidden_states
-        ) -> None:
+    def __init__(self,
+                 num_hidden_layers,
+                 hidden_size,
+                 num_attention_heads,
+                 hidden_act,
+                 intermediate_size,
+                 hidden_dropout_prob,
+                 layer_norm_eps,
+                 output_attentions,
+                 output_hidden_states) -> None:
         super().__init__()
-        self.layer = nn.ModuleList([BertLayer(hidden_size, num_attention_heads, hidden_act, intermediate_size, hidden_dropout_prob, layer_norm_eps)])
+        self.layer = nn.ModuleList([BertLayer(hidden_size, num_attention_heads, hidden_act, intermediate_size, hidden_dropout_prob, layer_norm_eps) for _ in range(num_hidden_layers)])
         self.output_attentions = output_attentions
         self.output_hidden_states = output_hidden_states
 
@@ -200,16 +198,17 @@ class BertOutput:
 
 class Bert(nn.Module):
     def __init__(self,
-        vocab_size,
-        type_vocab_size,
-        hidden_size,
-        max_position_embeddings,
-        hidden_dropout_prob,
-        num_attention_heads,
-        hidden_act,
-        intermediate_size,
-        output_attentions,
-        output_hidden_states,
+        vocab_size: int,
+        type_vocab_size: int =2,
+        max_position_embeddings: int = 512,
+        hidden_size: int = 768,
+        hidden_dropout_prob: float = 0.1,
+        num_attention_heads: int = 8,
+        num_hidden_layers: int = 12,
+        hidden_act: str = 'gelu',
+        intermediate_size: int = 3072,
+        output_attentions: bool = False,
+        output_hidden_states :bool = False,
         layer_norm_eps:float = 3e-12
         ) -> None:
         super().__init__()
@@ -223,6 +222,7 @@ class Bert(nn.Module):
         )
         self.encoder = BertEncoder(
             hidden_size=hidden_size,
+            num_hidden_layers=num_hidden_layers,
             num_attention_heads=num_attention_heads,
             hidden_act=hidden_act,
             intermediate_size=intermediate_size,
@@ -337,4 +337,27 @@ class Bert(nn.Module):
                              attentions=encoder_outputs[1:])
 
         return outputs
+    
+    
+class BertBaseConfig:
+    attention_probs_dropout_prob = 0.1,
+    gradient_checkpointing= False,
+    hidden_act = "gelu",
+    hidden_dropout_prob = 0.1,
+    hidden_size= 768,
+    initializer_range= 0.02,
+    intermediate_size= 3072,
+    layer_norm_eps= 1e-12,
+    max_position_embeddings= 512,
+    num_attention_heads= 12,
+    num_hidden_layers= 12,
+    pad_token_id= 0,
+    pooler_fc_size= 768,
+    pooler_num_attention_heads= 12,
+    pooler_num_fc_layers= 3,
+    pooler_size_per_head= 128,
+    position_embedding_type= 'absolute',
+    type_vocab_size= 2,
+    use_cache= True,
+    vocab_size= 21128
 
