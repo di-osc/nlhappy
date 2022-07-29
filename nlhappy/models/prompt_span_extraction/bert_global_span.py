@@ -1,6 +1,5 @@
 import pytorch_lightning as pl
 from transformers import AutoModel
-from torch.optim.lr_scheduler import OneCycleLR
 import torch.nn as nn
 import torch
 from ...metrics.span import SpanF1
