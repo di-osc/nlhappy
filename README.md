@@ -29,8 +29,8 @@ nlhappy是一款集成了数据处理,模型训练,文本处理流程构建等�
 > 推荐先去[pytorch官网](https://pytorch.org/get-started/locally/)安装pytorch和对应cuda
 ```bash
 # pip 安装
-pip install -upgrade pip
-pip install -upgrade nlhappy
+pip install --upgrade pip
+pip install --upgrade nlhappy
 
 # 通过poetry打包然后安装
 # 首先将文件下载到本地
@@ -73,7 +73,7 @@ from nlhappy.utils.convert_doc import convert_docs_to_tc_dataset
 import nlhappy
 # 构建corpus
 # 将数据处理为统一的Doc对象,它存储着所有标签数据
-nlp = nlhappy
+nlp = nlhappy.nlp()
 docs = []
 # data为你自己的数据
 # doc._.label 为文本的标签,之所以加'_'是因为这是spacy Doc保存用户自己数据的用法
