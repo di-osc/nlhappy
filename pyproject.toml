@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "nlhappy"
-version = "2022.07.20"
+version = "2022.08.02"
 description = "😄让你爱上自然语言处理😄"
 authors = ["wangmengdi <ddream_ai@163.com>"]
 
@@ -13,7 +13,7 @@ transformers = "^4.17.0"
 hydra-core = "1.1.1"
 hydra-colorlog = "1.1.0"
 oss2 = "^2.15.0"
-spacy = "^3.3.0"
+spacy = ">=3.3.0"
 rich = "^12.4.3"
 wandb = ">=0.12.18"
 googletrans = "4.0.0rc1"
