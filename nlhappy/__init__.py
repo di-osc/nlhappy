@@ -51,7 +51,7 @@ def nlp():
     return spacy.blank('zh')
 
 
-def load(path: str, disable: list=[]):
+def load(path: str, config: dict = {}, disable: list=[]):
     """load spacy nlp pipeline from path
 
     Args:
@@ -62,7 +62,7 @@ def load(path: str, disable: list=[]):
         nlp: spacy nlp pipeline
     """
     import spacy
-    nlp = spacy.load(name=path, disable=disable)
+    nlp = spacy.load(name=path, disable=disable, config=config)
     return nlp
 
     
