@@ -3,53 +3,15 @@ from typing import Dict, List
 from ..algorithms.text_match import BM25
 from onnxruntime import InferenceSession
 from transformers import AutoTokenizer 
-import numpy as np
 from spacy.tokens import Doc
 from collections import defaultdict
 from spacy.lang.zh import Chinese
 from spacy.language import Language
 import os
-import onnx
+from ..models import BERTCrossEncoder
+from ..utils.utils import get_logger
 
-
-
-
-def softmax(x):
-    max = np.max(x,axis=1,keepdims=True) #returns max of each row and keeps same dims
-    e_x = np.exp(x - max) #subtracts each row with its max value
-    sum = np.sum(e_x,axis=1,keepdims=True) #returns sum of each row and keeps same dims
-    f_x = e_x / sum 
-    return f_x
-
-class Matcher():
-    def __init__(self, 
-                 model: str, 
-                 tokenizer: str, 
-                 id2label: str):
-        super().__init__()
-        self.session = model
-        self.tokenizer = tokenizer
-        self.id2label = id2label
-
-    def match(self, text_a: str, text_b: str):
-        """精排方法
-
-        Args:
-            text_a (str): 原词
-            text_b (str): 召回词
-
-        Returns:
-            pred: str , score: int
-        """
-        inputs = dict(self.tokenizer(text_a, 
-                                     text_b, 
-                                     return_tensors='np'))
-        output = softmax(self.session.run(None, inputs)[0])
-        id = np.argmax(output)
-        pred = self.id2label[int(id)]
-        score = np.max(output)
-        return pred, score
-
+log = get_logger()
 
 class EntityNormalizer:
     def __init__(self,
@@ -59,7 +21,8 @@ class EntityNormalizer:
                 topk: int =20,
                 positive_label: str='1',
                 strategy: str='pre',
-                threshold: float = 0.5
+                threshold: float = 0.5,
+                device:str = 'cpu'
                 ) -> None:
         super().__init__()
         self.name = name
@@ -68,26 +31,24 @@ class EntityNormalizer:
         self.strategy = strategy
         self.threshold = threshold
         self.norm_labels = norm_labels
+        self.device = device
     
     def init_match(self,
-                    match_model_path, 
-                    match_tokenizer_path, 
-                    match_id2label_path):
+                    model_or_path):
         """初始化匹配模型
 
         Args:
-            match_model_path (_type_): _description_
-            match_tokenizer_path (_type_): _description_
-            match_id2label_path (_type_): _description_
+            model_or_path: 
         """
-        self._match_model_path = match_model_path
-        self._match_tokenizer_path = match_tokenizer_path
-        self._match_id2label_path = match_id2label_path
-        self.match_model = onnx.load(match_model_path)
-        self.match_infer = InferenceSession(self.match_model.SerializeToString())
-        self.match_tokenizer = AutoTokenizer.from_pretrained(match_tokenizer_path)
-        self.match_id2label = pickle.load(open(match_id2label_path, 'rb'))
-        self.matcher = Matcher(model=self.match_infer,tokenizer=self.match_tokenizer,id2label=self.match_id2label)
+        if isinstance(model_or_path, BERTCrossEncoder):
+            self.match_model = model_or_path
+            self.match_model.freeze()
+            self.match_model.to(self.device)
+            
+        else:
+            self.match_model= BERTCrossEncoder.load_from_checkpoint(model_or_path)
+            self.match_model.freeze()
+            self.match_model.to(self.device)
         
         
     def init_recall(self,
@@ -121,11 +82,11 @@ class EntityNormalizer:
                         self.map_dict[k].add(v)
         corpus = list(self.map_dict.keys())       
         self.recall_model = BM25(corpus=corpus,
-                    k1=k1,
-                    b=b,
-                    epsilon=epsilon,
-                    tokenizer=tokenizer,
-                    is_retain_docs=is_retrain_docs)
+                                k1=k1,
+                                b=b,
+                                epsilon=epsilon,
+                                tokenizer=tokenizer,
+                                is_retain_docs=is_retrain_docs)
             
         
     def normalize(self, query):
@@ -139,8 +100,8 @@ class EntityNormalizer:
         if self.strategy == 'pre':
             recall_ls = [recall[0] for recall in recalls]
             for recall in recall_ls:
-                pred, score = self.matcher.match(query, recall)
-                if pred[0] == self.positive_label and score > self.threshold:
+                pred, score = self.match_model.predict(text_pair=[query, recall], device=self.device)[0]
+                if pred == self.positive_label and score > self.threshold:
                     result_ls.append(recall)
                     break
             if len(result_ls) == 0:
@@ -152,8 +113,8 @@ class EntityNormalizer:
                     if v not in recall_ls:
                         recall_ls.append(v)
             for recall in recall_ls:
-                pred, score = self.matcher.match(query, recall)
-                if pred[0] == self.positive_label and score > self.threshold:
+                pred, score = self.match_model.predict(text_pair=[query, recall], device=self.device)[0]
+                if pred == self.positive_label and score > self.threshold:
                     result_ls.append(recall)
                     break
             if len(result_ls) == 0:
@@ -178,13 +139,9 @@ class EntityNormalizer:
         match_path = os.path.join(path, 'match')
         if not os.path.exists(match_path):
             os.mkdir(match_path)
-        match_model_path = os.path.join(match_path, 'bert_tm.onnx')
-        onnx.save(self.match_model, match_model_path)
-        id2label_file = os.path.join(match_path, 'id2label.pkl')
-        pickle.dump(self.match_id2label, open(id2label_file, 'wb'))
-        match_tokenizer_path = os.path.join(match_path, 'tokenizer')
-        self.match_tokenizer.save_pretrained(match_tokenizer_path)
-        
+        match_model_path = os.path.join(match_path, 'bert_tm.pkl')
+        with open(match_model_path, 'wb') as f:
+            pickle.dump(self.match_model, f)
         recall_path = os.path.join(path, 'recall')
         if not os.path.exists(recall_path):
             os.mkdir(recall_path)
@@ -197,15 +154,14 @@ class EntityNormalizer:
         
     def from_disk(self, path:str, exclude):
         # path: load_path/entity_normalizer
-        match_path = os.path.join(path, 'match')
-        match_model_path = os.path.join(path, 'match', 'bert_tm.onnx')
-        self.match_model = onnx.load(match_model_path)
-        infer = InferenceSession(self.match_model.SerializeToString())
-        match_tokenizer_path = os.path.join(match_path, 'tokenizer')
-        self.match_tokenizer = AutoTokenizer.from_pretrained(match_tokenizer_path)
-        match_id2label_path = os.path.join(match_path, 'id2label.pkl')
-        self.match_id2label = pickle.load(open(match_id2label_path, 'rb'))
-        self.matcher = Matcher(model=infer,tokenizer=self.match_tokenizer,id2label=self.match_id2label)
+        match_model_path = os.path.join(path, 'match', 'bert_tm.pkl')
+        with open(match_model_path, 'rb') as f:
+            self.match_model = pickle.load(f)
+        self.match_model.freeze()
+        try:
+            self.match_model.to(self.device)
+        except:
+            log.info(f' to device {self.device} failed')
         recall_path = os.path.join(path, 'recall')
         map_dict_path = os.path.join(recall_path, 'map_dict.pkl')
         self.map_dict = pickle.load(open(map_dict_path, 'rb'))
@@ -213,12 +169,12 @@ class EntityNormalizer:
         self.recall_model = pickle.load(open(bm25_path,'rb'))
         
 
-
 default_config = {
     'topk': 20,
     'positive_label': '1',
-    'strategy': 'pre',
-    'threshold': 0.5
+    'strategy': 'post',
+    'threshold': 0.5,
+    'device': 'cpu'
     }
         
         
@@ -229,7 +185,8 @@ def make_entity_normalizer(nlp: Language,
                             topk: int =20,
                             positive_label: str='1',
                             strategy: str='pre',
-                            threshold: float = 0.5):
+                            threshold: float = 0.5,
+                            device: str = 'cpu'):
     return EntityNormalizer(
         nlp=nlp,
         name=name,
@@ -237,7 +194,8 @@ def make_entity_normalizer(nlp: Language,
         topk=topk,
         positive_label=positive_label,
         strategy=strategy,
-        threshold=threshold)
+        threshold=threshold,
+        device=device)
 
         
         
