@@ -52,13 +52,13 @@ class EntityNormalizer:
         
         
     def init_recall(self,
-                norm_names: List[str],
-                synonym_dict: Dict[str, set]={},
-                tokenizer= None,
-                is_retrain_docs:bool=True,
-                k1: float= 1.5,
-                b: float=0.75,
-                epsilon: float=0.25):
+                    norm_names: List[str],
+                    synonym_dict: Dict[str, set]={},
+                    tokenizer= None,
+                    is_retrain_docs:bool=True,
+                    k1: float= 1.5,
+                    b: float=0.75,
+                    epsilon: float=0.25):
         """初始化bm25模型
         Args:
             norm_names (List[str]): 标准实体列表
@@ -187,15 +187,15 @@ def make_entity_normalizer(nlp: Language,
                             strategy: str='pre',
                             threshold: float = 0.5,
                             device: str = 'cpu'):
-    return EntityNormalizer(
-        nlp=nlp,
-        name=name,
-        norm_labels=norm_labels,
-        topk=topk,
-        positive_label=positive_label,
-        strategy=strategy,
-        threshold=threshold,
-        device=device)
+    
+    return EntityNormalizer(nlp=nlp,
+                            name=name,
+                            norm_labels=norm_labels,
+                            topk=topk,
+                            positive_label=positive_label,
+                            strategy=strategy,
+                            threshold=threshold,
+                            device=device)
 
         
         
