@@ -2,7 +2,11 @@ import os
 import oss2
 import zipfile
 from .utils import get_logger
-from typing import List
+from typing import List, Optional
+from torch.utils.data import DataLoader
+from datasets import load_from_disk
+import pytorch_lightning as pl
+from transformers import AutoConfig, AutoTokenizer
 
 log = get_logger()
 
@@ -197,6 +201,85 @@ def align_char_span_text_b(char_span_offset: tuple,
     except:
         log.warning(f'align {char_span_offset} failed')
     return token_span_offset
+
+
+
+class PLMDataModule(pl.LightningModule):
+    def __init__(self,
+                 plm: str,
+                 dataset: str,
+                 batch_size: int = 8,
+                 max_length: int = -1,
+                 labels: List[str] = None, 
+                 plm_dir: str = 'plms',
+                 dataset_dir: str = 'datasets',
+                 num_workers: int = 0,
+                 pin_memory: bool = False):
+        super().__init__()
+        self.save_hyperparameters()
     
+    def prepare_data(self) -> None:
+        prepare_data_from_oss(dataset=self.hparams.dataset,
+                              plm=self.hparams.plm,
+                              dataset_dir=self.hparams.dataset_dir,
+                              plm_dir=self.hparams.plm_dir)
+    
+    def setup(self, stage: Optional[str] = None) -> None:
+        self.hparams.trf_config = self.trf_config
+        self.hparams.label2id = self.label2id
+        self.hparams.vocab = self.tokenizer.vocab
+        self.dataset.set_transform(self.transform)
+    
+    @property
+    def dataset(self):
+        dataset_path = os.path.join(self.dataset_dir, self.hparams.dataset)
+        try:
+            ds = load_from_disk(dataset_path)
+            return ds
+        except:
+            print(f'load dataset failed from {dataset_path}')
+            
+    @property
+    def trf_config(self):
+        plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
+        return AutoConfig.from_pretrained(plm_path)
+    
+    @property
+    def tokenizer(self):
+        plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
+        return AutoTokenizer.from_pretrained(plm_path)
+    
+    @property
+    def label2id(self):
+        if self.hparams.labels is None:
+            return {}
+        else:
+            return {l:i for l,i in zip(self.hparams.labels, range(len(self.hparams.labels)))}
+    
+    
+    def transform(self):
+        raise NotImplementedError()
+    
+    
+    def train_dataloader(self):
+        return DataLoader(dataset= self.dataset['train'], 
+                          batch_size=self.hparams.batch_size, 
+                          num_workers=self.hparams.num_workers, 
+                          pin_memory=self.hparams.pin_memory,
+                          shuffle=True)
+    
+    
+    def val_dataloader(self):
+        return DataLoader(dataset=self.dataset['validation'], 
+                          batch_size=self.hparams.batch_size, 
+                          num_workers=self.hparams.num_workers, 
+                          pin_memory=self.hparams.pin_memory,
+                          shuffle=False)
 
 
+    def test_dataloader(self):
+        return DataLoader(dataset=self.dataset['test'], 
+                          batch_size=self.hparams.batch_size, 
+                          num_workers=self.hparams.num_workers, 
+                          pin_memory=self.hparams.pin_memory,
+                          shuffle=False)
