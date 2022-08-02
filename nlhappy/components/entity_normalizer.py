@@ -1,8 +1,6 @@
 import pickle
 from typing import Dict, List
 from ..algorithms.text_match import BM25
-from onnxruntime import InferenceSession
-from transformers import AutoTokenizer 
 from spacy.tokens import Doc
 from collections import defaultdict
 from spacy.lang.zh import Chinese
