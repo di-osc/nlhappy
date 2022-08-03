@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 from datasets import load_from_disk
 import pytorch_lightning as pl
 from transformers import AutoConfig, AutoTokenizer
+from functools import lru_cache
 
 log = get_logger()
 
@@ -206,11 +207,6 @@ def align_char_span_text_b(char_span_offset: tuple,
 
 class PLMDataModule(pl.LightningModule):
     def __init__(self,
-                 plm: str,
-                 dataset: str,
-                 batch_size: int = 8,
-                 max_length: int = -1,
-                 labels: List[str] = None, 
                  plm_dir: str = 'plms',
                  dataset_dir: str = 'datasets',
                  num_workers: int = 0,
@@ -224,15 +220,11 @@ class PLMDataModule(pl.LightningModule):
                               dataset_dir=self.hparams.dataset_dir,
                               plm_dir=self.hparams.plm_dir)
     
-    def setup(self, stage: Optional[str] = None) -> None:
-        self.hparams.trf_config = self.trf_config
-        self.hparams.label2id = self.label2id
-        self.hparams.vocab = self.tokenizer.vocab
-        self.dataset.set_transform(self.transform)
     
     @property
+    @lru_cache()
     def dataset(self):
-        dataset_path = os.path.join(self.dataset_dir, self.hparams.dataset)
+        dataset_path = os.path.join(self.hparams.dataset_dir, self.hparams.dataset)
         try:
             ds = load_from_disk(dataset_path)
             return ds
@@ -240,16 +232,19 @@ class PLMDataModule(pl.LightningModule):
             print(f'load dataset failed from {dataset_path}')
             
     @property
+    @lru_cache()
     def trf_config(self):
         plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
         return AutoConfig.from_pretrained(plm_path)
     
     @property
+    @lru_cache()
     def tokenizer(self):
         plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
         return AutoTokenizer.from_pretrained(plm_path)
     
     @property
+    @lru_cache()
     def label2id(self):
         if self.hparams.labels is None:
             return {}
@@ -257,8 +252,12 @@ class PLMDataModule(pl.LightningModule):
             return {l:i for l,i in zip(self.hparams.labels, range(len(self.hparams.labels)))}
     
     
-    def transform(self):
-        raise NotImplementedError()
+    
+    def setup(self, stage: Optional[str] = None) -> None:
+        self.hparams.trf_config = self.trf_config
+        self.hparams.label2id = self.label2id
+        self.hparams.vocab = self.tokenizer.vocab
+        self.dataset.set_transform(transform=self.transform)
     
     
     def train_dataloader(self):
