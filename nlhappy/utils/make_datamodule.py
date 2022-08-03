@@ -246,7 +246,7 @@ class PLMDataModule(pl.LightningModule):
     @property
     @lru_cache()
     def label2id(self):
-        if self.hparams.labels is None:
+        if ('labels' not in self.hparams) or (self.hparams.labels is None):
             return {}
         else:
             return {l:i for l,i in zip(self.hparams.labels, range(len(self.hparams.labels)))}
