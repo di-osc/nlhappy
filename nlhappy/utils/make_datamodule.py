@@ -2,7 +2,7 @@ import os
 import oss2
 import zipfile
 from .utils import get_logger
-from typing import List, Optional
+from typing import List, Optional, Dict
 from torch.utils.data import DataLoader
 from datasets import load_from_disk
 import pytorch_lightning as pl
@@ -207,19 +207,20 @@ def align_char_span_text_b(char_span_offset: tuple,
 
 class PLMDataModule(pl.LightningModule):
     def __init__(self,
+                 max_length: Optional[int] = None,
                  plm_dir: str = 'plms',
                  dataset_dir: str = 'datasets',
                  num_workers: int = 0,
                  pin_memory: bool = False):
         super().__init__()
         self.save_hyperparameters()
+        self.log = get_logger()
     
     def prepare_data(self) -> None:
         prepare_data_from_oss(dataset=self.hparams.dataset,
                               plm=self.hparams.plm,
                               dataset_dir=self.hparams.dataset_dir,
                               plm_dir=self.hparams.plm_dir)
-    
     
     @property
     @lru_cache()
@@ -243,20 +244,35 @@ class PLMDataModule(pl.LightningModule):
         plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
         return AutoTokenizer.from_pretrained(plm_path)
     
+    
     @property
     @lru_cache()
-    def label2id(self):
-        if ('labels' not in self.hparams) or (self.hparams.labels is None):
-            return {}
+    def label2id(self) -> Dict:
+        return self.get_label2id()
+    
+    
+    def get_label2id(self) -> Dict:
+        raise NotImplementedError
+    
+    
+    def transform(self):
+        raise NotImplementedError
+        
+    
+    @property
+    @lru_cache()
+    def max_length(self):
+        if self.hparams.max_length is None:
+            return min(512, max([len(d['text']) for d in self.dataset['train']]))
         else:
-            return {l:i for l,i in zip(self.hparams.labels, range(len(self.hparams.labels)))}
-    
-    
-    
+            return self.hparams.max_length
+            
+            
     def setup(self, stage: Optional[str] = None) -> None:
         self.hparams.trf_config = self.trf_config
         self.hparams.label2id = self.label2id
         self.hparams.vocab = self.tokenizer.vocab
+        self.hparams.max_length = self.max_length
         self.dataset.set_transform(transform=self.transform)
     
     
