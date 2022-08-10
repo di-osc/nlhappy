@@ -1,8 +1,8 @@
 import pytorch_lightning as pl
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoModel
 from transformers.optimization import get_linear_schedule_with_warmup
 from ...layers import EfficientGlobalPointer, MultiDropout
-from ...layers.loss import MultiLabelCategoricalCrossEntropy, SparseMultiLabelCrossEntropy
+from ...layers.loss import MultiLabelCategoricalCrossEntropy
 from ...metrics.triple import TripleF1, Triple
 import torch
 from torch import Tensor
@@ -42,9 +42,9 @@ class BertGPLinker(pl.LightningModule):
         # 主语 宾语分类器
         self.so_classifier = EfficientGlobalPointer(self.bert.config.hidden_size, hidden_size, 2)
         # 主语 宾语 头对齐
-        self.head_classifier = EfficientGlobalPointer(self.bert.config.hidden_size, hidden_size, len(data_params['p_label2id']), RoPE=False, tril_mask=False)
+        self.head_classifier = EfficientGlobalPointer(self.bert.config.hidden_size, hidden_size, len(data_params['label2id']), RoPE=False, tril_mask=False)
         # 主语 宾语 尾对齐
-        self.tail_classifier = EfficientGlobalPointer(self.bert.config.hidden_size, hidden_size, len(data_params['p_label2id']), RoPE=False, tril_mask=False)
+        self.tail_classifier = EfficientGlobalPointer(self.bert.config.hidden_size, hidden_size, len(data_params['label2id']), RoPE=False, tril_mask=False)
 
         # self.span_criterion = MultiLabelCategoricalCrossEntropy()
         self.so_criterion = MultiLabelCategoricalCrossEntropy()
@@ -184,7 +184,7 @@ class BertGPLinker(pl.LightningModule):
                     ps = set(p1s) & set(p2s)
                     if len(ps) > 0:
                         for p in ps:
-                            triples.add(Triple(triple=(sh.item(), st.item(), self.hparams['p_id2label'][p], oh.item(), ot.item())))
+                            triples.add(Triple(triple=(sh.item(), st.item(), self.hparams['id2label'][p], oh.item(), ot.item())))
             batch_triples.append(triples)
         return batch_triples
 
