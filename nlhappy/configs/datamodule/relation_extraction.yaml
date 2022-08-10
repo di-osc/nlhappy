@@ -1,9 +1,10 @@
 _target_: nlhappy.datamodules.RelationExtractionDataModule
 
 dataset: 
-max_length: 
 batch_size: 
-plm: chinese-roberta-wwm-ext
+transform: gplinker
+plm: roberta-wwm-base
+max_length: -1
 pin_memory: False
 num_workers: 0
 dataset_dir: ${dataset_dir}
