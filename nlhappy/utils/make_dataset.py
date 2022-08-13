@@ -1,5 +1,5 @@
-from datasets import Dataset, DatasetDict 
-from typing import Dict, Tuple, Optional, Union, List
+from datasets import Dataset, DatasetDict
+from typing import Dict, Tuple, Union, List
 from ..algorithms.text_match import BM25
 from spacy.tokens import Doc
 import random

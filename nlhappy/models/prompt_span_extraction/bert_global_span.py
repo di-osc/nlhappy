@@ -72,7 +72,7 @@ class BERTGlobalSpan(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         loss, pred, true = self.shared_step(batch)
         self.val_metric(pred, true)
-        self.log('val/f1', self.val_metric, on_epoch=True)
+        self.log('val/f1', self.val_metric, on_epoch=True, prog_bar=True)
         return {'loss': loss}
 
     def test_step(self, batch, batch_idx):
@@ -95,8 +95,6 @@ class BERTGlobalSpan(pl.LightningModule):
         ]
         optimizer = torch.optim.AdamW(grouped_parameters)
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 1.0 / (epoch + 1.0))
-        # total_steps = self.trainer.max_epochs * len(self.trainer.datamodule.train_dataloader()) // self.trainer.gpus
-        # scheduler_config = {'scheduler': OneCycleLR(optimizer=optimizer, max_lr=self.hparams.lr, total_steps=total_steps), 'interval':'step'}
         return [optimizer], [scheduler]
 
     def predict(self, prompts: List[str], texts: List[str], device: str='cpu', threshold = None):

@@ -9,6 +9,7 @@ import pytorch_lightning as pl
 from transformers import AutoConfig, AutoTokenizer
 from functools import lru_cache
 
+
 log = get_logger()
 
 def char_idx_to_token(char_idx, offset_mapping):
@@ -205,16 +206,30 @@ def align_char_span_text_b(char_span_offset: tuple,
 
 
 
-class PLMDataModule(pl.LightningModule):
+class PLMBaseDataModule(pl.LightningModule):
+    """数据模块的基类,子类需要完成setup方法,子类初始化的时候至少包含dataset,plm,batch_size参数,
+    内置功能:
+    - 直接调用self.log可以记录日志
+    - 自动获取最大文本长度,超过512则取512
+    - 下载数据集和预训练模型
+    - 自动读取tokenizer
+    - 自动读取数据集
+    - 自动设置dataloader,数据集需要切分为train,validation,test
+    """
     def __init__(self,
-                 max_length: Optional[int] = None,
                  plm_dir: str = 'plms',
                  dataset_dir: str = 'datasets',
                  num_workers: int = 0,
-                 pin_memory: bool = False):
+                 pin_memory: bool = False,
+                 shuffle_train: bool = True,
+                 shuffle_val: bool = False,
+                 shuffle_test: bool = False):
         super().__init__()
         self.save_hyperparameters()
-        self.log = get_logger()
+
+        self.hparams.vocab = self.get_vocab()
+        self.hparams.trf_config = self.get_trf_config()
+    
     
     def prepare_data(self) -> None:
         prepare_data_from_oss(dataset=self.hparams.dataset,
@@ -222,21 +237,20 @@ class PLMDataModule(pl.LightningModule):
                               dataset_dir=self.hparams.dataset_dir,
                               plm_dir=self.hparams.plm_dir)
     
+    
     @property
-    @lru_cache()
+    @lru_cache
     def dataset(self):
         dataset_path = os.path.join(self.hparams.dataset_dir, self.hparams.dataset)
-        try:
-            ds = load_from_disk(dataset_path)
-            return ds
-        except:
-            print(f'load dataset failed from {dataset_path}')
+        dsd = load_from_disk(dataset_path)
+        return dsd
             
-    @property
+            
     @lru_cache()
-    def trf_config(self):
+    def get_trf_config(self):
         plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
         return AutoConfig.from_pretrained(plm_path)
+    
     
     @property
     @lru_cache()
@@ -245,35 +259,27 @@ class PLMDataModule(pl.LightningModule):
         return AutoTokenizer.from_pretrained(plm_path)
     
     
-    @property
-    @lru_cache()
-    def label2id(self) -> Dict:
-        return self.get_label2id()
+    def get_vocab(self):
+        return dict(sorted(self.tokenizer.vocab.items(), key=lambda x: x[1]))
     
-    
-    def get_label2id(self) -> Dict:
-        raise NotImplementedError
-    
-    
-    def transform(self):
-        raise NotImplementedError
         
+    @lru_cache()
+    def get_max_length(self):
+        max_length = self.train_df['text'].str.len().max()
+        max_length = min(512, max_length)
+        return max_length
+    
     
     @property
     @lru_cache()
-    def max_length(self):
-        if self.hparams.max_length is None:
-            return min(512, max([len(d['text']) for d in self.dataset['train']]))
-        else:
-            return self.hparams.max_length
-            
-            
-    def setup(self, stage: Optional[str] = None) -> None:
-        self.hparams.trf_config = self.trf_config
-        self.hparams.label2id = self.label2id
-        self.hparams.vocab = self.tokenizer.vocab
-        self.hparams.max_length = self.max_length
-        self.dataset.set_transform(transform=self.transform)
+    def train_df(self):
+        return self.dataset['train'].to_pandas()
+    
+    
+    @property
+    @lru_cache()
+    def val_df(self):
+        return self.dataset['validation'].to_pandas()
     
     
     def train_dataloader(self):
@@ -281,7 +287,7 @@ class PLMDataModule(pl.LightningModule):
                           batch_size=self.hparams.batch_size, 
                           num_workers=self.hparams.num_workers, 
                           pin_memory=self.hparams.pin_memory,
-                          shuffle=True)
+                          shuffle=self.hparams.shuffle_train)
     
     
     def val_dataloader(self):
@@ -289,7 +295,7 @@ class PLMDataModule(pl.LightningModule):
                           batch_size=self.hparams.batch_size, 
                           num_workers=self.hparams.num_workers, 
                           pin_memory=self.hparams.pin_memory,
-                          shuffle=False)
+                          shuffle=self.hparams.shuffle_val)
 
 
     def test_dataloader(self):
@@ -297,4 +303,4 @@ class PLMDataModule(pl.LightningModule):
                           batch_size=self.hparams.batch_size, 
                           num_workers=self.hparams.num_workers, 
                           pin_memory=self.hparams.pin_memory,
-                          shuffle=False)
+                          shuffle=self.hparams.shuffle_test)
