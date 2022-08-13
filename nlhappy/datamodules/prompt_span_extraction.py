@@ -1,16 +1,9 @@
 import pytorch_lightning as pl
-from ..utils.make_datamodule import prepare_data_from_oss, char_idx_to_token
+from ..utils.make_datamodule import char_idx_to_token, PLMBaseDataModule
 import torch
-from datasets import load_from_disk
-import os
-from transformers import AutoTokenizer, AutoConfig
-from torch.utils.data import DataLoader
-import logging
-
-log = logging.getLogger()
 
 
-class PromptSpanExtractionDataModule(pl.LightningDataModule):
+class PromptSpanExtractionDataModule(PLMBaseDataModule):
     """
     Data module for the prompt span extraction task.
 
@@ -22,14 +15,15 @@ class PromptSpanExtractionDataModule(pl.LightningDataModule):
     """
     
     def __init__(self,
-                dataset: str,
-                plm: str,
-                max_length: int,
-                batch_size: int,
-                pin_memory: bool=False,
-                num_workers: int=0,
-                dataset_dir: str ='./datasets/',
-                plm_dir: str = './plms/') :
+                 dataset: str,
+                 plm: str,
+                 transform: str,
+                 batch_size: int,
+                 max_length: int = -1,
+                 pin_memory: bool = False,
+                 num_workers: int = 0,
+                 dataset_dir: str = 'datasets',
+                 plm_dir: str = 'plms') :
         """基于模板提示的文本片段抽取数据模块
 
         Args:
@@ -37,24 +31,17 @@ class PromptSpanExtractionDataModule(pl.LightningDataModule):
             plm (str): 预训练模型名称
             max_length (int): 文本最大长度
             batch_size (int): 批次大小
-            pin_memory (bool, optional): 锁页内存. Defaults to True.
-            num_workers (int, optional): 多进程. Defaults to 0.
-            dataset_dir (str, optional): 数据集目录. Defaults to './datasets/'.
-            plm_dir (str, optional): 预训练模型目录. Defaults to './plms/'.
         """
         super().__init__()
-        self.save_hyperparameters()
+        
+        self.transforms = {'global_span': self.global_span_transform}
         
         
-    def prepare_data(self) -> None:
+    def setup(self, stage: str) -> None:
+        self.dataset.set_transform(transform=self.transforms.get(self.hparams.transform))
         
-        prepare_data_from_oss(dataset=self.hparams.dataset,
-                              plm=self.hparams.plm,
-                              dataset_dir=self.hparams.dataset_dir,
-                              plm_dir=self.hparams.plm_dir)
-        
-        
-    def transform(self, example):
+ 
+    def global_span_transform(self, example):
         batch_text = example['text']
         batch_spans = example['spans']
         batch_prompt = example['prompt']
@@ -91,7 +78,7 @@ class PromptSpanExtractionDataModule(pl.LightningDataModule):
                 try:
                     span_ids[0, start, end] = 1.0
                 except Exception:
-                    log.warning(f'set span {(start, end)} out of boudry')
+                    self.log.warning(f'set span {(start, end)} out of boudry')
                     pass 
             del inputs['offset_mapping']
             inputs = dict(zip(inputs.keys(), map(torch.tensor, inputs.values())))
@@ -99,50 +86,8 @@ class PromptSpanExtractionDataModule(pl.LightningDataModule):
             batch['span_ids'].append(span_ids)
         return batch
     
-    
-    def setup(self, stage: str) -> None:
-        dataset_path = os.path.join(self.hparams.dataset_dir, self.hparams.dataset)
-        self.dataset = load_from_disk(dataset_path)
-        plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
-        self.tokenizer = AutoTokenizer.from_pretrained(plm_path)
-        self.hparams['vocab'] = dict(sorted(self.tokenizer.vocab.items(), key=lambda x: x[1]))
-        trf_config = AutoConfig.from_pretrained(plm_path)
-        self.hparams['trf_config'] = trf_config
-        self.dataset.set_transform(transform=self.transform)
             
 
-    def train_dataloader(self):
-        '''
-        返回训练集的DataLoader.
-        '''
-        return DataLoader(
-            dataset= self.dataset['train'], 
-            batch_size=self.hparams.batch_size, 
-            num_workers=self.hparams.num_workers, 
-            pin_memory=self.hparams.pin_memory,
-            shuffle=True)
-        
-    def val_dataloader(self):
-        '''
-        返回验证集的DataLoader.
-        '''
-        return DataLoader(
-            dataset=self.dataset['validation'], 
-            batch_size=self.hparams.batch_size, 
-            num_workers=self.hparams.num_workers, 
-            pin_memory=self.hparams.pin_memory,
-            shuffle=False)
-
-    def test_dataloader(self):
-        '''
-        返回验证集的DataLoader.
-        '''
-        return DataLoader(
-            dataset=self.dataset['test'], 
-            batch_size=self.hparams.batch_size, 
-            num_workers=self.hparams.num_workers, 
-            pin_memory=self.hparams.pin_memory,
-            shuffle=False)
     
     
     
