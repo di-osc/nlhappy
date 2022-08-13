@@ -5,7 +5,8 @@ plm_dir: ${plm_dir}
 
 dataset: 
 plm: 
-max_length: 
 batch_size: 
-pin_memory:  False
-num_workers:  0
+max_length: -1
+transform: global_span
+pin_memory: False
+num_workers: 0
