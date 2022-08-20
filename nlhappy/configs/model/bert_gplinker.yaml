@@ -1,6 +1,6 @@
 _target_: nlhappy.models.BertGPLinker
 
-hidden_size: 64
+hidden_size: 128
 lr: 3e-5
 dropout: 0.2
 weight_decay: 0.01

@@ -3,8 +3,8 @@ _target_: nlhappy.datamodules.RelationExtractionDataModule
 dataset: 
 batch_size: 
 transform: gplinker
-plm: roberta-wwm-base
-max_length: -1
+plm: roberta-wwm-large
+max_length: mean
 pin_memory: False
 num_workers: 0
 dataset_dir: ${dataset_dir}
