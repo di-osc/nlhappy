@@ -95,9 +95,7 @@ class OneRelForRelationExtraction(PLMBaseModel):
     def validation_step(self, batch, batch_idx):
         loss, tag_ids = self.step(batch)
         batch_triples_x = self.extract_triples(tag_ids)
-        self.print(f'triples_x: {batch_triples_x}')
         batch_triples_y = self.extract_triples(batch['tag_ids'])
-        self.print(f'triples_y: {batch_triples_y}')
         self.val_metric(batch_triples_x, batch_triples_y)
         self.log('val/f1', self.val_metric, on_epoch=True, on_step=False, prog_bar=True)
 
@@ -123,8 +121,6 @@ class OneRelForRelationExtraction(PLMBaseModel):
         return [self.optimizer], [scheduler_config]
 
     def extract_triples(self, tag_ids):
-        self.print(tag_ids)
-        self.print(torch.nonzero(tag_ids))
         batch_logits = torch.chunk(tag_ids, tag_ids.shape[0])
         batch_triples = []
         for i in range(len(batch_logits)):
