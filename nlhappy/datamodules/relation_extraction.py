@@ -1,11 +1,10 @@
 from functools import lru_cache
 import pytorch_lightning as pl
-from ..utils.make_datamodule import char_idx_to_token, PLMBaseDataModule, get_logger
+from ..utils.make_datamodule import char_idx_to_token, get_logger, PLMBaseDataModule
 import torch
 from typing import Dict, List, Optional
 import numpy as np
 import pandas as pd
-import time
 
 
 log = get_logger()
@@ -33,13 +32,16 @@ class RelationExtractionDataModule(PLMBaseDataModule):
                  plm: str,
                  transform: str, 
                  batch_size: int ,
-                 max_length: int = -1,
+                 max_length: int = 'max',
                  num_workers: int = 0,
                  pin_memory: bool = False,
                  dataset_dir: str ='datasets' ,
-                 plm_dir: str = 'plms'):
+                 plm_dir: str = 'plms',
+                 shuffle_train: bool = True,
+                 shuffle_val: bool = False,
+                 shuffle_test: bool = False):
         super().__init__()
-
+                
         self.transforms = {'gplinker': self.gplinker_transform,
                            'onerel': self.onerel_transform}
         assert self.hparams.transform in self.transforms.keys(), f'availabel models for relation extraction: {self.transforms.keys()}'
@@ -47,14 +49,17 @@ class RelationExtractionDataModule(PLMBaseDataModule):
 
     def setup(self, stage: str) -> None:
         """对数据设置转换"""
-        if self.hparams.max_length == -1:
-            self.hparams.max_length = self.get_max_length()
+        self.hparams.vocab = self.get_vocab()
+        self.hparams.trf_config = self.get_trf_config()
+        self.hparams.max_length = self.get_max_length()
         if self.hparams.transform == 'onerel':
             self.hparams.tag2id = self.onerel_tag2id
+            self.hparams.id2tag = {i:l for l,i in self.onerel_tag2id.items()}
         self.hparams.label2id = self.label2id
         self.hparams.id2label = {i:l for l, i in self.label2id.items()}
         # 设置数据转换
-        self.dataset.set_transform(transform=self.transforms.get(self.hparams.transform))
+        self.dataset.set_transform(transform=self.transforms.get(self.hparams.transform))   
+
     
     @property
     @lru_cache
@@ -62,26 +67,27 @@ class RelationExtractionDataModule(PLMBaseDataModule):
         labels = pd.Series(np.concatenate(self.train_df.triples.values)).apply(lambda x: x['predicate']).drop_duplicates().values
         label2id = {label: i for i, label in enumerate(labels)}
         return label2id
-        
+    
         
     def gplinker_transform(self, example) -> Dict:
         batch_text = example['text']
         batch_triples = example['triples']
-        batch_inputs = {'input_ids': [], 'attention_mask': [], 'token_type_ids': [], 'so_ids': [], 'head_ids': [], 'tail_ids': []}
+        batch_inputs = {'input_ids': [], 'attention_mask': [], 'token_type_ids': []}
+        batch_so_ids = []
+        batch_head_ids = []
+        batch_tail_ids = []
         for i, text in enumerate(batch_text):
-            inputs = self.tokenizer(
-                text, 
-                padding='max_length',  
-                max_length=self.hparams.max_length,
-                truncation=True,
-                return_offsets_mapping=True)
+            inputs = self.tokenizer(text, 
+                                    padding='max_length',  
+                                    max_length=self.hparams.max_length,
+                                    truncation=True,
+                                    return_offsets_mapping=True)
             batch_inputs['input_ids'].append(inputs['input_ids'])
             batch_inputs['attention_mask'].append(inputs['attention_mask'])
             batch_inputs['token_type_ids'].append(inputs['token_type_ids'])
             offset_mapping = inputs['offset_mapping']
             triples = batch_triples[i]
             so_ids = torch.zeros(2, self.hparams.max_length, self.hparams.max_length)
-            # span_ids = torch.zeros(len(self.hparams['s_label2id']), self.hparams.max_length, self.hparams.max_length)
             head_ids = torch.zeros(len(self.hparams['label2id']), self.hparams.max_length, self.hparams.max_length)
             tail_ids = torch.zeros(len(self.hparams['label2id']), self.hparams.max_length, self.hparams.max_length)
             for triple in triples:
@@ -101,29 +107,32 @@ class RelationExtractionDataModule(PLMBaseDataModule):
                 except:
                     log.warning(f'sub char offset {(sub_start, sub_end)} or obj char offset {(obj_start, obj_end)} align to token offset failed in \n{text}')
                     pass
-            batch_inputs['so_ids'].append(so_ids)
-            batch_inputs['head_ids'].append(head_ids)
-            batch_inputs['tail_ids'].append(tail_ids)
-        batch_inputs['so_ids'] = torch.stack(batch_inputs['so_ids'], dim=0)
-        batch_inputs['head_ids'] = torch.stack(batch_inputs['head_ids'], dim=0)
-        batch_inputs['tail_ids'] = torch.stack(batch_inputs['tail_ids'], dim=0)
-        batch = dict(zip(batch_inputs.keys(), map(torch.Tensor, batch_inputs.values())))
+            batch_so_ids.append(so_ids)
+            batch_head_ids.append(head_ids)
+            batch_tail_ids.append(tail_ids)
+        batch = dict(zip(batch_inputs.keys(), map(torch.tensor, batch_inputs.values())))
+        batch['so_ids'] = torch.stack(batch_so_ids, dim=0)
+        batch['head_ids'] = torch.stack(batch_head_ids, dim=0)
+        batch['tail_ids'] = torch.stack(batch_tail_ids, dim=0)
         return batch
     
     
     @property
     def onerel_tag2id(self):
-        return {'HB-TB':1, 'HB-TE':2, 'HE-TE':3, 'O':0}
+        return {'O':0, 'HB-TB':1, 'HB-TE':2, 'HE-TE':3}
     
     
     def onerel_transform(self, example):
         texts = example['text']
         batch_triples = example['triples']
-        batch_inputs = {'input_ids': [], 'attention_mask': [], 'token_type_ids': [], 'tag_ids': []}
+        batch_inputs = {'input_ids': [], 'attention_mask': [], 'token_type_ids': []}
+        batch_tag_ids = []
+        batch_loss_mask = []
+        max_length = self.hparams.max_length
         for i, text in enumerate(texts):
             inputs = self.tokenizer(text, 
                                     padding='max_length',  
-                                    max_length=self.hparams.max_length,
+                                    max_length=max_length,
                                     truncation=True,
                                     return_offsets_mapping=True)
             batch_inputs['input_ids'].append(inputs['input_ids'])
@@ -131,7 +140,10 @@ class RelationExtractionDataModule(PLMBaseDataModule):
             batch_inputs['token_type_ids'].append(inputs['token_type_ids'])
             offset_mapping = inputs['offset_mapping']
             triples = batch_triples[i]
-            tag_ids = torch.zeros(len(self.label2id), self.hparams.max_length, self.hparams.max_length)
+            tag_ids = torch.zeros(len(self.label2id), max_length, max_length, dtype=torch.long)
+            loss_mask = torch.ones(1, max_length, max_length, dtype=torch.long)
+            att_mask = torch.tensor(inputs['attention_mask'])
+            loss_mask = loss_mask * att_mask.unsqueeze(0) * att_mask.unsqueeze(0).T
             for triple in triples:
                 try:
                     rel = triple['predicate']
@@ -144,16 +156,27 @@ class RelationExtractionDataModule(PLMBaseDataModule):
                     obj_end = triple['object']['offset'][1]-1
                     obj_start = char_idx_to_token(obj_start, offset_mapping=offset_mapping)
                     obj_end = char_idx_to_token(obj_end, offset_mapping=offset_mapping)
-                    tag_ids[rel_id][sub_start][obj_start] = self.onerel_tag2id['HB-TB']
-                    tag_ids[rel_id][sub_start][obj_end] = self.onerel_tag2id['HB-TE']
-                    tag_ids[rel_id][sub_end][obj_end] = self.onerel_tag2id['HE-TE']
+                    if sub_start != sub_end and obj_start != obj_end:
+                        tag_ids[rel_id][sub_start][obj_start] = self.onerel_tag2id['HB-TB']
+                        tag_ids[rel_id][sub_start][obj_end] = self.onerel_tag2id['HB-TE']
+                        tag_ids[rel_id][sub_end][obj_end] = self.onerel_tag2id['HE-TE']
+                    if sub_start == sub_end and obj_start != obj_end:
+                        tag_ids[rel_id][sub_start][obj_start] = self.onerel_tag2id['HB-TB']
+                        tag_ids[rel_id][sub_end][obj_end] = self.onerel_tag2id['HE-TE']
+                    if sub_start != sub_end and obj_start == obj_end:
+                        tag_ids[rel_id][sub_start][obj_start] = self.onerel_tag2id['HB-TB']
+                        tag_ids[rel_id][sub_end][obj_end] = self.onerel_tag2id['HE-TE']
+                    if sub_start == sub_end and obj_start == obj_end:
+                        tag_ids[rel_id][sub_start][obj_start] = self.onerel_tag2id['HB-TB']
                 except Exception as e:
                     log.exception(e)
                     log.warning(f'sub char offset {(sub_start, sub_end)} or obj char offset {(obj_start, obj_end)} align to token offset failed in \n{text}')
                     pass
-            batch_inputs['tag_ids'].append(tag_ids)
-        batch_inputs['tag_ids'] = torch.stack(batch_inputs['tag_ids'], dim=0)
-        batch = dict(zip(batch_inputs.keys(), map(torch.Tensor, batch_inputs.values())))
+            batch_tag_ids.append(tag_ids)
+            batch_loss_mask.append(loss_mask)
+        batch = dict(zip(batch_inputs.keys(), map(torch.tensor, batch_inputs.values())))
+        batch['tag_ids'] = torch.stack(batch_tag_ids, dim=0)
+        batch['loss_mask'] = torch.stack(batch_loss_mask, dim=0)
         return batch
                     
                 
