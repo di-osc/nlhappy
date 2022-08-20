@@ -1,4 +1,3 @@
-from torch import dropout
 import torch.nn as nn
 import torch
 
@@ -12,7 +11,6 @@ class MultiDropout(nn.Module):
         self.dropout_3 = nn.Dropout(p=0.3)
         self.dropout_4 = nn.Dropout(p=0.4)
 
-        
         
     def forward(self, x):
         output_0 = self.dropout_0(x)

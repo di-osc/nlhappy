@@ -207,10 +207,10 @@ def align_char_span_text_b(char_span_offset: tuple,
 
 
 class PLMBaseDataModule(pl.LightningModule):
-    """数据模块的基类,子类需要完成setup方法,子类初始化的时候至少包含dataset,plm,batch_size参数,
+    """数据模块的基类,子类需要完成setup方法,子类初始化的时候至少包含dataset,plm,batch_size,max_length参数,
     内置功能:
-    - 直接调用self.log可以记录日志
-    - 自动获取最大文本长度,超过512则取512
+    - 自动保存超参数
+    - 不同策略自动获取最大文本长度,超过512则取512
     - 下载数据集和预训练模型
     - 自动读取tokenizer
     - 自动读取数据集
@@ -226,9 +226,6 @@ class PLMBaseDataModule(pl.LightningModule):
                  shuffle_test: bool = False):
         super().__init__()
         self.save_hyperparameters()
-
-        self.hparams.vocab = self.get_vocab()
-        self.hparams.trf_config = self.get_trf_config()
     
     
     def prepare_data(self) -> None:
@@ -249,7 +246,9 @@ class PLMBaseDataModule(pl.LightningModule):
     @lru_cache()
     def get_trf_config(self):
         plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
-        return AutoConfig.from_pretrained(plm_path)
+        config = AutoConfig.from_pretrained(plm_path)
+        config = config.to_dict()
+        return config
     
     
     @property
@@ -265,7 +264,13 @@ class PLMBaseDataModule(pl.LightningModule):
         
     @lru_cache()
     def get_max_length(self):
-        max_length = self.train_df['text'].str.len().max()
+        if self.hparams.max_length == 'max':
+            max_length = self.train_df['text'].str.len().max()
+        if self.hparams.max_length == 'mean':
+            max_length = int(self.train_df['text'].str.len().mean())
+        if type(self.hparams.max_length) == int:
+            assert self.hparams.max_length >0, 'max_length must > 0'
+            max_length = self.hparams.max_length
         max_length = min(512, max_length)
         return max_length
     
@@ -280,6 +285,12 @@ class PLMBaseDataModule(pl.LightningModule):
     @lru_cache()
     def val_df(self):
         return self.dataset['validation'].to_pandas()
+    
+    
+    @property
+    @lru_cache()
+    def test_df(self):
+        return self.dataset['test'].to_pandas()
     
     
     def train_dataloader(self):

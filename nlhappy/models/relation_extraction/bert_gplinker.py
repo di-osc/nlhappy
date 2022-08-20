@@ -8,13 +8,13 @@ import torch
 from torch import Tensor
 from typing import List, Set
 import os
-from ...utils.make_model import get_hf_tokenizer, align_token_span
+from ...utils.make_model import align_token_span, PLMBaseModel
 
 
 
 
 
-class BertGPLinker(pl.LightningModule):
+class BertGPLinker(PLMBaseModel):
     """基于globalpointer的关系抽取模型
     参考:
     - https://kexue.fm/archives/8888
@@ -28,17 +28,10 @@ class BertGPLinker(pl.LightningModule):
         weight_decay: float,
         threshold: float,
         **data_params):
-        super(BertGPLinker, self).__init__()
-        self.save_hyperparameters(logger=False)
+        super().__init__()
         
-        self.tokenizer = get_hf_tokenizer(config=self.hparams.trf_config, vocab=self.hparams.vocab)
-        
-        self.bert = AutoModel.from_config(data_params['trf_config'])
-        self.dropout = MultiDropout()
-        # self.dropout = torch.nn.Dropout(p=dropout)
-        
-        # span 分类器 
-        # self.span_classifier = EfficientGlobalPointer(self.bert.config.hidden_size, hidden_size, len(data_params['s_label2id'])) 
+        self.bert = self.get_plm_architecture()
+        self.dropout = MultiDropout()        
         # 主语 宾语分类器
         self.so_classifier = EfficientGlobalPointer(self.bert.config.hidden_size, hidden_size, 2)
         # 主语 宾语 头对齐
@@ -142,7 +135,6 @@ class BertGPLinker(pl.LightningModule):
         total_steps = self.trainer.max_epochs * steps_per_epoch
         scheduler = get_linear_schedule_with_warmup(optimizer=self.optimizer, num_training_steps=total_steps, num_warmup_steps=0.5 * steps_per_epoch)
         scheduler_config = {'scheduler': scheduler, 'interval':'step'}
-        # self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lambda epoch: 1.0 / (epoch + 1.0))
         return [self.optimizer], [scheduler_config]
 
 
