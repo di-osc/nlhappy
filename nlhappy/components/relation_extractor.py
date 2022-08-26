@@ -1,5 +1,5 @@
 import pickle
-from ..models import BertGPLinker, GlobalRelation
+from ..models import GPLinkerForPromptRelationExtraction, GPLinkerForRelationExtraction
 from ..utils.make_doc import RelationData
 from spacy.lang.zh import Chinese
 from spacy.tokens import Doc
@@ -35,13 +35,13 @@ class GPLinkerExtractor(object):
         return doc
     
     def init_model(self, model_or_path):
-        if isinstance(model_or_path, BertGPLinker):
+        if isinstance(model_or_path, GPLinkerForRelationExtraction):
             self.model = model_or_path
             self.model.to(self.device)
             self.model.freeze()
             
         else:
-            self.model= BertGPLinker.load_from_checkpoint(model_or_path)
+            self.model= GPLinkerForRelationExtraction.load_from_checkpoint(model_or_path)
             self.model.to(self.device)
             self.model.freeze()
     
@@ -92,13 +92,13 @@ class GlobalRelationExtractor():
         return doc
     
     def init_model(self, model_or_path):
-        if isinstance(model_or_path, GlobalRelation):
+        if isinstance(model_or_path, GPLinkerForPromptRelationExtraction):
             self.model = model_or_path
             self.model.to(self.device)
             self.model.freeze()
             
         else:
-            self.model= GlobalRelation.load_from_checkpoint(model_or_path)
+            self.model= GPLinkerForPromptRelationExtraction.load_from_checkpoint(model_or_path)
             self.model.to(self.device)
             self.model.freeze()
     
