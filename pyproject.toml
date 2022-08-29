@@ -1,8 +1,8 @@
 [tool.poetry]
 name = "nlhappy"
-version = "2022.08.02"
-description = "😄让你爱上自然语言处理😄"
-authors = ["wangmengdi <ddream_ai@163.com>"]
+version = "2022.08.20"
+description = "😄自然语言处理😄"
+authors = ["wangmengdi <790990241@qq.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.7"
