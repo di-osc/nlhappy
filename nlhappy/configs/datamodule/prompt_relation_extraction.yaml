@@ -3,8 +3,9 @@ dataset_dir: ${dataset_dir}
 plm_dir: ${plm_dir}
 
 dataset: 
-max_length: 
+auto_length: max
 batch_size: 
-plm: 
+plm: roberta-wwm-base
+transform: prompt_gplinker
 pin_memory: False
 num_workers: 0

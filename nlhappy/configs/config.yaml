@@ -4,6 +4,7 @@
 defaults:
   - _self_
   - trainer: default
+  - task: null
   - model: 
   - datamodule: 
   - callbacks: finetune
@@ -45,7 +46,7 @@ seed: null
 
 # name of the run is accessed by loggers
 # should be used along with experiment mode
-name: ${datamodule.plm}&lr-${model.lr}&bs-${datamodule.batch_size}
+name: ${datamodule.transform}:plm=${datamodule.plm}&lr=${model.lr}&bs=${datamodule.batch_size}
 
 # monitor of all callbacks
 monitor: val/f1
