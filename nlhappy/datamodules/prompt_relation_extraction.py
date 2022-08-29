@@ -1,22 +1,18 @@
-import pytorch_lightning as pl
-from ..utils.make_datamodule import prepare_data_from_oss, align_char_span_text_b
-from torch.utils.data import DataLoader
-from datasets import load_from_disk
-from transformers import AutoConfig, AutoTokenizer
-import os
+from ..utils.make_datamodule import align_char_span_text_b, PLMBaseDataModule
 import torch
-from typing import Dict
+from typing import Dict, Union
 import logging
 
 log = logging.getLogger()
 
 
 
-class PromptRelationExtractionDataModule(pl.LightningDataModule):
+class PromptRelationExtractionDataModule(PLMBaseDataModule):
     def __init__(self,
                 dataset: str,
                 plm: str,
-                max_length: int,
+                auto_length: Union[str, int],
+                transform: str,
                 batch_size: int,
                 pin_memory: bool=False,
                 num_workers: int=0,
@@ -35,27 +31,16 @@ class PromptRelationExtractionDataModule(pl.LightningDataModule):
             plm_dir (str, optional): 预训练模型目录. Defaults to './plms/'.
         """
         super().__init__()
-        self.save_hyperparameters()
-        
-        
-    def prepare_data(self) -> None:
-        
-        prepare_data_from_oss(dataset=self.hparams.dataset,
-                              plm=self.hparams.plm,
-                              dataset_dir=self.hparams.dataset_dir,
-                              plm_dir=self.hparams.plm_dir)
+        self.transforms = {'prompt_gplinker': self.gplinker_transform}        
+        assert self.hparams.transform in self.transforms.keys(), f'availabel models for relation extraction: {self.transforms.keys()}'
+    
         
     def setup(self, stage: str) -> None:
-        dataset_path = os.path.join(self.hparams.dataset_dir, self.hparams.dataset)
-        self.dataset = load_from_disk(dataset_path)
-        plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
-        self.tokenizer = AutoTokenizer.from_pretrained(plm_path)
-        self.hparams['vocab'] = dict(sorted(self.tokenizer.vocab.items(), key=lambda x: x[1]))
-        trf_config = AutoConfig.from_pretrained(plm_path)
-        self.hparams['trf_config'] = trf_config
-        self.dataset.set_transform(transform=self.transform)
+        self.hparams.max_length = self.get_max_length()
+        self.dataset.set_transform(transform=self.transforms.get(self.hparams.transform))
         
-    def transform(self, example) -> Dict:
+        
+    def gplinker_transform(self, example) -> Dict:
         batch_text = example['text']
         batch_triples = example['triples']
         batch_prompts = example['prompts']
@@ -102,37 +87,4 @@ class PromptRelationExtractionDataModule(pl.LightningDataModule):
         batch_inputs['tail_ids'] = torch.stack(batch_inputs['tail_ids'], dim=0)
         batch = dict(zip(batch_inputs.keys(), map(torch.tensor, batch_inputs.values())))
         return batch
-            
-
-    def train_dataloader(self):
-        '''
-        返回训练集的DataLoader.
-        '''
-        return DataLoader(
-            dataset= self.dataset['train'], 
-            batch_size=self.hparams.batch_size, 
-            num_workers=self.hparams.num_workers, 
-            pin_memory=self.hparams.pin_memory,
-            shuffle=True)
         
-    def val_dataloader(self):
-        '''
-        返回验证集的DataLoader.
-        '''
-        return DataLoader(
-            dataset=self.dataset['validation'], 
-            batch_size=self.hparams.batch_size, 
-            num_workers=self.hparams.num_workers, 
-            pin_memory=self.hparams.pin_memory,
-            shuffle=False)
-
-    def test_dataloader(self):
-        '''
-        返回验证集的DataLoader.
-        '''
-        return DataLoader(
-            dataset=self.dataset['test'], 
-            batch_size=self.hparams.batch_size, 
-            num_workers=self.hparams.num_workers, 
-            pin_memory=self.hparams.pin_memory,
-            shuffle=False)

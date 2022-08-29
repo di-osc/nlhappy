@@ -1,7 +1,7 @@
 import pytorch_lightning as pl
 from typing import Tuple, List, Dict
 from transformers import AutoTokenizer, AutoConfig
-from ..utils.make_datamodule import prepare_data_from_oss
+from ..utils.make_datamodule import prepare_data_from_remote
 from torch.utils.data import DataLoader
 from datasets import load_from_disk
 import torch

@@ -5,7 +5,7 @@ from transformers import AutoConfig, AutoTokenizer
 from torch.utils.data import DataLoader
 from datasets import load_from_disk
 import os
-from ..utils.make_datamodule import prepare_data_from_oss
+from ..utils.make_datamodule import prepare_data_from_remote
 
 
 
