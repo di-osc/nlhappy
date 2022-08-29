@@ -1,6 +1,5 @@
 import pytorch_lightning as pl
 from transformers import AutoModel
-from transformers.optimization import get_linear_schedule_with_warmup
 from ...layers import EfficientGlobalPointer, MultiDropout
 from ...layers.loss import MultiLabelCategoricalCrossEntropy
 from ...metrics.triple import TripleF1, Triple
@@ -8,13 +7,13 @@ import torch
 from torch import Tensor
 from typing import List, Set
 import os
-from ...utils.make_model import align_token_span, PLMBaseModel
+from ...utils.make_model import get_hf_tokenizer, align_token_span, PLMBaseModel
 
 
 
 
 
-class BertGPLinker(PLMBaseModel):
+class GPLinkerForPromptRelationExtraction(PLMBaseModel):
     """基于globalpointer的关系抽取模型
     参考:
     - https://kexue.fm/archives/8888
@@ -27,19 +26,20 @@ class BertGPLinker(PLMBaseModel):
         dropout: float,
         weight_decay: float,
         threshold: float,
-        **data_params):
-        super().__init__()
+        scheduler: str = 'linear_warmup_step',
+        **kwargs):
+        super().__init__()        
         
-        self.bert = self.get_plm_architecture()
-        self.dropout = MultiDropout()        
+        self.plm = self.get_plm_architecture()
+        self.dropout = MultiDropout()
+        
         # 主语 宾语分类器
-        self.so_classifier = EfficientGlobalPointer(self.bert.config.hidden_size, hidden_size, 2)
+        self.so_classifier = EfficientGlobalPointer(self.plm.config.hidden_size, hidden_size, 2)
         # 主语 宾语 头对齐
-        self.head_classifier = EfficientGlobalPointer(self.bert.config.hidden_size, hidden_size, len(data_params['label2id']), RoPE=False, tril_mask=False)
+        self.head_classifier = EfficientGlobalPointer(self.plm.config.hidden_size, hidden_size, 1, RoPE=False, tril_mask=False)
         # 主语 宾语 尾对齐
-        self.tail_classifier = EfficientGlobalPointer(self.bert.config.hidden_size, hidden_size, len(data_params['label2id']), RoPE=False, tril_mask=False)
+        self.tail_classifier = EfficientGlobalPointer(self.plm.config.hidden_size, hidden_size, 1, RoPE=False, tril_mask=False)
 
-        # self.span_criterion = MultiLabelCategoricalCrossEntropy()
         self.so_criterion = MultiLabelCategoricalCrossEntropy()
         self.head_criterion = MultiLabelCategoricalCrossEntropy()
         self.tail_criterion = MultiLabelCategoricalCrossEntropy()
@@ -51,7 +51,7 @@ class BertGPLinker(PLMBaseModel):
     
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
-        hidden_state = self.bert(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask).last_hidden_state
+        hidden_state = self.plm(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask).last_hidden_state
         hidden_state = self.dropout(hidden_state)
         so_logits = self.so_classifier(hidden_state, mask=attention_mask)
         head_logits = self.head_classifier(hidden_state, mask=attention_mask)
@@ -61,7 +61,6 @@ class BertGPLinker(PLMBaseModel):
 
     def shared_step(self, batch):
         #inputs为bert常规输入, span_ids: [batch_size, 2, seq_len, seq_len],
-        #head_ids: [batch_size, len(label2id), seq_len, seq_len], tail_ids: [batch_size, len(label2id), seq_len, seq_len]
         input_ids, token_type_ids, attention_mask = batch['input_ids'], batch['token_type_ids'], batch['attention_mask']
         so_ture, head_true, tail_true = batch['so_ids'],  batch['head_ids'], batch['tail_ids']
         so_logits, head_logits, tail_logits = self(input_ids, token_type_ids, attention_mask)
@@ -113,9 +112,9 @@ class BertGPLinker(PLMBaseModel):
     def configure_optimizers(self)  :
         no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
         grouped_parameters = [
-            {'params': [p for n, p in self.bert.named_parameters() if not any(nd in n for nd in no_decay)],
+            {'params': [p for n, p in self.plm.named_parameters() if not any(nd in n for nd in no_decay)],
             'lr': self.hparams.lr, 'weight_decay': self.hparams.weight_decay},
-            {'params': [p for n, p in self.bert.named_parameters() if any(nd in n for nd in no_decay)],
+            {'params': [p for n, p in self.plm.named_parameters() if any(nd in n for nd in no_decay)],
             'lr': self.hparams.lr, 'weight_decay': 0.0},
             {'params': [p for n, p in self.so_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
             'lr': self.hparams.lr* 10, 'weight_decay': self.hparams.weight_decay},
@@ -130,12 +129,9 @@ class BertGPLinker(PLMBaseModel):
             {'params': [p for n, p in self.tail_classifier.named_parameters() if any(nd in n for nd in no_decay)],
             'lr': self.hparams.lr* 10, 'weight_decay': 0.0}
         ]
-        self.optimizer = torch.optim.AdamW(grouped_parameters, eps=1e-5)
-        steps_per_epoch = len(self.trainer.datamodule.train_dataloader()) // self.trainer.gpus
-        total_steps = self.trainer.max_epochs * steps_per_epoch
-        scheduler = get_linear_schedule_with_warmup(optimizer=self.optimizer, num_training_steps=total_steps, num_warmup_steps=0.5 * steps_per_epoch)
-        scheduler_config = {'scheduler': scheduler, 'interval':'step'}
-        return [self.optimizer], [scheduler_config]
+        optimizer = torch.optim.AdamW(grouped_parameters, eps=1e-5)
+        scheduler_config = self.get_scheduler_config(optimizer=optimizer, name=self.hparams.scheduler)
+        return [optimizer], [scheduler_config]
 
 
     def extract_triple(
@@ -149,8 +145,8 @@ class BertGPLinker(PLMBaseModel):
         将三个globalpointer预测的结果进行合并，得到三元组的预测结果
         参数:
         - so_logits: [batch_size, 2, seq_len, seq_len]
-        - head_logits: [batch_size, predicate_type, seq_len, seq_len]
-        - tail_logtis: [batch_size, predicate_type, seq_len, seq_len]
+        - head_logits: [batch_size, 1, seq_len, seq_len]
+        - tail_logtis: [batch_size, 1, seq_len, seq_len]
         返回:
         - batch_size大小的列表，每个元素是一个集合，集合中的元素是三元组
         """
@@ -176,14 +172,14 @@ class BertGPLinker(PLMBaseModel):
                     ps = set(p1s) & set(p2s)
                     if len(ps) > 0:
                         for p in ps:
-                            triples.add(Triple(triple=(sh.item(), st.item(), self.hparams['id2label'][p], oh.item(), ot.item())))
+                            triples.add(Triple(triple=(sh.item(), st.item(), '', oh.item(), ot.item())))
             batch_triples.append(triples)
         return batch_triples
 
 
 
 
-    def predict(self, text: str, device:str='cpu', threshold = None) -> Set[Triple]:
+    def predict(self,prompts:List[str], texts: List[str], device:str='cpu', threshold: float = None) -> Set[Triple]:
         """模型预测
         参数:
         - text: 要预测的单条文本
@@ -192,43 +188,32 @@ class BertGPLinker(PLMBaseModel):
         返回
         - 预测的三元组
         """
-        max_length = min(len(text), self.hparams.max_length)
+        max_length = min(max([len(prompt+text)+3 for prompt, text in zip(prompts, texts)]), 512)
         inputs = self.tokenizer(
-                text, 
-                padding='max_length',  
-                max_length=max_length,
-                return_tensors='pt',
-                truncation=True)
+            prompts,
+            texts,
+            max_length=max_length,
+            truncation=True,
+            return_tensors='pt',
+            padding='max_length')
+        mapping = self.tokenizer(
+            prompts,
+            texts,
+            max_length=max_length,
+            truncation=True,
+            padding='max_length',
+            return_offsets_mapping=True)['offset_mapping']
         inputs.to(torch.device(device))
         so_logits, head_logits, tail_logits = self(**inputs)
-        if threshold == None:
-            batch_triples = self.extract_triple(so_logits, head_logits, tail_logits, threshold=self.hparams.threshold)
-        else:
-            batch_triples = self.extract_triple(so_logits, head_logits, tail_logits, threshold=threshold)
+        if threshold is None:
+            threshold = self.hparams.threshold
+        batch_triples = self.extract_triple(so_logits, head_logits, tail_logits, threshold=threshold)
         rels = []
         if len(batch_triples) >0:
-            triples = [(triple[0], triple[1], triple[2], triple[3], triple[4])  for s in batch_triples for triple in s]
-            offset_mapping = self.tokenizer(
-                text,
-                max_length=max_length,
-                padding='max_length',
-                truncation=True,
-                return_offsets_mapping=True)['offset_mapping']
-            for triple in triples:
-                sub = align_token_span((triple[0], triple[1]+1), offset_mapping)
-                obj = align_token_span((triple[3], triple[4]+1), offset_mapping)
-                rels.append((sub[0],sub[1],triple[2],obj[0],obj[1]))
+            for i, triples_type in enumerate(batch_triples):
+                triples = [(triple[0], triple[1], prompts[i], triple[3], triple[4])  for triple in triples_type]
+                for triple in triples:
+                    sub = align_token_span((triple[0], triple[1]+1), mapping[i])
+                    obj = align_token_span((triple[3], triple[4]+1), mapping[i])
+                    rels.append((sub[0],sub[1],prompts[i],obj[0],obj[1]))
         return rels
-
-
-        
-
-
-    
-
-
-        
-
-    
-
-

@@ -1,5 +1,5 @@
 import pytorch_lightning as pl
-from ..utils.make_datamodule import prepare_data_from_oss
+from ..utils.make_datamodule import prepare_data_from_remote
 import torch
 from datasets import load_from_disk
 from transformers import BertTokenizer, BertConfig
@@ -26,7 +26,7 @@ class SpanClassificationDataModule(pl.LightningDataModule):
 
     def prepare_data(self) -> None:
         '下载数据集和预训练模型'
-        prepare_data_from_oss(dataset=self.hparams.dataset,
+        prepare_data_from_remote(dataset=self.hparams.dataset,
                               plm=self.hparams.plm,
                               dataset_dir=self.hparams.dataset_dir,
                               plm_dir=self.hparams.plm_dir)

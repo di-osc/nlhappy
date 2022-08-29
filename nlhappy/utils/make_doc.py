@@ -32,7 +32,7 @@ def get_relations(doc: Doc) -> List[Relation]:
     return rels 
 
 
-Doc.set_extension('relations', getter=get_relations)
+Doc.set_extension('rels', getter=get_relations)
 Doc.set_extension('events', getter=get_events)
 Span.set_extension('norm_name', default='')
 Doc.set_extension('label', default='')
@@ -148,7 +148,7 @@ class Relation():
         return self.sub.doc
     
     def __repr__(self) -> str:
-        return f'Relation({self.sub},{self.label})'
+        return f'Relation({self.sub},{self.label},{self.objs})'
     
     def __eq__(self, rel) -> bool:
         if rel.label != self.label:

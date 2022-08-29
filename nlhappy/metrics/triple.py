@@ -56,7 +56,7 @@ class TripleF1(Metric):
         - pred: batch_size大小的列表, 列表内为每个样本的预测的三元组的集合(set)
         - true: 同pred
         """
-        assert len(pred) == len(true)
+        assert len(pred) == len(true), f'pred : {pred}, true : {true}'
         for p, t in zip(pred, true):
             self.correct += len(p & t)
             self.all_pred += len(p)

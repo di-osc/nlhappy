@@ -1,1 +1,1 @@
-from .global_relation import GlobalRelation
+from .gplinker import GPLinkerForPromptRelationExtraction

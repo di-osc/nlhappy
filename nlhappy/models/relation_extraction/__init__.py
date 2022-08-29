@@ -1,4 +1,7 @@
-from .bert_gplinker import BertGPLinker
+from .gplinker import GPLinkerForRelationExtraction
 from .onerel import OneRelForRelationExtraction
+from .casrel import CasRelForRelationExtraction
 
-__all__ = ['BertGPLinker', 'OneRelForRelationExtraction']
+__all__ = ['GPLinkerForRelationExtraction', 
+           'OneRelForRelationExtraction',
+           'CasRelForRelationExtraction']

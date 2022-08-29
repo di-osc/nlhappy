@@ -6,7 +6,7 @@ from typing import List, Optional, Dict
 from torch.utils.data import DataLoader
 from datasets import load_from_disk
 import pytorch_lightning as pl
-from transformers import AutoConfig, AutoTokenizer
+from transformers import AutoConfig, AutoTokenizer, AutoModel
 from functools import lru_cache
 
 
@@ -59,8 +59,8 @@ class OSSStorer:
         if not os.path.exists(localpath):
             os.makedirs(localpath)
         file = dataset + '.zip'
-        file_path = localpath + file
-        dataset_path = localpath + dataset
+        file_path = os.path.join(localpath, file)
+        dataset_path = os.path.join(localpath, dataset)
         if not os.path.exists(dataset_path):
             try:
                 self.data_bucket.get_object_to_file(key=file, filename=file_path)
@@ -82,8 +82,8 @@ class OSSStorer:
         if not os.path.exists(localpath):
             os.makedirs(localpath)
         file = model + '.zip'
-        file_path = localpath + file
-        model_path = localpath + model
+        file_path = os.path.join(localpath, file)
+        model_path = os.path.join(localpath, model)
         if not os.path.exists(model_path):
             try:
                 self.model_bucket.get_object_to_file(key=file, filename=file_path)
@@ -96,10 +96,10 @@ class OSSStorer:
 
 log = get_logger(__name__)  
         
-def prepare_data_from_oss(dataset: str,
-                          plm: str,
-                          dataset_dir: str ='./datasets/',
-                          plm_dir: str = './plms/') -> None:
+def prepare_data_from_remote(dataset: str,
+                             plm: str,
+                             dataset_dir: str ='./datasets/',
+                             plm_dir: str = './plms/') -> None:
         '''
         下载数据集.这个方法只会在一个GPU上执行一次.
         '''
@@ -107,22 +107,32 @@ def prepare_data_from_oss(dataset: str,
         dataset_path = os.path.join(dataset_dir, dataset)
         plm_path = os.path.join(plm_dir, plm)
         # 检测数据
-        log.info('Checking all data ...' )
         if os.path.exists(dataset_path):
-            log.info(f'{dataset_path} already exists.')
+            # log.info(f'{dataset_path} already exists.')
+            pass
         else:
-            log.info('not exists dataset in {}'.format(dataset_path))
+            log.info('dataset not exists  in {}'.format(dataset_path))
             log.info('start downloading dataset from oss')
             oss.download_dataset(dataset, dataset_dir)
             log.info('finish downloading dataset from oss')
-        if os.path.exists(plm_path):
-            log.info(f'{plm_path} already exists.') 
-        else : 
-            log.info('not exists plm in {}'.format(plm_path))
-            log.info('start downloading plm from oss')
-            oss.download_plm(plm, plm_dir)
-            log.info('finish downloading plm from oss')
-        log.info('all data are ready')
+        if os.path.isdir(plm_dir):
+            if os.path.exists(plm_path):
+                pass 
+            else : 
+                log.info('plm not exists in {}'.format(plm_path))
+                try:
+                    log.info('start downloading plm from oss')
+                    oss.download_plm(plm, plm_dir)
+                    log.info('finish downloading plm from oss')
+                except Exception as e:
+                    log.info('download plm from oss failed')
+        else:
+            try:
+                log.info('start downloading plm from huffingface')
+                model = AutoModel.from_pretrained(plm_path)
+                tokenizer = AutoTokenizer.from_pretrained(plm_path)
+            except:
+                log.info('download from huffingface failed')
         
         
 def align_char_span(char_span_offset: tuple, 
@@ -207,7 +217,7 @@ def align_char_span_text_b(char_span_offset: tuple,
 
 
 class PLMBaseDataModule(pl.LightningModule):
-    """数据模块的基类,子类需要完成setup方法,子类初始化的时候至少包含dataset,plm,batch_size,max_length参数,
+    """数据模块的基类,子类需要完成setup方法,子类初始化的时候至少包含dataset,plm,batch_size,auto_length参数,
     内置功能:
     - 自动保存超参数
     - 不同策略自动获取最大文本长度,超过512则取512
@@ -229,7 +239,7 @@ class PLMBaseDataModule(pl.LightningModule):
     
     
     def prepare_data(self) -> None:
-        prepare_data_from_oss(dataset=self.hparams.dataset,
+        prepare_data_from_remote(dataset=self.hparams.dataset,
                               plm=self.hparams.plm,
                               dataset_dir=self.hparams.dataset_dir,
                               plm_dir=self.hparams.plm_dir)
@@ -264,15 +274,17 @@ class PLMBaseDataModule(pl.LightningModule):
         
     @lru_cache()
     def get_max_length(self):
-        if self.hparams.max_length == 'max':
+        if self.hparams.auto_length == 'max':
             max_length = self.train_df['text'].str.len().max()
-        if self.hparams.max_length == 'mean':
+        if self.hparams.auto_length == 'mean':
             max_length = int(self.train_df['text'].str.len().mean())
-        if type(self.hparams.max_length) == int:
-            assert self.hparams.max_length >0, 'max_length must > 0'
-            max_length = self.hparams.max_length
-        max_length = min(512, max_length)
-        return max_length
+        if type(self.hparams.auto_length) == int:
+            assert self.hparams.auto_length >0, 'max_length length  must > 0'
+            max_length = self.hparams.auto_length
+        max_length_ = min(512, max_length+2)
+        log.info(f'current max_length: {max_length_}')
+        self.hparams.max_length = max_length_
+        return max_length_
     
     
     @property

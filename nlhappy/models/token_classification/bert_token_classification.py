@@ -1,6 +1,5 @@
 import pytorch_lightning as pl
 from transformers import BertModel, BertTokenizer
-from datasets import load_metric
 import torch
 import torch.nn.functional as F
 import os
