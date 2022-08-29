@@ -1,10 +1,10 @@
 from functools import lru_cache
-import pytorch_lightning as pl
 from ..utils.make_datamodule import char_idx_to_token, get_logger, PLMBaseDataModule
 import torch
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 import numpy as np
 import pandas as pd
+import random
 
 
 log = get_logger()
@@ -20,7 +20,7 @@ class RelationExtractionDataModule(PLMBaseDataModule):
             dataset (str): 数据集名称
             plm (str): 预训练模型名称
             transform(str): 转换特征格式,可以通过get_available_transforms查看
-            max_length (int): 包括特殊token的最大序列长度,如果是None则自动设置最大长度,默认为None
+            auto_length (str, int): 自动设置最大长度的策略, 可以为'max', 'mean'或者>0的数,超过512的设置为512
             batch_size (int): 训练,验证,测试数据集的批次大小,
             num_workers (int): 多进程数
             pin_memory (bool): 是否应用锁页内存,
@@ -32,25 +32,21 @@ class RelationExtractionDataModule(PLMBaseDataModule):
                  plm: str,
                  transform: str, 
                  batch_size: int ,
-                 max_length: int = 'max',
+                 auto_length: Union[int, str] = 'max',
                  num_workers: int = 0,
                  pin_memory: bool = False,
-                 dataset_dir: str ='datasets' ,
-                 plm_dir: str = 'plms',
-                 shuffle_train: bool = True,
-                 shuffle_val: bool = False,
-                 shuffle_test: bool = False):
+                 dataset_dir: str ='datasets',
+                 plm_dir: str = 'plms'):
         super().__init__()
                 
         self.transforms = {'gplinker': self.gplinker_transform,
-                           'onerel': self.onerel_transform}
+                           'onerel': self.onerel_transform,
+                           'casrel': self.casrel_transform}
         assert self.hparams.transform in self.transforms.keys(), f'availabel models for relation extraction: {self.transforms.keys()}'
 
 
     def setup(self, stage: str) -> None:
         """对数据设置转换"""
-        self.hparams.vocab = self.get_vocab()
-        self.hparams.trf_config = self.get_trf_config()
         self.hparams.max_length = self.get_max_length()
         if self.hparams.transform == 'onerel':
             self.hparams.tag2id = self.onerel_tag2id
@@ -178,5 +174,74 @@ class RelationExtractionDataModule(PLMBaseDataModule):
         batch['tag_ids'] = torch.stack(batch_tag_ids, dim=0)
         batch['loss_mask'] = torch.stack(batch_loss_mask, dim=0)
         return batch
+    
+    
+    def casrel_transform(self, example):
+        texts = example['text']
+        batch_triples = example['triples']
+        batch_inputs = {'input_ids': [], 
+                        'attention_mask': [], 
+                        'token_type_ids': []}
+        batch_subs = []
+        batch_objs = []
+        batch_sub = []
+                        
+        max_length = self.hparams.max_length
+        for i, text in enumerate(texts):
+            inputs = self.tokenizer(text, 
+                                    padding='max_length',  
+                                    max_length=max_length,
+                                    truncation=True,
+                                    return_offsets_mapping=True)
+            offset_mapping = inputs['offset_mapping']
+            triples = batch_triples[i]
+            s2ro_map = {}
+            for triple in triples:
+                sub_start = triple['subject']['offset'][0]
+                sub_end = triple['subject']['offset'][1]-1
+                sub_start = char_idx_to_token(sub_start, offset_mapping=offset_mapping)
+                sub_end = char_idx_to_token(sub_end, offset_mapping=offset_mapping)
+                obj_start = triple['object']['offset'][0]
+                obj_end = triple['object']['offset'][1]-1
+                obj_start = char_idx_to_token(obj_start, offset_mapping=offset_mapping)
+                obj_end = char_idx_to_token(obj_end, offset_mapping=offset_mapping)
+                rel_id = self.hparams.label2id[triple['predicate']]
+                if (sub_start, sub_end) not in s2ro_map:
+                    s2ro_map[(sub_start, sub_end)] = [] 
+                s2ro_map[(sub_start, sub_end)].append((obj_start, obj_end, rel_id))
+                
+            if s2ro_map:
+                subs = torch.zeros(max_length, 2, dtype=torch.float)
+                for s in s2ro_map:
+                    subs[s[0], 0] = 1
+                    subs[s[1], 1] = 1
+                # for sub_head_idx, sub_tail_idx in list(s2ro_map.keys()):
+                sub_head_idx, sub_tail_idx = random.choice(list(s2ro_map.keys()))
+                sub = torch.tensor([sub_head_idx, sub_tail_idx], dtype=torch.long)
+                objs = torch.zeros((max_length, len(self.hparams.label2id), 2), dtype=torch.float)
+                for ro in s2ro_map.get((sub_head_idx, sub_tail_idx), []):
+                    objs[ro[0], ro[2], 0] = 1
+                    objs[ro[1], ro[2], 1] = 1
+                batch_subs.append(subs)
+                batch_objs.append(objs)
+                batch_sub.append(sub)
+                batch_inputs['input_ids'].append(inputs['input_ids'])
+                batch_inputs['attention_mask'].append(inputs['attention_mask'])
+                batch_inputs['token_type_ids'].append(inputs['token_type_ids'])
+        batch = dict(zip(batch_inputs.keys(), map(torch.tensor, batch_inputs.values())))
+        batch['subs'] = torch.stack(batch_subs, dim=0)
+        batch['sub'] = torch.stack(batch_sub, dim=0)
+        batch['objs'] = torch.stack(batch_objs, dim=0)
+        return batch
+        
+
+    
+    @staticmethod
+    def get_one_example():
+        return {'text':'小明是小花的朋友',
+                'triples': [{'object': {'offset': [0, 2], 'text': '小明'},
+                             'predicate': '朋友',
+                             'subject': {'offset': [3, 5], 'text': '小花'}}]}
+                
                     
                 
