@@ -1,20 +1,18 @@
 import torch
-from pytorch_lightning import LightningModule
 from torchmetrics import F1Score
 from typing import List, Any
-from transformers import BertModel, BertTokenizer
 from ...layers import SimpleDense, MultiDropout
-from ...utils.make_model import get_hf_tokenizer
+from ...utils.make_model import PLMBaseModel
 from typing import List, Dict
-import os
 import torch.nn.functional as F
 
-class BertTextClassification(LightningModule):
+class BertTextClassification(PLMBaseModel):
     '''
     文本分类模型
     '''
     def __init__(self, 
                 hidden_size: int ,
+                scheduler: str,
                 lr: float ,
                 weight_decay: float ,
                 dropout: float,
@@ -23,7 +21,7 @@ class BertTextClassification(LightningModule):
         self.save_hyperparameters()
 
         # 模型架构
-        self.bert = BertModel(self.hparams['trf_config'])
+        self.bert = self.get_plm_architecture()
         self.classifier = SimpleDense(self.bert.config.hidden_size, hidden_size, len(self.hparams.label2id))
         self.dropout = MultiDropout()
         
@@ -35,8 +33,6 @@ class BertTextClassification(LightningModule):
         self.val_f1= F1Score(num_classes=len(self.hparams.label2id), average='macro')
         self.test_f1 = F1Score(num_classes=len(self.hparams.label2id), average='macro')
 
-        # 预处理tokenizer
-        self.tokenizer = get_hf_tokenizer(config=self.hparams.trf_config, vocab=self.hparams.vocab)
 
     def forward(self, input_ids, token_type_ids, attention_mask):
         x = self.bert(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask)
@@ -47,9 +43,11 @@ class BertTextClassification(LightningModule):
     
         
     def shared_step(self, batch):
-        inputs = batch['inputs']
+        input_ids = batch['input_ids']
+        token_type_ids = batch['token_type_ids']
+        attention_mask = batch['attention_mask']
         label_ids = batch['label_ids']
-        logits = self(**inputs)
+        logits = self(input_ids, token_type_ids, attention_mask)
         loss = self.criterion(logits, label_ids)
         pred_ids = torch.argmax(logits, dim=-1)
         return loss, pred_ids, label_ids
@@ -88,8 +86,8 @@ class BertTextClassification(LightningModule):
              'lr': self.hparams.lr * 5, 'weight_decay': 0.0}
         ]
         optimizer = torch.optim.AdamW(grouped_parameters)
-        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 1.0 / (epoch + 1.0))
-        return [optimizer], [scheduler]
+        scheduler_config = self.get_scheduler_config(optimizer, self.hparams.scheduler)
+        return [optimizer], [scheduler_config]
 
 
     def predict(self, text: str, device: str='cpu') -> Dict[str, float]:
