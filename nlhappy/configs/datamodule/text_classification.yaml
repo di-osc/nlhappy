@@ -3,9 +3,10 @@ dataset_dir: ${dataset_dir}
 plm_dir: ${plm_dir}
 
 dataset: 
-plm: chinese-roberta-wwm-ext
-max_length: 
 batch_size: 
+plm: roberta-wwm-ext
+transform: simple
+auto_length: max
 num_workers: 0
 pin_memory: False
 
