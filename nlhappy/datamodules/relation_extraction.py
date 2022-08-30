@@ -15,17 +15,6 @@ class RelationExtractionDataModule(PLMBaseDataModule):
         数据集样式:
             {'text':'小明是小花的朋友'。
             'triples': [{'object': {'offset': [0, 2], 'text': '小明'},'predicate': '朋友','subject': {'offset': [3, 5], 'text': '小花'}}]}}
-
-        Args:
-            dataset (str): 数据集名称
-            plm (str): 预训练模型名称
-            transform(str): 转换特征格式,可以通过get_available_transforms查看
-            auto_length (str, int): 自动设置最大长度的策略, 可以为'max', 'mean'或者>0的数,超过512的设置为512
-            batch_size (int): 训练,验证,测试数据集的批次大小,
-            num_workers (int): 多进程数
-            pin_memory (bool): 是否应用锁页内存,
-            dataset_dir (str): 数据集默认路径
-            plm_dir (str): 预训练模型默认路径
         """
     def __init__(self, 
                  dataset: str, 
@@ -37,6 +26,18 @@ class RelationExtractionDataModule(PLMBaseDataModule):
                  pin_memory: bool = False,
                  dataset_dir: str ='datasets',
                  plm_dir: str = 'plms'):
+        """
+        Args:
+            dataset (str): 数据集名称
+            plm (str): 预训练模型名称
+            transform(str): 转换特征格式,可以通过get_available_transforms查看
+            auto_length (str, int): 自动设置最大长度的策略, 可以为'max', 'mean'或者>0的数,超过512的设置为512
+            batch_size (int): 训练,验证,测试数据集的批次大小,
+            num_workers (int): 多进程数
+            pin_memory (bool): 是否应用锁页内存,
+            dataset_dir (str): 数据集默认路径
+            plm_dir (str): 预训练模型默认路径
+        """
         super().__init__()
                 
         self.transforms = {'gplinker': self.gplinker_transform,

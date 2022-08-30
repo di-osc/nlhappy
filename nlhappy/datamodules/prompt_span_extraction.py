@@ -1,4 +1,3 @@
-import pytorch_lightning as pl
 from ..utils.make_datamodule import char_idx_to_token, PLMBaseDataModule
 import torch
 
