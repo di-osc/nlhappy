@@ -188,6 +188,26 @@ def make_re_dataset_from_docs(docs: List[Doc],
                 
         ds = Dataset.from_dict({'text':text_ls, 'triples':triple_ls, 'prompts': prompt_ls})
         return ds
+
+
+def make_ee_dataset_from_doc(docs: List[Doc]):
+    text_ls = []
+    event_ls = []
+    for doc in tqdm(docs):
+        text_ls.append(doc.text)
+        events = []
+        for event in doc._.events:
+            e = {'label':event.label, 'roles':[]}
+            for role in event.roles:
+                spans = event.roles[role]
+                for span in spans:
+                    e['roles'].append({'label':role, 
+                                    'offset':(span.start_char, span.end_char), 
+                                    'text':span.text})
+            events.append(e)
+        event_ls.append(events)
+    ds = Dataset.from_dict({'text':text_ls, 'events':event_ls})
+    return ds
         
             
         
