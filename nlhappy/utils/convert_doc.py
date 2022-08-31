@@ -601,8 +601,4 @@ def convert_relation_to_relation_extraction_dataset(docs: List[Doc],
                 prompt_ls.append(l)
                 
         ds = Dataset.from_dict({'text':text_ls, 'triples':triple_ls, 'prompts': prompt_ls})
-        return ds
-
-    
-            
-                                       
+        return ds    
