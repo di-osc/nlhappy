@@ -51,6 +51,7 @@ class GPLinkerForEventExtraction(PLMBaseModel):
                  hidden_size: int,
                  weight_decay: float,
                  threshold: float,
+                 scheduler: str,
                  **kwargs: Any) -> None:
         super().__init__()
         self.plm = self.get_plm_architecture()
@@ -73,12 +74,12 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         self.val_metric = EventF1()                  
 
         
-    def forward(self, input_ids, token_type_ids, attention_mask=None):
+    def forward(self, input_ids, token_type_ids, attention_mask):
         x = self.plm(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask).last_hidden_state
         x = self.dropout(x)
-        role_logits = self.role_classifier(x)
-        head_logits = self.head_classifier(x)
-        tail_logits = self.tail_classifier(x)
+        role_logits = self.role_classifier(x, mask=attention_mask)
+        head_logits = self.head_classifier(x, mask=attention_mask)
+        tail_logits = self.tail_classifier(x, mask=attention_mask)
         return role_logits, head_logits, tail_logits
 
 
@@ -154,6 +155,30 @@ class GPLinkerForEventExtraction(PLMBaseModel):
             batch_events.append(events)
         return batch_events
 
+    
+    def configure_optimizers(self)  :
+        no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
+        grouped_parameters = [
+            {'params': [p for n, p in self.plm.named_parameters() if not any(nd in n for nd in no_decay)],
+            'lr': self.hparams.lr, 'weight_decay': self.hparams.weight_decay},
+            {'params': [p for n, p in self.plm.named_parameters() if any(nd in n for nd in no_decay)],
+            'lr': self.hparams.lr, 'weight_decay': 0.0},
+            {'params': [p for n, p in self.role_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
+            'lr': self.hparams.lr* 10, 'weight_decay': self.hparams.weight_decay},
+            {'params': [p for n, p in self.role_classifier.named_parameters() if any(nd in n for nd in no_decay)],
+            'lr': self.hparams.lr* 10, 'weight_decay': 0.0},
+            {'params': [p for n, p in self.head_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
+            'lr': self.hparams.lr* 10, 'weight_decay': self.hparams.weight_decay},
+            {'params': [p for n, p in self.head_classifier.named_parameters() if any(nd in n for nd in no_decay)],
+            'lr': self.hparams.lr* 10, 'weight_decay': 0.0},
+            {'params': [p for n, p in self.tail_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
+            'lr': self.hparams.lr* 10, 'weight_decay': self.hparams.weight_decay},
+            {'params': [p for n, p in self.tail_classifier.named_parameters() if any(nd in n for nd in no_decay)],
+            'lr': self.hparams.lr* 10, 'weight_decay': 0.0}
+        ]
+        optimizer = torch.optim.AdamW(grouped_parameters, eps=1e-5)
+        scheduler_config = self.get_scheduler_config(optimizer=optimizer, name=self.hparams.scheduler)
+        return [optimizer], [scheduler_config]
 
     def predict(self):
         pass
