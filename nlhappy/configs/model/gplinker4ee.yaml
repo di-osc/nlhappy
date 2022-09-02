@@ -1,0 +1,7 @@
+_target_: nlhappy.models.GPLinkerForEventExtraction
+
+lr: 3e-5
+hidden_size: 64
+weight_decay: 0.01
+threshold: 0.5
+scheduler: linear_warmup_step
