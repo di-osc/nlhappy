@@ -74,6 +74,8 @@ class PLMBaseModel(LightningModule):
     def __init__(self) -> None:
         super().__init__()
         self.save_hyperparameters()
+        if 'label2id' not in self.hparams and 'id2label' in self.hparams:
+            self.hparams.label2id = {l:i for i,l in self.hparams.id2label.items()}
         
     
     @property
