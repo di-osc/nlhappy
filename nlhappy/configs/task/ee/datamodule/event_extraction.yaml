@@ -1,5 +1,0 @@
-_target_: nlhappy.datamodules.EventExtractionDataModule
-plm: roberta-wwm-base
-dataset: Du-EE
-auto_length: max
-batch_size: 10

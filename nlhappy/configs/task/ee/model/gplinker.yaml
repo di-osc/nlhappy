@@ -1,5 +1,0 @@
-_target_: nlhappy.models.event_extraction.GPLinkerForEventExtraction
-lr: 5e-5
-hidden_size: 64
-weight_decay: 0.01
-threshold: 0.5
