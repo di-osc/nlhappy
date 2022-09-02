@@ -6,3 +6,4 @@ from .span_classification import SpanClassificationDataModule
 from .relation_extraction import RelationExtractionDataModule
 from .prompt_span_extraction import PromptSpanExtractionDataModule
 from .prompt_relation_extraction import PromptRelationExtractionDataModule
+from .event_extraction import EventExtractionDataModule
