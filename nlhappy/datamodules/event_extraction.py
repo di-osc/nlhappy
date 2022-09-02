@@ -39,12 +39,13 @@ class EventExtractionDataModule(PLMBaseDataModule):
         return {l:i for i, l in enumerate(labels)}
 
     @property
-    @lru_cache
+    @lru_cache()
     def role2id(self):
         labels = pd.Series(np.concatenate(pd.Series(np.concatenate(self.train_df.events.values)).apply(lambda x: x['roles']).values)).apply(lambda x: x['label']).drop_duplicates().values
         return {l:i for i, l in enumerate(labels)}
 
     @property
+    @lru_cache()
     def combined2id(self):
         def get_labels(e):
             labels = []
