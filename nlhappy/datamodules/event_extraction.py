@@ -45,10 +45,11 @@ class EventExtractionDataModule(PLMBaseDataModule):
             labels = []
             label = e['label']
             for r in e['roles']:
-                labels.append(label + '-' + r['label'])
+                labels.append((label,r['label']))
             return labels
-        labels = sorted(list(set(np.concatenate(pd.Series(np.concatenate(self.train_df.events.values)).apply(get_labels).values))))
-        return {l:i for i, l in enumerate(labels)}
+        df = pd.DataFrame(np.concatenate(pd.Series(np.concatenate(self.train_df.events.values)).apply(get_labels).values).tolist()).drop_duplicates()
+        labels = sorted([tuple(v) for v in df.values])
+        return {l:i for i,l in enumerate(labels)}
 
 
 
@@ -58,7 +59,7 @@ class EventExtractionDataModule(PLMBaseDataModule):
         batch_inputs = {'input_ids':[], 
                         'token_type_ids':[],
                         'attention_mask':[]}
-        batch_label_ids = []
+        batch_role_ids = []
         batch_head_ids = []
         batch_tail_ids = []
         for i, text in enumerate(batch_text):
@@ -72,13 +73,13 @@ class EventExtractionDataModule(PLMBaseDataModule):
             batch_inputs['token_type_ids'].append(inputs['token_type_ids'])
             offset_mapping = inputs['offset_mapping']
             events = batch_events[i]
-            label_ids = torch.zeros(len(self.combined2id), self.hparams.max_length, self.hparams.max_length)
+            role_ids = torch.zeros(len(self.combined2id), self.hparams.max_length, self.hparams.max_length)
             head_ids = torch.zeros(1, self.hparams.max_length, self.hparams.max_length)
             tail_ids = torch.zeros(1, self.hparams.max_length, self.hparams.max_length)
             for event in events:
                 e_label = event['label']
                 for i, role in enumerate(event['roles']):
-                    label = e_label + '-' + role['label']
+                    label = (e_label, role['label'])
                     try:
                         start_ = role['offset'][0]
                         end_ = role['offset'][1]-1
@@ -87,7 +88,7 @@ class EventExtractionDataModule(PLMBaseDataModule):
                     except:
                         log.warning(f'role {role["text"]} offset {(start, end)} align to token offset failed in \n{text}')
                         continue
-                    label_ids[self.combined2id[label]][start][end] = 1
+                    role_ids[self.combined2id[label]][start][end] = 1
                         # 这个role 跟 其他的每个role 头头 尾尾 联系起来
                     for j, role1 in enumerate(event['roles']):
                         if j>i:
@@ -101,11 +102,11 @@ class EventExtractionDataModule(PLMBaseDataModule):
                                 continue
                             head_ids[0][min(start, start1)][max(start, start1)] = 1
                             tail_ids[0][min(end, end1)][max(end, end1)] = 1
-            batch_label_ids.append(label_ids)
+            batch_role_ids.append(role_ids)
             batch_head_ids.append(head_ids)
             batch_tail_ids.append(tail_ids)
         batch = dict(zip(batch_inputs.keys(), map(torch.tensor, batch_inputs.values())))
-        batch['label_ids'] = torch.stack(batch_label_ids, dim=0)
+        batch['role_ids'] = torch.stack(batch_role_ids, dim=0)
         batch['head_ids'] = torch.stack(batch_head_ids, dim=0)
         batch['tail_ids'] = torch.stack(batch_tail_ids, dim=0)
         return batch
