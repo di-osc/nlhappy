@@ -156,3 +156,4 @@ datasets/
 plms/
 .nohup.out
 scripts/
+test.py
