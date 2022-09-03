@@ -1,5 +1,5 @@
 from .token_classification import BertTokenClassification, BertCRF
-from .span_classification import GlobalPointer
+from .span_extraction import GlobalPointer
 from .text_classification import BertTextClassification
 from .relation_extraction import GPLinkerForRelationExtraction
 from .text_multi_classification import BertTextMultiClassification
