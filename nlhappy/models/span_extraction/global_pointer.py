@@ -1,10 +1,8 @@
-import pytorch_lightning as pl
 import torch.nn as nn
 import torch
-import os
 from ...metrics.span import SpanF1
 from ...utils.make_model import PLMBaseModel
-from ...layers import MultiLabelCategoricalCrossEntropy, EfficientGlobalPointer
+from ...layers import MultiLabelCategoricalCrossEntropy, EfficientGlobalPointer, MultiDropout
 from ...tricks.adversarial_training import adversical_tricks
 
 
@@ -31,7 +29,7 @@ class GlobalPointer(PLMBaseModel):
                         output_size=len(self.hparams.label2id)
                         )
 
-        self.dropout = nn.Dropout(dropout)
+        self.dropout = MultiDropout()
         self.criterion = MultiLabelCategoricalCrossEntropy()
 
         self.train_metric = SpanF1()
