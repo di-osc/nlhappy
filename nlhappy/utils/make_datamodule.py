@@ -236,6 +236,7 @@ class PLMBaseDataModule(pl.LightningModule):
                  shuffle_test: bool = False):
         super().__init__()
         self.save_hyperparameters()
+        self.transforms = {}
     
     
     def prepare_data(self) -> None:
@@ -303,6 +304,10 @@ class PLMBaseDataModule(pl.LightningModule):
     @lru_cache()
     def test_df(self):
         return self.dataset['test'].to_pandas()
+
+
+    def show_one_sample(self) -> Dict:
+        raise NotImplementedError
     
     
     def train_dataloader(self):
