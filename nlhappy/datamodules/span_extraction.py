@@ -62,8 +62,8 @@ class SpanExtractionDataModule(PLMBaseDataModule):
         self.hparams.label2id = self.label2id
         self.dataset.set_transform(transform=self.transforms.get(self.hparams.transform))
 
-
-    def show_one_example(self):
+    @staticmethod
+    def show_one_sample(self):
         return {'text':'我的电话是12345','spans':[{'label':'电话','offset':[5, 10], 'text':'12345'}]}
 
 
