@@ -1,4 +1,4 @@
-_target_: nlhappy.datamodules.SpanClassificationDataModule
+_target_: nlhappy.datamodules.SpanExtractionDataModule
 dataset_dir: ${dataset_dir}
 plm_dir: ${plm_dir}
 
