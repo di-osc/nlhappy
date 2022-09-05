@@ -271,6 +271,10 @@ class PLMBaseDataModule(pl.LightningModule):
     
     def get_vocab(self):
         return dict(sorted(self.tokenizer.vocab.items(), key=lambda x: x[1]))
+
+
+    def get_available_transforms(self):
+        return self.transforms.keys()
     
         
     @lru_cache()
