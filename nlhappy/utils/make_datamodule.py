@@ -2,7 +2,7 @@ import os
 import oss2
 import zipfile
 from .utils import get_logger
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Union
 from torch.utils.data import DataLoader
 from datasets import load_from_disk
 import pytorch_lightning as pl
@@ -227,6 +227,7 @@ class PLMBaseDataModule(pl.LightningModule):
     - 自动设置dataloader,数据集需要切分为train,validation,test
     """
     def __init__(self,
+                 auto_length: Union[str, int] = 'max',
                  plm_dir: str = 'plms',
                  dataset_dir: str = 'datasets',
                  num_workers: int = 0,
@@ -279,10 +280,11 @@ class PLMBaseDataModule(pl.LightningModule):
         
     @lru_cache()
     def get_max_length(self):
+        length = self.train_df.text.map(lambda x: len(self.tokenizer.tokenize(x)))
         if self.hparams.auto_length == 'max':
-            max_length = self.train_df['text'].str.len().max()
+            max_length = length.max()
         if self.hparams.auto_length == 'mean':
-            max_length = int(self.train_df['text'].str.len().mean())
+            max_length = int(length.mean())
         if type(self.hparams.auto_length) == int:
             assert self.hparams.auto_length >0, 'max_length length  must > 0'
             max_length = self.hparams.auto_length
