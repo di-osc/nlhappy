@@ -1,0 +1,12 @@
+_target_: nlhappy.models.entity_extraction.W2NERForEntityExtraction
+
+lr: 
+scheduler: 'linear_warmup_step'
+weight_decay: 0.01
+conv_hidden_size: 96
+dilation: [1,2,3]
+dist_emb_size: 20
+reg_emb_size: 20
+biaffine_size: 512
+dropout: 0.2
+ffnn_hidden_size: 288
