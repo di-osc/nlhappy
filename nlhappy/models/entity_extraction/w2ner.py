@@ -1,5 +1,6 @@
 from ...utils.make_model import PLMBaseModel
-from ...layers import LayerNorm
+from ...layers import LayerNorm 
+from ...metrics.entity import Entity, EntityF1
 import torch.nn as nn
 import torch.nn.functional as F
 import torch
@@ -113,7 +114,8 @@ class W2NERForEntityExtraction(PLMBaseModel):
     """
     def __init__(self,
                  lr: float,
-                 lstm_hidden_size: int = 512,
+                 scheduler: str= 'linear',
+                 weight_decay: float = 0.01,
                  conv_hidden_size: int = 96,
                  dilation: List[int] = [1,2,3],
                  dist_emb_size: int = 20,
@@ -145,7 +147,6 @@ class W2NERForEntityExtraction(PLMBaseModel):
                                           dilation=self.hparams.dilation,
                                           dropout=self.hparams.dropout)
 
-
         self.predictor = CoPredictor(cls_num=len(self.hparams.label2id), 
                                      hid_size=self.plm.config.hidden_size, 
                                      biaffine_size=self.hparams.biaffine_size,
@@ -153,8 +154,11 @@ class W2NERForEntityExtraction(PLMBaseModel):
                                      ffnn_hid_size=self.hparams.ffnn_hidden_size,
                                      dropout=self.hparams.dropout)
 
-        self.criterion = nn.CrossEntropyLoss()
-    def forward(self, input_ids, token_type_ids, attention_mask, distance_ids):
+        self.criterion = nn.CrossEntropyLoss(reduction='none')
+        self.train_metric = EntityF1()
+        self.val_metric = EntityF1()
+
+    def forward(self, input_ids, token_type_ids, attention_mask, distance_ids, grid_mask):
         # 将bert的输出取后四层的平均 -> b, l, h
         hiddens = self.plm(input_ids, token_type_ids, attention_mask, output_hidden_states=True).hidden_states
         hidden = torch.stack(hiddens[-4:], dim=-1).mean(-1) 
@@ -167,7 +171,6 @@ class W2NERForEntityExtraction(PLMBaseModel):
         cln = self.cln(hidden.unsqueeze(2), hidden)
         # 将distance, region 和 cln输出 拼接 -> b,l,l,h_concat
         dis_emb = self.distance_embeddings(distance_ids)
-        grid_mask = self.get_grid_mask(attention_mask)
         region_ids = self.get_region_ids(grid_mask)
         reg_emb = self.region_embeddings(region_ids)
         conv_inputs = torch.cat([dis_emb, reg_emb, cln], dim=-1)
@@ -203,21 +206,47 @@ class W2NERForEntityExtraction(PLMBaseModel):
         attention_mask = batch['attention_mask']
         distance_ids = batch['distance_ids']
         label_ids = batch['label_ids']
-        logits = self(input_ids, token_type_ids, attention_mask, distance_ids)
-        loss = self.criterion(logits, label_ids)
+        grid_mask = self.get_grid_mask(attention_mask)
+        logits = self(input_ids, token_type_ids, attention_mask, distance_ids, grid_mask)
+        loss = self.criterion(logits.permute(0, 3, 1, 2), label_ids)
+        loss = torch.sum(loss * grid_mask) / torch.sum(grid_mask) 
         return logits, loss
 
     
     def training_step(self, batch, batch_idx):
+        targs = batch['label_ids']
         logits, loss = self.step(batch)
-        
+        # preds = self.extract_ents(logits)
+        # self.train_metric(preds, targs)
+        # self.log('train/f1', self.train_metric, on_step=True, prog_bar=True)
         return {'loss':loss}
 
 
     def validation_step(self, batch, batch_idx):
-        pass
+        targs = batch['label_ids']
+        logits, loss = self.step(batch)
+        preds = self.extract_ents(logits)
+        self.val_metric(preds, targs)
+        self.log('val/f1', self.train_metric, on_epoch=True, prog_bar=True)
 
 
     def configure_optimizers(self):
-        pass
+        plm_params = set(self.plm.parameters())
+        other_params = list(set(self.parameters()) - plm_params)
+        no_decay = ['bias', 'LayerNorm.weight']
+        params = [
+            {'params': [p for n, p in self.plm.named_parameters() if not any(nd in n for nd in no_decay)],
+             'lr': self.hparams.lr,
+             'weight_decay': self.hparams.weight_decay},
+            {'params': [p for n, p in self.plm.named_parameters() if any(nd in n for nd in no_decay)],
+             'lr': self.hparams.lr * 10,
+             'weight_decay': 0.0},
+            {'params': other_params,
+             'lr': self.hparams.lr * 10,
+             'weight_decay': self.hparams.weight_decay},
+        ]
+        optimizer = torch.optim.AdamW(params, lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
+        scheduler_config = self.get_scheduler_config(optimizer, name=self.hparams.scheduler)
+        return [optimizer], [scheduler_config]
+        
 

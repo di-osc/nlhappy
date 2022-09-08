@@ -10,10 +10,10 @@ from ...tricks.adversarial_training import adversical_tricks
 
 class GlobalPointer(PLMBaseModel):
     def __init__(self,
-                 hidden_size: int,
                  lr: float,
-                 weight_decay: float,
-                 dropout: float,
+                 hidden_size: int=64,
+                 weight_decay: float=0.01,
+                 dropout: float=0.2,
                  threshold: float = 0.5,
                  adv: str =None,
                  **kwargs) : 
@@ -23,11 +23,9 @@ class GlobalPointer(PLMBaseModel):
 
 
         self.bert = self.get_plm_architecture()
-        self.classifier = EfficientGlobalPointer(
-                        input_size=self.bert.config.hidden_size, 
-                        hidden_size=hidden_size,
-                        output_size=len(self.hparams.label2id)
-                        )
+        self.classifier = EfficientGlobalPointer(input_size=self.bert.config.hidden_size, 
+                                                 hidden_size=hidden_size,
+                                                 output_size=len(self.hparams.label2id))
 
         self.dropout = MultiDropout()
         self.criterion = MultiLabelCategoricalCrossEntropy()
@@ -148,36 +146,3 @@ class GlobalPointer(PLMBaseModel):
             span_text = text[start-1:end]
             spans.append([start-1, end, self.hparams.id2label[span[1]], span_text])
         return spans
-
-    def to_onnx(self, file_path: str):
-        text = '我是中国人'
-        torch_inputs = self.tokenizer(text, return_tensors='pt')
-        dynamic_axes = {
-                    'input_ids': {0: 'batch', 1: 'seq'},
-                    'attention_mask': {0: 'batch', 1: 'seq'},
-                    'token_type_ids': {0: 'batch', 1: 'seq'},
-                }
-        with torch.no_grad():
-            torch.onnx.export(
-                model=self,
-                args=tuple(torch_inputs.values()), 
-                f=file_path, 
-                input_names=list(torch_inputs.keys()),
-                dynamic_axes=dynamic_axes, 
-                opset_version=14,
-                output_names=['logits'],
-                export_params=True)
-        print('export to onnx successfully')
-            
-        
-        
-    
-
-
-        
-
-
-    
-
-    
-        

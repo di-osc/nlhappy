@@ -5,15 +5,15 @@ import numpy as np
 import torch
 
 
-class EntityExtractionDataMudule(PLMBaseDataModule):
+class EntityExtractionDataModule(PLMBaseDataModule):
     """实体抽取数据模块
     可以解决嵌套实体和非连续实体
     """
     def __init__(self,
-                 plm: str,
                  dataset: str,
-                 transform: str,
                  batch_size: int,
+                 transform: str = 'w2ner',
+                 plm: str = 'roberta-wwm-base',
                  **kwargs):
         super().__init__()
         self.transforms['w2ner'] = self.w2ner_transform
@@ -21,7 +21,7 @@ class EntityExtractionDataMudule(PLMBaseDataModule):
 
     @staticmethod
     def show_one_sample(self):
-        return '{"text":"这个一个实体","entities":[{"indexes":[4,5],"label":"实体"}]}'
+        return '{"text":"这是一个长颈鹿","entities":[{"indexes":[4,5,6],"label":"动物"}]}'
 
 
     @property
@@ -62,10 +62,7 @@ class EntityExtractionDataMudule(PLMBaseDataModule):
         batch_inputs = {'input_ids':[], 'token_type_ids':[], 'attention_mask':[]}
         batch_label_ids = []
         batch_dist_ids = []
-        batch_length = []
         for i, text in enumerate(batch_text):
-            length = len(self.tokenizer.tokenize(text))
-            batch_length.append(length)
             inputs = self.tokenizer(text,
                                     max_length=max_length,
                                     padding='max_length',
@@ -77,7 +74,7 @@ class EntityExtractionDataMudule(PLMBaseDataModule):
             batch_inputs['token_type_ids'].append(inputs['token_type_ids'])
             mapping = inputs['offset_mapping']
             ents = batch_ents[i]
-            label_ids = torch.zeros(max_length, max_length)
+            label_ids = torch.zeros(max_length, max_length, dtype=torch.long)
             for ent in ents:
                 idx_ls = ent['indexes']
                 for i in range(len(idx_ls)):
