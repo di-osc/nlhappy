@@ -32,12 +32,14 @@ class BasicTokenizer(object):
     - """
 
     def __init__(self,
+                 vocab,
                  do_lower_case=False,
                  return_offset=False,
                  never_split=[]):
         self.do_lower_case = do_lower_case
         self.never_split = never_split
         self.return_offset = return_offset
+        self.vocab = vocab
 
     def tokenize(self, text):
         """文本切分成token"""
