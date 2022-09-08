@@ -42,16 +42,6 @@ class TextPairClassificationDataModule(pl.LightningDataModule):
         self.save_hyperparameters(logger=False)
         
         
-
-    def prepare_data(self):
-        '''
-        下载数据集.这个方法只会在一个GPU上执行一次.
-        '''
-        prepare_data_from_oss(dataset=self.hparams.dataset,
-                              plm=self.hparams.plm,
-                              dataset_dir=self.hparams.dataset_dir,
-                              plm_dir=self.hparams.plm_dir)
-        
     
     def setup(self, stage: str):
         dataset_path = os.path.join(self.hparams.dataset_dir , self.hparams.dataset)

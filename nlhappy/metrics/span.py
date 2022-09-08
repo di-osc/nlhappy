@@ -6,8 +6,8 @@ from typing import List, Set
 
 class SpanF1(Metric):
     """计算span矩阵的F1"""
-    def __init__(self, dist_sync_on_step=False):
-        super().__init__(dist_sync_on_step=dist_sync_on_step)
+    def __init__(self):
+        super().__init__()
 
         self.add_state('correct', default=torch.tensor(0.0), dist_reduce_fx='sum')
         self.add_state('all_pred', default=torch.tensor(0.0), dist_reduce_fx='sum')

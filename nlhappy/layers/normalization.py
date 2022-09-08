@@ -30,10 +30,12 @@ class LayerNorm(nn.Module):
             self.dense2 = nn.Linear(conditional_size, hidden_size, bias=False)
             self.dense2.weight.data.uniform_(0, 0)
 
-    def forward(self, x):
-        
-        inputs = x[0]  # 这里是visible_hiddens
-
+    def forward(self, inputs, cond=None):
+        """
+        Args:
+            inputs (_type_): 特征输入.
+            cond (_type_, optional): 条件输入. Defaults to None.
+        """
         if self.norm_mode == 'rmsnorm':
             # t5使用的是RMSnorm
             variance = inputs.to(torch.float32).pow(2).mean(-1, keepdim=True)
@@ -50,7 +52,6 @@ class LayerNorm(nn.Module):
             self.bias = 0
 
         if self.conditional_size:
-            cond = x[1]  # 这里是repeat_hiddens
             # 三者的形状都是一致的
             # print(inputs.shape, cond.shape, o.shape)
             for _ in range(len(inputs.shape) - len(cond.shape)):
