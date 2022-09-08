@@ -38,7 +38,7 @@ def explain(key: str):
     else:
         return 'No explanation for this key.'
     
-def chinese(tokenizer: str = 'char'):
+def chinese(tokenizer: str = 'basic'):
     import spacy
     from nlhappy.components.tokenizer import all_tokenizers
     tokenizer = all_tokenizers[tokenizer]
