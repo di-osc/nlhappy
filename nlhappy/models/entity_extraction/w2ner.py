@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import torch
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from typing import List
+from collections import deque, defaultdict
 
 
 
@@ -104,9 +105,6 @@ class CoPredictor(nn.Module):
         return o1 + o2
 
 
-
-
-
 class W2NERForEntityExtraction(PLMBaseModel):
     """w2ner 统一解决嵌套非连续实体, 模型复现
     reference: 
@@ -114,7 +112,7 @@ class W2NERForEntityExtraction(PLMBaseModel):
     """
     def __init__(self,
                  lr: float,
-                 scheduler: str= 'linear',
+                 scheduler: str= 'linear_warmup_step',
                  weight_decay: float = 0.01,
                  conv_hidden_size: int = 96,
                  dilation: List[int] = [1,2,3],
@@ -158,6 +156,7 @@ class W2NERForEntityExtraction(PLMBaseModel):
         self.train_metric = EntityF1()
         self.val_metric = EntityF1()
 
+
     def forward(self, input_ids, token_type_ids, attention_mask, distance_ids, grid_mask):
         # 将bert的输出取后四层的平均 -> b, l, h
         hiddens = self.plm(input_ids, token_type_ids, attention_mask, output_hidden_states=True).hidden_states
@@ -196,10 +195,49 @@ class W2NERForEntityExtraction(PLMBaseModel):
         return grid_mask
 
 
-    def extract_ents(self, logits):
-        pass
-
-        
+    def extract_ents(self, label_ids, attention_mask):
+        class Node:
+            def __init__(self):
+                self.THW = []                # [(tail, type)]
+                self.NNW = defaultdict(set)
+        q = deque()
+        ents = []
+        length = torch.sum(attention_mask, dim=-1)
+        for instance, l, in zip(label_ids, length):
+            l = l.item()
+            nodes = [Node() for _ in range(l)]
+            predicts = []
+            for cur in reversed(range(l)):
+                heads = []
+                for pre in range(cur+1):
+                    if instance[cur, pre] > 1: 
+                            nodes[pre].THW.append((cur, instance[cur, pre]))
+                            heads.append(pre)
+                        # NNW
+                    if pre < cur and instance[pre, cur] == 1:
+                        # cur node
+                        for head in heads:
+                            nodes[pre].NNW[(head,cur)].add(cur)
+                        # post nodes
+                        for head,tail in nodes[cur].NNW.keys():
+                            if tail >= cur and head <= pre:
+                                nodes[pre].NNW[(head,tail)].add(cur)
+                for tail,type_id in nodes[cur].THW:
+                        if cur == tail:
+                            predicts.append(([cur], type_id))
+                            continue
+                        q.clear()
+                        q.append([cur])
+                        while len(q) > 0:
+                            chains = q.pop()
+                            for idx in nodes[chains[-1]].NNW[(cur,tail)]:
+                                if idx == tail:
+                                    predicts.append((chains + [idx], type_id))
+                                else:
+                                    q.append(chains + [idx])
+            preds = [Entity(label=l.item(), indexes=tuple(i)) for i,l in predicts]
+            ents.append(set(preds))
+        return ents
     def step(self, batch):
         input_ids = batch['input_ids']
         token_type_ids = batch['token_type_ids']
@@ -215,17 +253,23 @@ class W2NERForEntityExtraction(PLMBaseModel):
     
     def training_step(self, batch, batch_idx):
         targs = batch['label_ids']
+        attention_mask = batch['attention_mask']
+        targs = self.extract_ents(targs, attention_mask)
         logits, loss = self.step(batch)
-        # preds = self.extract_ents(logits)
-        # self.train_metric(preds, targs)
-        # self.log('train/f1', self.train_metric, on_step=True, prog_bar=True)
+        preds = logits.argmax(dim=-1)
+        preds = self.extract_ents(preds, attention_mask)
+        self.train_metric(preds, targs)
+        self.log('train/f1', self.train_metric, on_step=True, prog_bar=True)
         return {'loss':loss}
 
 
     def validation_step(self, batch, batch_idx):
         targs = batch['label_ids']
+        attention_mask = batch['attention_mask']
+        targs = self.extract_ents(targs, attention_mask)
         logits, loss = self.step(batch)
-        preds = self.extract_ents(logits)
+        preds = logits.argmax(dim=-1)
+        preds = self.extract_ents(preds, attention_mask)
         self.val_metric(preds, targs)
         self.log('val/f1', self.train_metric, on_epoch=True, prog_bar=True)
 
@@ -248,5 +292,7 @@ class W2NERForEntityExtraction(PLMBaseModel):
         optimizer = torch.optim.AdamW(params, lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
         scheduler_config = self.get_scheduler_config(optimizer, name=self.hparams.scheduler)
         return [optimizer], [scheduler_config]
-        
 
+
+    def predict(self, text):
+        pass
