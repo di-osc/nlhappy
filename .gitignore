@@ -159,3 +159,4 @@ scripts/
 test.py
 **.sh
 corpus/
+**.ipynb
