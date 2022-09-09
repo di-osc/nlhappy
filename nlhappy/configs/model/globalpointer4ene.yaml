@@ -1,0 +1,9 @@
+_target_: nlhappy.models.GlobalPointerForEntityExtraction
+
+lr: 3e-5 
+scheduler: harmonic_epoch
+threshold: 0.0
+dropout: 0.2
+hidden_size: 256 
+weight_decay: 0.0
+adv: ''
