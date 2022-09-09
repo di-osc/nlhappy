@@ -1,1 +1,2 @@
 from .w2ner import W2NERForEntityExtraction
+from .globalpointer import GlobalPointerForEntityExtraction
