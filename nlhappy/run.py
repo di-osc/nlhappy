@@ -12,13 +12,13 @@ from pytorch_lightning import (
 from pytorch_lightning.loggers import LightningLoggerBase
 
 from .utils import utils
+import os
+
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 log = utils.get_logger(__name__)
 
 
-    
-
-    
 @hydra.main(config_path="configs/", config_name="config.yaml")
 def train(config: DictConfig) -> Optional[float]:
     """Contains training pipeline.
