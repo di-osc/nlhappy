@@ -47,7 +47,7 @@ class GlobalPointer(PLMBaseModel):
 
 
     def shared_step(self, batch):
-        span_ids = batch['span_ids']
+        span_ids = batch['label_ids']
         logits = self(input_ids=batch['input_ids'], token_type_ids=batch['token_type_ids'], attention_mask=batch['attention_mask'])
         pred = logits.ge(self.hparams.threshold).float()
         batch_size, ent_type_size = logits.shape[:2]

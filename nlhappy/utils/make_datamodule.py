@@ -248,7 +248,7 @@ class PLMBaseDataModule(pl.LightningModule):
     
     
     @property
-    @lru_cache
+    @lru_cache()
     def dataset(self):
         dataset_path = os.path.join(self.hparams.dataset_dir, self.hparams.dataset)
         dsd = load_from_disk(dataset_path)
@@ -280,6 +280,11 @@ class PLMBaseDataModule(pl.LightningModule):
         
     @lru_cache()
     def get_max_length(self):
+        """根据auto_length参数自动获取最大token的长度
+
+        Returns:
+            int: 最大token长度
+        """
         length = self.train_df.text.map(lambda x: len(self.tokenizer.tokenize(x)))
         if self.hparams.auto_length == 'max':
             max_length = length.max()

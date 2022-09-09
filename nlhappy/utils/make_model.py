@@ -79,7 +79,7 @@ class PLMBaseModel(LightningModule):
         
     
     @property
-    @lru_cache
+    @lru_cache()
     def tokenizer(self):
         keys = self.hparams.keys()
         if 'trf_config' in keys and 'vocab' in keys:
@@ -132,6 +132,15 @@ class PLMBaseModel(LightningModule):
     
     
     def get_scheduler_config(self, optimizer, name: str):
+        """
+
+        Args:
+            optimizer (): 优化器实例
+            name (str): 'harmonic_epoch', 'linear_warmup_step', 'cosine_warmup_step'之一
+
+        Returns:
+            dict: scheduler配置字典
+        """
         availabel_names = ['harmonic_epoch', 'linear_warmup_step', 'cosine_warmup_step']
         assert name in availabel_names, f'availabel names {availabel_names}'
         if name == 'harmonic_epoch':
