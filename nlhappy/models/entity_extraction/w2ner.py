@@ -157,7 +157,7 @@ class W2NERForEntityExtraction(PLMBaseModel):
         self.val_metric = EntityF1()
 
 
-    def forward(self, input_ids, token_type_ids, attention_mask, distance_ids, grid_mask):
+    def forward(self, input_ids, token_type_ids, attention_mask, grid_mask, distance_ids):
         # 将bert的输出取后四层的平均 -> b, l, h
         hiddens = self.plm(input_ids, token_type_ids, attention_mask, output_hidden_states=True).hidden_states
         hidden = torch.stack(hiddens[-4:], dim=-1).mean(-1) 
@@ -245,21 +245,21 @@ class W2NERForEntityExtraction(PLMBaseModel):
         distance_ids = batch['distance_ids']
         label_ids = batch['label_ids']
         grid_mask = self.get_grid_mask(attention_mask)
-        logits = self(input_ids, token_type_ids, attention_mask, distance_ids, grid_mask)
+        logits = self(input_ids, token_type_ids, attention_mask, grid_mask, distance_ids)
         loss = self.criterion(logits.permute(0, 3, 1, 2), label_ids)
         loss = torch.sum(loss * grid_mask) / torch.sum(grid_mask) 
         return logits, loss
 
     
     def training_step(self, batch, batch_idx):
-        targs = batch['label_ids']
-        attention_mask = batch['attention_mask']
-        targs = self.extract_ents(targs, attention_mask)
+        # targs = batch['label_ids']
+        # attention_mask = batch['attention_mask']
+        # targs = self.extract_ents(targs, attention_mask)
         logits, loss = self.step(batch)
-        preds = logits.argmax(dim=-1)
-        preds = self.extract_ents(preds, attention_mask)
-        self.train_metric(preds, targs)
-        self.log('train/f1', self.train_metric, on_step=True, prog_bar=True)
+        # preds = logits.argmax(dim=-1)
+        # preds = self.extract_ents(preds, attention_mask)
+        # self.train_metric(preds, targs)
+        # self.log('train/f1', self.train_metric, on_step=True, prog_bar=True)
         return {'loss':loss}
 
 
