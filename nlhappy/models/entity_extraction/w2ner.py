@@ -271,7 +271,7 @@ class W2NERForEntityExtraction(PLMBaseModel):
         preds = logits.argmax(dim=-1)
         preds = self.extract_ents(preds, attention_mask)
         self.val_metric(preds, targs)
-        self.log('val/f1', self.train_metric, on_epoch=True, prog_bar=True)
+        self.log('val/f1', self.val_metric, on_epoch=True, prog_bar=True)
 
 
     def configure_optimizers(self):
