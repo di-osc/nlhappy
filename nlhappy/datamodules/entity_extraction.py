@@ -70,17 +70,17 @@ class EntityExtractionDataModule(PLMBaseDataModule):
                                       add_special_tokens=False,
                                       return_tensors='pt')
         batch_mappings = batch_inputs.pop('offset_mapping').tolist()
-        # batch_lengths = batch_inputs['attention_mask'].sum(dim=-1).tolist()
-        # batch_size = len(batch_text)
-        # batch_dist_ids = np.zeros((batch_size, max_length, max_length), dtype=np.int32)
-        # batch_dist = []
+        batch_lengths = batch_inputs['attention_mask'].sum(dim=-1).tolist()
+        batch_size = len(batch_text)
+        batch_dist_ids = np.zeros((batch_size, max_length, max_length), dtype=np.int)
+        batch_dist = []
         batch_label_ids = []
-        batch_dist_ids = []
+        # batch_dist_ids = []
         dis2idx = self.get_dis2idx()
         for i, text in enumerate(batch_text):
             mapping = batch_mappings[i]
             ents = batch_ents[i]
-            # length = batch_lengths[i]
+            length = batch_lengths[i]
             label_ids = np.zeros((max_length, max_length), dtype=np.int)
             for ent in ents:
                 idx_ls = ent['indexes']
@@ -91,25 +91,25 @@ class EntityExtractionDataModule(PLMBaseDataModule):
                 label_ids[char_idx_to_token(idx_ls[-1], mapping), char_idx_to_token(idx_ls[0], mapping)] = self.label2id[ent['label']]
             batch_label_ids.append(label_ids)
 
-            _dist_inputs = np.zeros((max_length, max_length), dtype=np.int)
-            for k in range(max_length):
+            _dist_inputs = np.zeros((length, length), dtype=np.int)
+            for k in range(length):
                 _dist_inputs[k, :] += k
                 _dist_inputs[:, k] -= k
 
-            for i in range(max_length):
-                for j in range(max_length):
+            for i in range(length):
+                for j in range(length):
                     if _dist_inputs[i, j] < 0:
                         _dist_inputs[i, j] = dis2idx[-_dist_inputs[i, j]] + 9
                     else:
                         _dist_inputs[i, j] = dis2idx[_dist_inputs[i, j]]
             _dist_inputs[_dist_inputs == 0] = 19
-            batch_dist_ids.append(_dist_inputs)
+            batch_dist.append(_dist_inputs)
 
         
         batch_label_ids = np.stack(batch_label_ids)
         batch_inputs['label_ids'] = torch.from_numpy(batch_label_ids)
-        # _batch_dist_ids = self.fill(batch_dist, batch_dist_ids)
-        batch_dist_ids = np.stack(batch_dist_ids)
+        _batch_dist_ids = self.fill(batch_dist, batch_dist_ids)
+        batch_dist_ids = np.stack(_batch_dist_ids)
         batch_inputs['distance_ids'] = torch.from_numpy(batch_dist_ids)
         return batch_inputs
 
