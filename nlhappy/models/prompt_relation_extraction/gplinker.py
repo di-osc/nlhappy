@@ -1,16 +1,10 @@
-import pytorch_lightning as pl
-from transformers import AutoModel
 from ...layers import EfficientGlobalPointer, MultiDropout
 from ...layers.loss import MultiLabelCategoricalCrossEntropy
 from ...metrics.triple import TripleF1, Triple
+from ...utils.make_model import align_token_span, PLMBaseModel
 import torch
 from torch import Tensor
 from typing import List, Set
-import os
-from ...utils.make_model import get_hf_tokenizer, align_token_span, PLMBaseModel
-
-
-
 
 
 class GPLinkerForPromptRelationExtraction(PLMBaseModel):
