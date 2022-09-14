@@ -18,7 +18,6 @@ name = "nlhappy"
 version = "2022.08.20"
 description = "😄自然语言处理😄"
 authors = [
-    {name = "wangmengdi", email = "790990241@qq.com"},
     {name = "wangmengdi",email = "790990241@qq.com"},
 ]
 dependencies = ["torch<2.0.0,>=1.11.0", "pytorch-lightning==1.7.1", "datasets<3.0.0,>=2.0.0", "transformers<5.0.0,>=4.17.0", "hydra-core==1.1.1", "hydra-colorlog==1.1.0", "oss2<3.0.0,>=2.15.0", "spacy>=3.3.0", "rich<13.0.0,>=12.4.3", "wandb>=0.12.18", "googletrans==4.0.0rc1"]
