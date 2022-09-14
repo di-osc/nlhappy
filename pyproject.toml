@@ -1,38 +1,35 @@
-[tool.poetry]
+[tool.pdm]
+[tool.pdm.dev-dependencies]
+dev = []
+
+[tool.pdm.build]
+includes = []
+
+[[tool.pdm.source]]
+name = "tsinghua"
+url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple/"
+verify_ssl = true
+[build-system]
+requires = ["pdm-pep517>=1.0.0"]
+build-backend = "pdm.pep517.api"
+
+[project]
 name = "nlhappy"
 version = "2022.08.20"
 description = "😄自然语言处理😄"
-authors = ["wangmengdi <790990241@qq.com>"]
+authors = [
+    {name = "wangmengdi", email = "790990241@qq.com"},
+    {name = "wangmengdi",email = "790990241@qq.com"},
+]
+dependencies = ["torch<2.0.0,>=1.11.0", "pytorch-lightning==1.7.1", "datasets<3.0.0,>=2.0.0", "transformers<5.0.0,>=4.17.0", "hydra-core==1.1.1", "hydra-colorlog==1.1.0", "oss2<3.0.0,>=2.15.0", "spacy>=3.3.0", "rich<13.0.0,>=12.4.3", "wandb>=0.12.18", "googletrans==4.0.0rc1"]
+requires-python = ">=3.7,<4.0"
+readme = "README.md"
+license = {text = "MIT"}
 
-[tool.poetry.dependencies]
-python = "^3.7"
-torch = "^1.11.0"
-pytorch-lightning = "1.7.1"
-datasets = "^2.0.0"
-transformers = "^4.17.0"
-hydra-core = "1.1.1"
-hydra-colorlog = "1.1.0"
-oss2 = "^2.15.0"
-spacy = ">=3.3.0"
-rich = "^12.4.3"
-wandb = ">=0.12.18"
-googletrans = "4.0.0rc1"
+[project.urls]
 
-[tool.poetry.dev-dependencies]
+[project.entry-points.spacy_factories]
+span_classifier = "nlhappy.components:make_spancat"
 
-[tool.poetry.plugins."spacy_factories"]
-"span_classifier" = "nlhappy.components:make_spancat"
-
-[tool.poetry.scripts]
+[project.scripts]
 nlhappy = "nlhappy.run:train"
-
-
-[build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
-
-# 添加清华镜像
-[[tool.poetry.source]]
-name = "tsinghua"
-url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple/"
-default = true
