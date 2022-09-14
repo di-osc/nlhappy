@@ -160,3 +160,4 @@ test.py
 **.sh
 corpus/
 **.ipynb
+.pdm.toml
