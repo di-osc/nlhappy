@@ -1,6 +1,4 @@
 import os
-import oss2
-import zipfile
 from .utils import get_logger
 from typing import List, Optional, Dict, Union
 from torch.utils.data import DataLoader
@@ -24,77 +22,7 @@ def char_idx_to_token(char_idx, offset_mapping):
         if span[0] <= char_idx < span[1]:
             return index
     return -1
-
-
-default_access_key_id = 'LTAI5t6MP68LoaghwWStqxuC'
-default_access_key_secret = 'v0DSdRawIXcZnVCeq0eZ1cldAy5DQ1'
-default_endpoint = 'http://oss-cn-beijing.aliyuncs.com'
-default_data_bucket = 'deepset'
-default_model_bucket = 'pretrained-model'
-
-class OSSStorer:
-    '''阿里云oss对象存储'''
-    def __init__(
-        self, 
-        access_key_id : str = default_access_key_id,
-        access_key_secret : str = default_access_key_secret, 
-        endpoint :str = default_endpoint, 
-        data_bucket : str = default_data_bucket,
-        model_bucket : str = default_model_bucket,
-        ):
-        super().__init__()
-        self.auth = oss2.Auth(access_key_id, access_key_secret)
-        self.data_bucket = oss2.Bucket(self.auth, endpoint, data_bucket)
-        self.model_bucket = oss2.Bucket(self.auth, endpoint, model_bucket)
-
-
-    def download_dataset(
-        self, 
-        dataset:str, 
-        localpath: str='./datasets/'):
-        """下载数据集
-        - dataset: 数据集名称
-        - localpath: 下载到本地的路径 默认为./datasets/
-        """
-        if not os.path.exists(localpath):
-            os.makedirs(localpath)
-        file = dataset + '.zip'
-        file_path = os.path.join(localpath, file)
-        dataset_path = os.path.join(localpath, dataset)
-        if not os.path.exists(dataset_path):
-            try:
-                self.data_bucket.get_object_to_file(key=file, filename=file_path)
-                with zipfile.ZipFile(file=file_path, mode='r') as zf:
-                    zf.extractall(path=localpath)
-            finally:
-                if os.path.exists(file_path):
-                    os.remove(path=file_path)
-
-
-    def download_plm(
-        self, 
-        model:str, 
-        localpath: str = './plms/'):
-        """下载预训练模型
-        - model: 模型名称
-        - localpath: 下载到本地的路径 默认为./plms/
-        """
-        if not os.path.exists(localpath):
-            os.makedirs(localpath)
-        file = model + '.zip'
-        file_path = os.path.join(localpath, file)
-        model_path = os.path.join(localpath, model)
-        if not os.path.exists(model_path):
-            try:
-                self.model_bucket.get_object_to_file(key=file, filename=file_path)
-                with zipfile.ZipFile(file=file_path, mode='r') as zf:
-                    zf.extractall(path=localpath)
-            finally:
-                if os.path.exists(file_path):
-                    os.remove(path=file_path)
                 
-
-log = get_logger(__name__)  
         
 def prepare_data_from_remote(dataset: str,
                              plm: str,
@@ -103,34 +31,24 @@ def prepare_data_from_remote(dataset: str,
         '''
         下载数据集.这个方法只会在一个GPU上执行一次.
         '''
-        oss = OSSStorer()
         dataset_path = os.path.join(dataset_dir, dataset)
         plm_path = os.path.join(plm_dir, plm)
         # 检测数据
         if os.path.exists(dataset_path):
-            # log.info(f'{dataset_path} already exists.')
             pass
         else:
-            log.info('dataset not exists  in {}'.format(dataset_path))
-            log.info('start downloading dataset from oss')
-            oss.download_dataset(dataset, dataset_dir)
-            log.info('finish downloading dataset from oss')
-        if os.path.isdir(plm_dir):
-            if os.path.exists(plm_path):
-                pass 
-            else : 
-                log.info('plm not exists in {}'.format(plm_path))
-                try:
-                    log.info('start downloading plm from oss')
-                    oss.download_plm(plm, plm_dir)
-                    log.info('finish downloading plm from oss')
-                except Exception as e:
-                    log.info('download plm from oss failed')
-        else:
+            log.error('dataset not exists  in {}, please prepare your dataset'.format(dataset_path))
+            
+        if os.path.exists(plm_path):
+            pass 
+        else : 
+            log.info('cannot found plm in {}'.format(plm_path))
             try:
-                log.info('start downloading plm from huffingface')
-                model = AutoModel.from_pretrained(plm_path)
-                tokenizer = AutoTokenizer.from_pretrained(plm_path)
+                log.info('start download plm from huffingface')
+                model = AutoModel.from_pretrained(plm)
+                tokenizer = AutoTokenizer.from_pretrained(plm)
+                model.save_pretrained(plm_path)
+                tokenizer.save_pretrained(plm_path)
             except:
                 log.info('download from huffingface failed')
         
@@ -294,7 +212,7 @@ class PLMBaseDataModule(pl.LightningModule):
             assert self.hparams.auto_length >0, 'max_length length  must > 0'
             max_length = self.hparams.auto_length
         max_length_ = min(512, max_length+2)
-        log.info(f'current max_length: {max_length_}')
+        log.info(f'current max token length: {max_length_}')
         self.hparams.max_length = max_length_
         return max_length_
     
