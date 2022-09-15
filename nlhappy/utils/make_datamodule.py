@@ -2,7 +2,7 @@ import os
 from .utils import get_logger
 from typing import List, Optional, Dict, Union
 from torch.utils.data import DataLoader
-from datasets import load_from_disk
+from datasets import load_from_disk, load_dataset
 import pytorch_lightning as pl
 from transformers import AutoConfig, AutoTokenizer, AutoModel
 from functools import lru_cache
@@ -22,35 +22,6 @@ def char_idx_to_token(char_idx, offset_mapping):
         if span[0] <= char_idx < span[1]:
             return index
     return -1
-                
-        
-def prepare_data_from_remote(dataset: str,
-                             plm: str,
-                             dataset_dir: str ='./datasets/',
-                             plm_dir: str = './plms/') -> None:
-        '''
-        下载数据集.这个方法只会在一个GPU上执行一次.
-        '''
-        dataset_path = os.path.join(dataset_dir, dataset)
-        plm_path = os.path.join(plm_dir, plm)
-        # 检测数据
-        if os.path.exists(dataset_path):
-            pass
-        else:
-            log.error('dataset not exists  in {}, please prepare your dataset'.format(dataset_path))
-            
-        if os.path.exists(plm_path):
-            pass 
-        else : 
-            log.info('cannot found plm in {}'.format(plm_path))
-            try:
-                log.info('start download plm from huffingface')
-                model = AutoModel.from_pretrained(plm)
-                tokenizer = AutoTokenizer.from_pretrained(plm)
-                model.save_pretrained(plm_path)
-                tokenizer.save_pretrained(plm_path)
-            except:
-                log.info('download from huffingface failed')
         
         
 def align_char_span(char_span_offset: tuple, 
@@ -133,6 +104,43 @@ def align_char_span_text_b(char_span_offset: tuple,
     return token_span_offset
 
 
+def prepare_data_from_huffingface(dataset: str,
+                             plm: str,
+                             dataset_dir: str ='./datasets/',
+                             plm_dir: str = './plms/') -> None:
+        '''
+        下载数据集.这个方法只会在一个GPU上执行一次.
+        '''
+        dataset_path = os.path.join(dataset_dir, dataset)
+        plm_path = os.path.join(plm_dir, plm)
+        # 检测数据
+        if os.path.exists(dataset_path):
+            pass
+        else:
+            log.info('cannot found dataset in {}.'.format(dataset_path))
+            try:
+                log.info(f'download dataset {dataset} from huffingface')
+                dataset = load_dataset(dataset)
+                dataset.save_to_disk(dataset_path)
+                log.info(f'download dataset succeed')
+            except:
+                log.error('download dataset failed')
+
+        if os.path.exists(plm_path):
+            pass 
+        else : 
+            log.info('cannot found plm in {}'.format(plm_path))
+            try:
+                log.info(f'download plm {plm} from huffingface')
+                model = AutoModel.from_pretrained(plm)
+                tokenizer = AutoTokenizer.from_pretrained(plm)
+                model.save_pretrained(plm_path)
+                tokenizer.save_pretrained(plm_path)
+                log.info(f'download dataset succeed')
+            except:
+                log.error('download plm failed')
+
+
 
 class PLMBaseDataModule(pl.LightningModule):
     """数据模块的基类,子类需要完成setup方法,子类初始化的时候至少包含dataset,plm,batch_size,auto_length参数,
@@ -159,10 +167,10 @@ class PLMBaseDataModule(pl.LightningModule):
     
     
     def prepare_data(self) -> None:
-        prepare_data_from_remote(dataset=self.hparams.dataset,
-                              plm=self.hparams.plm,
-                              dataset_dir=self.hparams.dataset_dir,
-                              plm_dir=self.hparams.plm_dir)
+        prepare_data_from_huffingface(dataset=self.hparams.dataset,
+                                      plm=self.hparams.plm,
+                                      dataset_dir=self.hparams.dataset_dir,
+                                      plm_dir=self.hparams.plm_dir)
     
     
     @property
