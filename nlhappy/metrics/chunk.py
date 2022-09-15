@@ -114,13 +114,3 @@ class ChunkF1(Metric):
 
     def compute(self):
         return 2 * self.correct / (self.all_pred + self.all_true)
-        
-
-
-
-
-
-
-
-
-
