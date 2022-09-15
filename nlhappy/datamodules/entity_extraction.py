@@ -18,6 +18,7 @@ class EntityExtractionDataModule(PLMBaseDataModule):
         super().__init__()
         self.transforms['w2ner'] = self.w2ner_transform
         self.transforms['globalpointer'] = self.gp_transform
+        assert self.hparams.transform in self.transforms.keys(), f'availabel transforms {list(self.transforms.keys())}'
 
 
     @staticmethod
