@@ -160,4 +160,6 @@ test.py
 **.sh
 corpus/
 **.ipynb
+# pdm
 .pdm.toml
+pdm.lock
