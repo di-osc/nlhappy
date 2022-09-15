@@ -59,7 +59,7 @@ class RelationExtractionDataModule(PLMBaseDataModule):
 
     
     @property
-    @lru_cache
+    @lru_cache()
     def label2id(self):
         labels = pd.Series(np.concatenate(self.train_df.triples.values)).apply(lambda x: x['predicate']).drop_duplicates().values
         label2id = {label: i for i, label in enumerate(labels)}
