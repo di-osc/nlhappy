@@ -4,7 +4,6 @@ from ...metrics.entity import Entity, EntityF1
 import torch.nn as nn
 import torch.nn.functional as F
 import torch
-from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from typing import List
 from collections import deque, defaultdict
 
@@ -103,16 +102,18 @@ class CoPredictor(nn.Module):
         z = self.dropout(self.mlp_rel(z))
         o2 = self.linear(z)
         return o1 + o2
-
+    
 
 class W2NERForEntityExtraction(PLMBaseModel):
     """w2ner 统一解决嵌套非连续实体, 模型复现
+    修改:
+        - 去除了lstm层
     reference: 
         - https://github.com/ljynlp/W2NER
     """
     def __init__(self,
                  lr: float,
-                 scheduler: str= 'linear_warmup_step',
+                 scheduler: str = 'linear_warmup_step',
                  weight_decay: float = 0.01,
                  conv_hidden_size: int = 96,
                  dilation: List[int] = [1,2,3],
@@ -122,17 +123,26 @@ class W2NERForEntityExtraction(PLMBaseModel):
                  dropout: float = 0.2,
                  ffnn_hidden_size: int = 288,
                  **kwargs):
+        """
+
+        Args:
+            lr (float): 学习率
+            scheduler (str, optional): 学习率调度器名称. Defaults to 'linear_warmup_step'.
+            weight_decay (float, optional): 权重衰减. Defaults to 0.01.
+            conv_hidden_size (int, optional): 卷积层维度. Defaults to 96.
+            dilation (List[int], optional): . Defaults to [1,2,3].
+            dist_emb_size (int, optional): 距离编码维度. Defaults to 20.
+            reg_emb_size (int, optional): 区域编码维度. Defaults to 20.
+            biaffine_size (int, optional): 放射变换维度. Defaults to 512.
+            dropout (float, optional): dropout比率. Defaults to 0.2.
+            ffnn_hidden_size (int, optional): . Defaults to 288.
+        """
+                
         super().__init__()
         self.plm = self.get_plm_architecture()
 
         self.distance_embeddings = nn.Embedding(20, self.hparams.dist_emb_size)
         self.region_embeddings = nn.Embedding(3, self.hparams.reg_emb_size)
-
-        # self.lstm = nn.LSTM(self.plm.config.hidden_size, 
-        #                        self.hparams.lstm_hidden_size, 
-        #                        num_layers=1, 
-        #                        batch_first=True,
-        #                        bidirectional=True)
 
         self.dropout = nn.Dropout(self.hparams.dropout)
 
@@ -162,10 +172,6 @@ class W2NERForEntityExtraction(PLMBaseModel):
         hiddens = self.plm(input_ids, token_type_ids, attention_mask, output_hidden_states=True).hidden_states
         hidden = torch.stack(hiddens[-4:], dim=-1).mean(-1) 
         hidden = self.dropout(hidden)
-        # 经过lstm -> b, l, h
-        # packed = pack_padded_sequence(hidden, attention_mask.sum(dim=-1), batch_first=True, enforce_sorted=False)
-        # packed, (_, _) = self.lstm(packed)
-        # hidden, _ = pad_packed_sequence(packed, batch_first=True, total_length=attention_mask)
         # 经过cln -> b, l, l, h
         cln = self.cln(hidden.unsqueeze(2), hidden)
         # 将distance, region 和 cln输出 拼接 -> b,l,l,h_concat
@@ -238,6 +244,8 @@ class W2NERForEntityExtraction(PLMBaseModel):
             preds = [Entity(label=l.item(), indexes=tuple(i)) for i,l in predicts]
             ents.append(set(preds))
         return ents
+
+
     def step(self, batch):
         input_ids = batch['input_ids']
         token_type_ids = batch['token_type_ids']
