@@ -1,5 +1,5 @@
 from torchmetrics import Metric 
-from typing import List, Set, Union
+from typing import List, Set, Union, Optional
 import torch
 from collections import namedtuple
 
@@ -26,6 +26,9 @@ class Event:
 class EventF1(Metric):
     """事件抽取评价指标
     """
+
+    full_state_update: Optional[bool] = False
+
     def __init__(self):
         super().__init__()
         self.add_state('correct', default=torch.tensor(0.0), dist_reduce_fx='sum')

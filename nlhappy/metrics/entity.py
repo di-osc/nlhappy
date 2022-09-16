@@ -1,12 +1,15 @@
 from torchmetrics import Metric
 import torch
-from typing import List, Set, Tuple
+from typing import List, Set, Tuple, Optional
 from collections import namedtuple
 
 Entity = namedtuple('Entity', ['label', 'indexes'])
 
 
 class EntityF1(Metric):
+    
+    full_state_update: Optional[bool] = False
+
     def __init__(self):
         super().__init__()
         self.add_state('correct', default=torch.tensor(0.0), dist_reduce_fx='sum')

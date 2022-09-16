@@ -1,6 +1,7 @@
 import os
 import torch
 from torchmetrics import Metric
+from typing import Optional
 
 def end_of_chunk(prev_tag, tag, prev_type, type_):
     """Checks if a chunk ended between the previous and current word.
@@ -98,8 +99,11 @@ def get_entities(seq):
 
 
 class ChunkF1(Metric):
-    def __init__(self, dist_sync_on_step=False):
-        super().__init__(dist_sync_on_step=dist_sync_on_step)
+
+    full_state_update: Optional[bool] = False
+    
+    def __init__(self):
+        super().__init__()
         self.add_state('correct', default=torch.tensor(0.0), dist_reduce_fx='sum')
         self.add_state('all_pred', default=torch.tensor(0.0), dist_reduce_fx='sum')
         self.add_state('all_true', default=torch.tensor(0.0), dist_reduce_fx='sum')

@@ -1,6 +1,6 @@
 from torchmetrics import Metric
 import torch
-from typing import Tuple, Set, List
+from typing import Tuple, Set, List, Optional
 
 class Triple(tuple):
     """存放三元组的五元形式(sub_start, sub_end, predicate, obj_start, obj_end), 这样改写方便求交集"""
@@ -44,8 +44,11 @@ class TripleF1(Metric):
     说明:
     - 输入为(subject_start, subject_end, predicate, object_start, object_end)
     """
-    def __init__(self, dist_sync_on_step=False):
-        super().__init__(dist_sync_on_step=dist_sync_on_step)
+
+    full_state_update: Optional[bool] = False
+
+    def __init__(self):
+        super().__init__()
         self.add_state('correct', default=torch.tensor(0.0), dist_reduce_fx='sum')
         self.add_state('all_pred', default=torch.tensor(0.0), dist_reduce_fx='sum')
         self.add_state('all_true', default=torch.tensor(0.0), dist_reduce_fx='sum')

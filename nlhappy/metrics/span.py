@@ -1,7 +1,7 @@
 from torch import Tensor
 from torchmetrics import Metric
 import torch
-from typing import List, Set 
+from typing import List, Set, Optional
 
 
 class SpanF1(Metric):
@@ -23,8 +23,11 @@ class SpanF1(Metric):
 
 
 class SpanOffsetF1(Metric):
-    def __init__(self, dist_sync_on_step=False):
-        super().__init__(dist_sync_on_step=dist_sync_on_step)
+
+    full_state_update: Optional[bool] = False
+
+    def __init__(self):
+        super().__init__()
         self.add_state('correct', default=torch.tensor(0.0), dist_reduce_fx='sum')
         self.add_state('all_pred', default=torch.tensor(0.0), dist_reduce_fx='sum')
         self.add_state('all_true', default=torch.tensor(0.0), dist_reduce_fx='sum')
