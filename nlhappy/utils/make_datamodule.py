@@ -155,6 +155,7 @@ class PLMBaseDataModule(pl.LightningModule):
     def __init__(self,
                  auto_length: Union[str, int] = 'max',
                  plm_dir: str = 'plms',
+                 plm_max_input_length: int = 512,
                  dataset_dir: str = 'datasets',
                  num_workers: int = 0,
                  pin_memory: bool = False,
@@ -205,8 +206,10 @@ class PLMBaseDataModule(pl.LightningModule):
     
         
     @lru_cache()
-    def get_max_length(self):
-        """根据auto_length参数自动获取最大token的长度
+    def get_max_length(self, set_to_hparams: bool = True):
+        """根据auto_length参数自动获取最大token的长度,并将其添加进hparams
+        Args:
+            set_to_hparam (bool): 调用该方法时自动设置为self.hparams.max_length,默认为True
 
         Returns:
             int: 最大token长度
@@ -219,9 +222,10 @@ class PLMBaseDataModule(pl.LightningModule):
         if type(self.hparams.auto_length) == int:
             assert self.hparams.auto_length >0, 'max_length length  must > 0'
             max_length = self.hparams.auto_length
-        max_length_ = min(512, max_length+2)
+        max_length_ = min(self.hparams.plm_max_input_length, max_length+2)
         log.info(f'current max token length: {max_length_}')
-        self.hparams.max_length = max_length_
+        if set_to_hparams:
+            self.hparams.max_length = max_length_
         return max_length_
     
     
