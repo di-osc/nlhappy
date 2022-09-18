@@ -2,7 +2,7 @@ from functools import lru_cache
 from typing import Dict, Union
 import os
 from transformers import AutoTokenizer, AutoConfig, AutoModel
-from transformers.optimization import get_linear_schedule_with_warmup, get_cosine_schedule_with_warmup, get_constant_schedule_with_warmup
+from transformers.optimization import get_linear_schedule_with_warmup, get_cosine_schedule_with_warmup
 from pytorch_lightning import LightningModule
 import torch
 from typing import Any
@@ -124,11 +124,12 @@ class PLMBaseModel(LightningModule):
     
     
     def get_one_epoch_steps(self):
-        if type(self.trainer.gpus) == int:
+        if type(self.trainer.num_devices) == int:
             steps_per_epoch = len(self.trainer.datamodule.train_dataloader()) // self.trainer.gpus
-        if type(self.trainer.gpus) == list:
+            return steps_per_epoch
+        if type(self.trainer.num_devices) == list:
             steps_per_epoch = len(self.trainer.datamodule.train_dataloader()) // len(self.trainer.gpus)
-        return steps_per_epoch
+            return steps_per_epoch
     
     
     def get_scheduler_config(self, optimizer, name: str):
