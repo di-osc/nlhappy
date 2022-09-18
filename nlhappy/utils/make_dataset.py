@@ -7,7 +7,6 @@ from tqdm import tqdm
 
 
 
-
 def train_val_split(dataset: Dataset, 
                     val_frac: float =0.1,
                     return_dataset_dict: bool =True) -> Union[Tuple[Dataset, Dataset], DatasetDict]:
@@ -208,12 +207,38 @@ def make_ee_dataset_from_doc(docs: List[Doc]):
         event_ls.append(events)
     ds = Dataset.from_dict({'text':text_ls, 'events':event_ls})
     return ds
-        
-            
-        
 
 
-    
-    
-    
-    
+def make_ene_dataset_from_doc(docs: List[Doc], 
+                              from_ent_or_span:str = 'ent',
+                              span_key: str = 'all'):
+    """制作entity extraction 格式的数据集,只能得到连续的实体
+
+    Args:
+        docs (List[Doc]): 含有ent标记的spacy文档
+        from_ent_or_span (str): 实体标记,ent为doc.ent,span为doc.spans,当为span时请确保span_key正确
+        span_key (str): doc.spans的主键,即doc.spans[span_key]
+
+    Returns:
+        ds (Dataset): 数据模块EntityExtraction格式的数据集
+    """
+    assert from_ent_or_span in ['ent', 'span'], 'only ent or span available'
+    text_ls = []
+    ent_ls = []
+    if from_ent_or_span == 'ent':
+        for doc in tqdm(docs):
+            text_ls.append(doc.text)
+            ents = []
+            for ent in doc.ents:
+                e = {'label': ent.label_,'indexes':[i for i in range(ent.start_char, ent.end_char)], 'text':ent.text}
+                ents.append(e)
+            ent_ls.append(ents)
+    elif from_ent_or_span == 'span':
+        for doc in tqdm(docs):
+            text_ls.append(doc.text)
+            ents = []
+            for span in doc.spans[span_key]:
+                e = {'label': span.label_, 'indexes':[i for i in range(span.start_char, span.end_char)], 'text':span.text}
+                ents.append(e)
+    ds = Dataset.from_dict({'text':text_ls, 'entities':ent_ls})
+    return ds  
