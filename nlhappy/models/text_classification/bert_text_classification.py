@@ -18,7 +18,6 @@ class BertTextClassification(PLMBaseModel):
                 dropout: float,
                 **kwargs):
         super(BertTextClassification, self).__init__()  
-        self.save_hyperparameters()
 
         # 模型架构
         self.bert = self.get_plm_architecture()
@@ -83,7 +82,7 @@ class BertTextClassification(PLMBaseModel):
             {'params': [p for n, p in self.classifier.named_parameters() if not any(nd in n for nd in no_decay)],
              'lr': self.hparams.lr *5, 'weight_decay': self.hparams.weight_decay},
             {'params': [p for n, p in self.classifier.named_parameters() if any(nd in n for nd in no_decay)],
-             'lr': self.hparams.lr * 5, 'weight_decay': 0.0}
+             'lr': self.hparams.lr *5, 'weight_decay': 0.0}
         ]
         optimizer = torch.optim.AdamW(grouped_parameters)
         scheduler_config = self.get_scheduler_config(optimizer, self.hparams.scheduler)
@@ -107,25 +106,3 @@ class BertTextClassification(PLMBaseModel):
             for i, v in enumerate(scores[0]):   # scores : [[0.1, 0.2, 0.3, 0.4]]
                 cats[self.hparams.id2label[i]] = v
         return sorted(cats.items(), key=lambda x: x[1], reverse=True)
-
-    
-    def to_onnx(self, file_path: str):
-        text = '我是中国人'
-        torch_inputs = self.tokenizer(text, return_tensors='pt')
-        dynamic_axes = {
-                    'input_ids': {0: 'batch', 1: 'seq'},
-                    'attention_mask': {0: 'batch', 1: 'seq'},
-                    'token_type_ids': {0: 'batch', 1: 'seq'},
-                }
-        with torch.no_grad():
-            torch.onnx.export(
-                model=self,
-                args=tuple(torch_inputs.values()), 
-                f=file_path, 
-                input_names=list(torch_inputs.keys()),
-                dynamic_axes=dynamic_axes, 
-                opset_version=14,
-                output_names=['logits'],
-                export_params=True)
-        print('export to onnx successfully')
-
