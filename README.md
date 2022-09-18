@@ -31,16 +31,6 @@ nlhappy是一款集成了数据处理,模型训练,文本处理流程构建等�
 # pip 安装
 pip install --upgrade pip
 pip install --upgrade nlhappy
-
-# 通过poetry打包然后安装
-# 首先将文件下载到本地
-# 通过pipx 安装poetry
-pip install -U pipx
-pipx install poetry
-pipx ensurepath 
-# 需要重新打开命令行
-poetry build
-# 安装包 在dist文件夹
 ```
 </details>
 
