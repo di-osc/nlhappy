@@ -35,9 +35,9 @@ pip install --upgrade nlhappy
 </details>
 
 <details>
-<summary><b>注册wandb</b></summary>
+<summary><b>其他可选</b></summary>
 
-> wandb(用于可视化训练日志)
+> 推荐安装wandb用于可视化训练日志
 - 注册: https://wandb.ai/
 - 获取认证: https://wandb.ai/authorize
 - 登陆:
@@ -87,41 +87,32 @@ dsd.save_to_disk('datasets/TNEWS')
 ```
 > 训练模型
 
-编写训练脚本,scripts/train.sh
-- 单卡
+- 编写训练脚本,scripts/train.sh
 ```
 nlhappy \
 datamodule=text_classification \
 datamodule.dataset=TNEWS \
-datamodule.plm=roberta-wwm-base \
-datamodule.max_length=150 \
+datamodule.plm=hfl/chinese-roberta-wwm-ext \
 datamodule.batch_size=32 \
 model=bert_tc \
 model.lr=3e-5 \
 seed=1234
-# 默认为0号显卡,可以下代码可以修改显卡
-# trainer.gpus=[1]
-```
-- 多卡
-```
-nlhappy \
-datamodule=text_classification \
-datamodule.dataset=TNEWS \
-datamodule.plm=roberta-wwm-base \
-datamodule.max_length=150 \
-datamodule.batch_size=32 \
-model=bert_tc \
-model.lr=3e-5 \
-trainer=ddp \
-trainer.gpus=4 \
-seed=123456
+# 默认为单gpu 0号显卡训练,可以通过以下方式修改显卡
+# trainer.devices=[1]
+# 单卡半精度训练
+# trainer.precision=16
+# 使用wandb记录日志
+# logger=wandb
+# 多卡训练
+# trainer=ddp trainer.devices=4
 ```
 
 - 后台训练
 ```
 nohup bash scripts/train.sh >/dev/null 2>&1 &
 ```
-- 现在可以去[wandb官网](https://wandb.ai/)查看训练详情了, 并且会自动产生logs目录里面包含了训练的ckpt,日志等信息.
+- 如果设置logger=wandb则现在可以去[wandb官网](https://wandb.ai/)查看训练详情了, 并且会自动产生logs目录里面包含了训练的ckpt,日志等信息.
+
 > 构建自然语言处理流程,并添加组件
 ```python
 import nlhappy
