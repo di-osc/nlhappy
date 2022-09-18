@@ -136,7 +136,7 @@ def prepare_data_from_huffingface(dataset: str,
                 tokenizer = AutoTokenizer.from_pretrained(plm)
                 model.save_pretrained(plm_path)
                 tokenizer.save_pretrained(plm_path)
-                log.info(f'download dataset succeed')
+                log.info(f'download plm succeed')
             except:
                 log.error('download plm failed')
 
