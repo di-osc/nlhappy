@@ -16,11 +16,7 @@ class TextClassificationDataModule(PLMBaseDataModule):
                 plm: str,
                 batch_size: int ,
                 transform: str = 'simple',
-                auto_length: str = 'max',
-                num_workers: int =0,
-                pin_memory: bool =False,
-                plm_dir: str ='./plms/',
-                dataset_dir: str ='./datasets/'): 
+                **kwargs):
         """单文本分类数据模块
 
         Args:
@@ -43,27 +39,23 @@ class TextClassificationDataModule(PLMBaseDataModule):
         self.hparams.max_length = self.get_max_length()
         self.hparams.label2id = self.label2id
         self.hparams.id2label = {i:l for l, i in self.label2id.items()}
-        self.dataset.set_transform(transform=self.simple_transform)
+        self.dataset.set_transform(transform=self.transforms.get(self.hparams.transform))
 
     
     def simple_transform(self, examples) -> Dict:
         batch_text = examples['text']
-        batch_inputs = {'input_ids':[], 'token_type_ids':[], 'attention_mask':[]}
         batch_label_ids = []
         max_length = self.hparams.max_length
+        batch_inputs = self.tokenizer(batch_text,
+                                      padding='max_length',
+                                      max_length=max_length,
+                                      truncation=True,
+                                      return_tensors='pt')
         for i, text in enumerate(batch_text):
-            inputs = self.tokenizer(text, 
-                                    padding='max_length',  
-                                    max_length=max_length,
-                                    truncation=True)
-            batch_inputs['input_ids'].append(inputs['input_ids'])
-            batch_inputs['token_type_ids'].append(inputs['token_type_ids'])
-            batch_inputs['attention_mask'].append(inputs['attention_mask'])
-            batch_label_ids.append(self.hparams['label2id'][examples['label'][i]])
-        batch_inputs['label_ids'] = batch_label_ids
-        batch = dict(zip(batch_inputs.keys(), map(torch.tensor, batch_inputs.values())))
-        
-        return batch
+            label_id = self.hparams['label2id'][examples['label'][i]]
+            batch_label_ids.append(label_id)
+        batch_inputs['label_ids'] = torch.LongTensor(batch_label_ids)        
+        return batch_inputs
 
 
     @property
