@@ -13,7 +13,7 @@ class EntityExtractionDataModule(PLMBaseDataModule):
                  dataset: str,
                  batch_size: int,
                  transform: str = 'w2ner',
-                 plm: str = 'roberta-wwm-base',
+                 plm: str = 'hfl/chinese-macbert-base',
                  **kwargs):
         super().__init__()
         self.transforms['w2ner'] = self.w2ner_transform
@@ -76,7 +76,6 @@ class EntityExtractionDataModule(PLMBaseDataModule):
         batch_dist_ids = np.zeros((batch_size, max_length, max_length), dtype=np.int)
         batch_dist = []
         batch_label_ids = []
-        # batch_dist_ids = []
         dis2idx = self.get_dis2idx()
         for i, text in enumerate(batch_text):
             mapping = batch_mappings[i]
@@ -119,33 +118,30 @@ class EntityExtractionDataModule(PLMBaseDataModule):
         batch_text = examples['text']
         batch_ents = examples['entities']
         max_length = self.get_max_length()
-        batch_inputs = {'input_ids':[],'token_type_ids':[],'attention_mask':[]}
+        batch_inputs = self.tokenizer(batch_text,
+                                      max_length=max_length,
+                                      padding='max_length',
+                                      truncation=True,
+                                      return_offsets_mapping=True,
+                                      add_special_tokens=False,
+                                      return_tensors='pt')
+        batch_mappings = batch_inputs.pop('offset_mapping').tolist()
         batch_label_ids = []
         for i, text in enumerate(batch_text):
-            inputs = self.tokenizer(text, 
-                                    padding='max_length',  
-                                    max_length=max_length,
-                                    truncation=True,
-                                    return_offsets_mapping=True)
             ents = batch_ents[i]
-            mapping = inputs['offset_mapping']
+            mapping = batch_mappings[i]
             label_ids = torch.zeros(len(self.hparams.label2id), max_length, max_length)
             for ent in ents :
-                # +1 是因为添加了 [CLS]
                 start = ent['indexes'][0]
                 start = char_idx_to_token(start, mapping)
                 end = ent['indexes'][-1] 
                 end = char_idx_to_token(end, mapping)
                 label_id = self.hparams.label2id[ent['label']]
                 label_ids[label_id,  start, end] = 1
-            batch_inputs['input_ids'].append(inputs['input_ids'])
-            batch_inputs['token_type_ids'].append(inputs['token_type_ids'])
-            batch_inputs['attention_mask'].append(inputs['attention_mask'])
             batch_label_ids.append(label_ids)
         batch_label_ids = torch.stack(batch_label_ids, dim=0)
-        batch = dict(zip(batch_inputs.keys(), map(torch.tensor, batch_inputs.values())))
-        batch['label_ids'] = batch_label_ids
-        return batch
+        batch_inputs['label_ids'] = batch_label_ids
+        return batch_inputs
 
 
     def setup(self, stage):
