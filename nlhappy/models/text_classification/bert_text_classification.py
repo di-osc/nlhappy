@@ -5,23 +5,27 @@ from ...layers import SimpleDense, MultiDropout
 from ...utils.make_model import PLMBaseModel
 from typing import List, Dict
 import torch.nn.functional as F
+from transformers import AutoModel
 
 class BertTextClassification(PLMBaseModel):
     '''
     文本分类模型
     '''
     def __init__(self, 
-                hidden_size: int ,
-                scheduler: str,
-                lr: float ,
-                weight_decay: float ,
-                dropout: float,
-                **kwargs):
+                 lr: float ,
+                 hidden_size: int = 256,
+                 scheduler: str = 'linear_warmup_step',
+                 weight_decay: float = 0.1,
+                 **kwargs):
         super(BertTextClassification, self).__init__()  
 
         # 模型架构
-        self.bert = self.get_plm_architecture()
-        self.classifier = SimpleDense(self.bert.config.hidden_size, hidden_size, len(self.hparams.label2id))
+        plm_config = self.get_plm_config()
+        plm_config.add_pooler_layer=True
+        self.bert = AutoModel.from_config(plm_config)
+        self.classifier = SimpleDense(input_size=self.bert.config.hidden_size, 
+                                      hidden_size=hidden_size, 
+                                      output_size=len(self.hparams.label2id))
         self.dropout = MultiDropout()
         
         # 损失函数
@@ -35,7 +39,7 @@ class BertTextClassification(PLMBaseModel):
 
     def forward(self, input_ids, token_type_ids, attention_mask):
         x = self.bert(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask)
-        x = x.last_hidden_state[:, 0]
+        x = x.pooler_output
         x = self.dropout(x)
         logits = self.classifier(x)  # (batch_size, output_size)
         return logits
