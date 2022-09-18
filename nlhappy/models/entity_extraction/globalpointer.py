@@ -8,16 +8,15 @@ from ...tricks.adversarial_training import adversical_tricks
 
 class GlobalPointerForEntityExtraction(PLMBaseModel):
     def __init__(self,
+                 hidden_size: int,
                  lr: float,
                  scheduler: str = 'linear_warmup_step',
-                 hidden_size: int = 64,
                  weight_decay: float = 0.01,
                  dropout: float = 0.2,
                  adv: str = None,
                  threshold: float = 0.0,
                  **kwargs) : 
         super().__init__()
-
         ## 手动optimizer 可参考https://pytorch-lightning.readthedocs.io/en/stable/common/optimizers.html#manual-optimization
         self.automatic_optimization = False    
 
@@ -33,6 +32,7 @@ class GlobalPointerForEntityExtraction(PLMBaseModel):
         self.train_metric = SpanF1()
         self.val_metric = SpanF1()
         self.test_metric = SpanF1()
+
 
     def forward(self, input_ids, token_type_ids, attention_mask=None):
         x = self.bert(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask).last_hidden_state
