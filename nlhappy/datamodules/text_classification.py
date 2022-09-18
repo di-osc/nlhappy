@@ -61,9 +61,14 @@ class TextClassificationDataModule(PLMBaseDataModule):
     @property
     @lru_cache()
     def label2id(self):
-        labels = set(self.train_df.label.values)
+        labels = sorted(set(self.train_df.label.values))
         label2id = {l : i for i,l in enumerate(labels)}
         return label2id
+
+
+    @property
+    def id2label(self):
+        return {i:l for l,i in enumerate(self.label2id)}
 
         
     @staticmethod
