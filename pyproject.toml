@@ -9,7 +9,7 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.7"
 torch = ">=1.11.0"
-pytorch-lightning = ">=1.7.1"
+pytorch-lightning = "1.6.3"
 datasets = ">=2.0.0"
 transformers = ">=4.17.0"
 hydra-core = ">=1.1.1"
