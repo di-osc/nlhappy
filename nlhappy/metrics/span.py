@@ -5,6 +5,9 @@ from typing import List, Set, Optional
 
 
 class SpanF1(Metric):
+
+    full_state_update: Optional[bool] = False
+
     """计算span矩阵的F1"""
     def __init__(self):
         super().__init__()
