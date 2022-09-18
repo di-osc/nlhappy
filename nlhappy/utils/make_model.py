@@ -87,7 +87,15 @@ class PLMBaseModel(LightningModule):
         elif 'plm' in keys and 'plm_dir' in keys:
             plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
             return AutoTokenizer.from_pretrained(plm_path)
-    
+
+
+    def get_plm_config(self):
+        if 'trf_config' in self.hparams.keys():
+            return get_hf_config_object(self.hparams.trf_config)
+        elif 'plm' in self.hparams.keys() and 'plm_dir' in self.hparams.keys():
+            plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
+            plm_config = AutoConfig.from_pretrained(plm_path)    
+            return plm_config
     
     def get_plm_architecture(self):
         if 'trf_config' in self.hparams.keys():
