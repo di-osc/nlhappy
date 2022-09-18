@@ -243,6 +243,3 @@ class RelationExtractionDataModule(PLMBaseDataModule):
                 'triples': [{'object': {'offset': [0, 2], 'text': '小明'},
                              'predicate': '朋友',
                              'subject': {'offset': [3, 5], 'text': '小花'}}]}
-                
-                    
-                
