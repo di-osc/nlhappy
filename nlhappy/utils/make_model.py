@@ -132,11 +132,12 @@ class PLMBaseModel(LightningModule):
     
     
     def get_one_epoch_steps(self):
-        if type(self.trainer.num_devices) == int:
-            steps_per_epoch = len(self.trainer.datamodule.train_dataloader()) // self.trainer.gpus
+        devices = self.trainer.num_devices
+        if type(devices) == int:
+            steps_per_epoch = len(self.trainer.datamodule.train_dataloader()) // devices
             return steps_per_epoch
-        if type(self.trainer.num_devices) == list:
-            steps_per_epoch = len(self.trainer.datamodule.train_dataloader()) // len(self.trainer.gpus)
+        if type(devices) == list:
+            steps_per_epoch = len(self.trainer.datamodule.train_dataloader()) // len(devices)
             return steps_per_epoch
     
     

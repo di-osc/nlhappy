@@ -119,7 +119,7 @@ class EventExtractionDataModule(PLMBaseDataModule):
 
 
     @staticmethod
-    def show_one_sample():
+    def show_one_example():
         return {'text':'半年前，患者开始出现持续性头疼',
                 'events':[{'label':'临床事件', 'roles':[{'label':'主体词', 'offset':(14,16), 'text':'头疼'},
                                                        {'label':'描述词', 'offset':(10,13), 'text':'持续性'}]}]}

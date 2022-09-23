@@ -245,10 +245,6 @@ class PLMBaseDataModule(pl.LightningModule):
     @lru_cache()
     def test_df(self):
         return self.dataset['test'].to_pandas()
-
-
-    def show_one_sample(self) -> Dict:
-        raise NotImplementedError
     
     
     def train_dataloader(self):

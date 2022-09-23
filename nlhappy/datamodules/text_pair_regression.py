@@ -1,12 +1,8 @@
 import torch
-import pytorch_lightning as pl
-from typing import List
 from transformers import AutoConfig, AutoTokenizer
-from torch.utils.data import DataLoader
 from datasets import load_from_disk
 import os
 from ..utils.make_datamodule import PLMBaseDataModule
-
 
 
 class TextPairRegressionDataModule(PLMBaseDataModule):

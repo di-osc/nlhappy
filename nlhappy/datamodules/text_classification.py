@@ -13,9 +13,9 @@ class TextClassificationDataModule(PLMBaseDataModule):
     '''
     def __init__(self,
                 dataset: str,
-                plm: str,
                 batch_size: int ,
-                transform: str = 'simple',
+                plm: str = 'hfl/chinese-roberta-wwm-ext',
+                transform: str = 'bert',
                 **kwargs):
         """单文本分类数据模块
 
@@ -31,18 +31,18 @@ class TextClassificationDataModule(PLMBaseDataModule):
         """
         
         super().__init__()        
-        self.transforms = {'simple': self.simple_transform}
+        self.transforms = {'bert': self.bert_transform}
         assert self.hparams.transform in self.transforms.keys(), f'availabel models for text classification dm: {self.transforms.keys()}'
         
         
-    def setup(self, stage: str) -> None:
+    def setup(self, stage: str = 'fit') -> None:
         self.hparams.max_length = self.get_max_length()
         self.hparams.label2id = self.label2id
         self.hparams.id2label = {i:l for l, i in self.label2id.items()}
         self.dataset.set_transform(transform=self.transforms.get(self.hparams.transform))
 
     
-    def simple_transform(self, examples) -> Dict:
+    def bert_transform(self, examples) -> Dict:
         batch_text = examples['text']
         batch_label_ids = []
         max_length = self.hparams.max_length
@@ -71,7 +71,12 @@ class TextClassificationDataModule(PLMBaseDataModule):
         return {i:l for l,i in enumerate(self.label2id)}
 
         
-    @staticmethod
-    def show_one_sample():
+    @classmethod
+    def show_one_example(cls):
         return {'label': '新闻', 'text': '怎么给这个图片添加超级链接呢？'}
+    
+    
+    @classmethod
+    def get_available_transforms(cls):
+        return ['bert']
         

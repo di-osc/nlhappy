@@ -18,14 +18,11 @@ class RelationExtractionDataModule(PLMBaseDataModule):
         """
     def __init__(self, 
                  dataset: str, 
-                 plm: str,
-                 transform: str, 
                  batch_size: int ,
+                 plm: str = 'hfl/chinese-roberta-wwm-ext',
+                 transform: str = 'gplinker',
                  auto_length: Union[int, str] = 'max',
-                 num_workers: int = 0,
-                 pin_memory: bool = False,
-                 dataset_dir: str ='datasets',
-                 plm_dir: str = 'plms'):
+                 **kwargs):
         """
         Args:
             dataset (str): 数据集名称
@@ -237,8 +234,8 @@ class RelationExtractionDataModule(PLMBaseDataModule):
         
 
     
-    @staticmethod
-    def get_one_example():
+    @classmethod
+    def show_one_example(cls):
         return {'text':'小明是小花的朋友',
                 'triples': [{'object': {'offset': [0, 2], 'text': '小明'},
                              'predicate': '朋友',

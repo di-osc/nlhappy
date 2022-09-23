@@ -8,11 +8,14 @@ import torch
 class EntityExtractionDataModule(PLMBaseDataModule):
     """实体抽取数据模块
     可以解决嵌套实体和非连续实体
+    globalpointer: 可以解决嵌套实体问题,不能解决非连续问题
+    w2ner: 可以解决非连续喝嵌套问题
     """
+        
     def __init__(self,
                  dataset: str,
                  batch_size: int,
-                 transform: str = 'w2ner',
+                 transform: str = 'globalpointer',
                  plm: str = 'hfl/chinese-macbert-base',
                  **kwargs):
         super().__init__()
@@ -21,9 +24,14 @@ class EntityExtractionDataModule(PLMBaseDataModule):
         assert self.hparams.transform in self.transforms.keys(), f'availabel transforms {list(self.transforms.keys())}'
 
 
-    @staticmethod
-    def show_one_sample(self):
+    @classmethod
+    def show_one_example(cls):
         return '{"text":"这是一个长颈鹿","entities":[{"indexes":[4,5,6],"label":"动物", "text":"长颈鹿"}]}'
+    
+    
+    @classmethod
+    def get_available_transforms(cls):
+        return ['w2ner', 'globalpointer']
 
 
     @property
