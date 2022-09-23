@@ -5,7 +5,7 @@ plm_dir: ${plm_dir}
 dataset: 
 auto_length: max
 batch_size: 
-plm: roberta-wwm-base
+plm: hfl/chinese-roberta-wwm-ext
 transform: prompt_gplinker
 pin_memory: False
 num_workers: 0

@@ -5,7 +5,8 @@ plm_dir: ${plm_dir}
 
 dataset: 
 batch_size: 
-transform: w2ner
-plm: roberta-wwm-base
+transform: globalpointer
+plm: hfl/chinese-roberta-wwm-ext
+auto_length: max
 pin_memory: False
 num_workers: 0

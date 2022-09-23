@@ -3,8 +3,8 @@ dataset_dir: ${dataset_dir}
 plm_dir: ${plm_dir}
 
 dataset: 
-plm: 
-max_length: 
+plm: hfl/chinese-roberta-wwm-ext
+auto_length: max
 batch_size: 
 return_pair: False
 num_workers: 0

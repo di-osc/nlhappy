@@ -6,7 +6,7 @@ plm_dir: ${plm_dir}
 dataset: 
 max_length: 
 batch_size: 
-plm: chinese-roberta-wwm-ext
+plm: hfl/chinese-roberta-wwm-ext
 pin_memory: False
 num_workers: 0
 

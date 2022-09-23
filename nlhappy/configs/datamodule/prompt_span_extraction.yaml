@@ -4,7 +4,7 @@ plm_dir: ${plm_dir}
 
 
 dataset: 
-plm: 
+plm: hfl/chinese-roberta-wwm-ext
 batch_size: 
 max_length: -1
 transform: global_span
