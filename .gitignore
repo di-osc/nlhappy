@@ -153,6 +153,7 @@ wandb/
 # test
 test.ipynb 
 datasets/
+assets/
 plms/
 .nohup.out
 scripts/
