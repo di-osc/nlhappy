@@ -61,7 +61,7 @@ def train_val_test_split(dataset: Dataset,
         return DatasetDict({'train': train_ds, 'validation': val_ds, 'test': test_ds})
         
 
-def make_text_match_dataset_with_bm25(corpus: List[str],
+def get_text_match_dataset_with_bm25(corpus: List[str],
                                       synonym_dict: Dict[str, set],
                                       num_positive_samples: int=10,
                                       num_negative_samples: int=20,
@@ -124,7 +124,7 @@ def make_text_match_dataset_with_bm25(corpus: List[str],
         return ds, bm25
     
 
-def make_re_dataset_from_docs(docs: List[Doc], 
+def get_re_dataset_from_docs(docs: List[Doc], 
                               prompt_type: bool=False,
                               num_negative: int = 2): 
     """将doc._.relations 转换为relation extraction任务数据
@@ -189,7 +189,7 @@ def make_re_dataset_from_docs(docs: List[Doc],
         return ds
 
 
-def make_ee_dataset_from_doc(docs: List[Doc]):
+def get_event_extraction_ds_from_doc(docs: List[Doc]):
     text_ls = []
     event_ls = []
     for doc in tqdm(docs):
@@ -209,7 +209,7 @@ def make_ee_dataset_from_doc(docs: List[Doc]):
     return ds
 
 
-def make_ene_dataset_from_doc(docs: List[Doc], 
+def get_entity_extraction_ds_from_doc(docs: List[Doc], 
                               from_ent_or_span:str = 'ent',
                               span_key: str = 'all'):
     """制作entity extraction 格式的数据集,只能得到连续的实体
@@ -242,3 +242,16 @@ def make_ene_dataset_from_doc(docs: List[Doc],
                 ents.append(e)
     ds = Dataset.from_dict({'text':text_ls, 'entities':ent_ls})
     return ds  
+
+
+def get_text_classification_ds_from_dict(data: Dict[str,List]) -> Dataset:
+    """文本分类数据集
+
+    Args:
+        data (Dict[str,List]): 文本分类格式的字典数据 
+    Example:
+        {'text':['今天天气真好!','北京天安门在哪?'], 'label':['天气','地点']}
+    Returns:
+        Dataset: 数据集对象
+    """
+    pass
