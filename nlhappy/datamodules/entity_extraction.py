@@ -1,5 +1,5 @@
 from functools import lru_cache
-from ..utils.make_datamodule import PLMBaseDataModule, char_idx_to_token
+from ..utils.datamodule import PLMBaseDataModule, char_idx_to_token
 import pandas as pd
 import numpy as np
 import torch

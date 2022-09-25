@@ -1,12 +1,9 @@
-import imp
-import pytorch_lightning as pl
 from typing import Any
-from ..utils.make_datamodule import OSSStorer
 from torch.utils.data import DataLoader
 from datasets import load_from_disk
-import os
+from ..utils.datamodule import PLMBaseDataModule
 
-class TextMultiClassification(pl.LightningModule):
+class TextMultiClassification(PLMBaseDataModule):
     """多标签多分类的数据模块, 每个标签下有多重选择的情况"""
     def __init__(self,
                 dataset: str,
@@ -33,12 +30,6 @@ class TextMultiClassification(pl.LightningModule):
         self.save_hyperparameters()
 
 
-    def prepare_data(self) -> None:
-        '下载数据集和预训练模型'
-        oss = OSSStorer()
-        oss.download_dataset(self.hparams.dataset, self.hparams.data_dir)
-        oss.download_plm(self.hparams.plm, self.hparams.plm_dir)
-
     def transform(self, batch):
         raise NotImplementedError
 
@@ -49,30 +40,3 @@ class TextMultiClassification(pl.LightningModule):
     @property
     def dataset(self):
         return load_from_disk(self.hparams.data_dir + self.hparams.dataset)
-    
-
-
-    def train_dataloader(self):
-        return DataLoader(dataset=self.dataset['train'], 
-                          batch_size=self.hparams.batch_size, 
-                          shuffle=True,
-                          pin_memory=self.hparams.pin_memory,
-                          num_workers=self.hparams.num_workers)
-                          
-
-
-    def val_dataloader(self):
-        return DataLoader(dataset=self.dataset['validation'],
-                          batch_size=self.hparams.batch_size,
-                          shuffle=False,
-                          pin_memory=self.hparams.pin_memory,
-                          num_workers=self.hparams.num_workers)
-
-
-
-    def test_dataloader(self):
-        return DataLoader(dataset=self.dataset['test'],
-                            batch_size=self.hparams.batch_size,
-                            shuffle=False,
-                            pin_memory=self.hparams.pin_memory,
-                            num_workers=self.hparams.num_workers)

@@ -1,7 +1,7 @@
 from functools import lru_cache
 import pytorch_lightning as pl
 from typing import Optional,  Tuple, List, Union
-from ..utils.make_datamodule import PLMBaseDataModule
+from ..utils.datamodule import PLMBaseDataModule
 import torch
 import os
 

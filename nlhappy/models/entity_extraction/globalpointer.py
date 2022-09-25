@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch
 from ...metrics.span import SpanF1
-from ...utils.make_model import PLMBaseModel, align_token_span
+from ...utils.model import PLMBaseModel, align_token_span
 from ...layers import MultiLabelCategoricalCrossEntropy, EfficientGlobalPointer, MultiDropout
 from ...tricks.adversarial_training import adversical_tricks
 
@@ -12,7 +12,6 @@ class GlobalPointerForEntityExtraction(PLMBaseModel):
                  lr: float,
                  scheduler: str = 'linear_warmup_step',
                  weight_decay: float = 0.01,
-                 dropout: float = 0.2,
                  adv: str = None,
                  threshold: float = 0.0,
                  **kwargs) : 

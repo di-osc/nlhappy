@@ -1,4 +1,4 @@
-from ...utils.make_model import PLMBaseModel
+from ...utils.model import PLMBaseModel
 from ...layers import LayerNorm, Biaffine
 from ...metrics.entity import Entity, EntityF1
 import torch.nn as nn

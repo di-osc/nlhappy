@@ -1,4 +1,4 @@
-from ...utils.make_model import PLMBaseModel, align_token_span
+from ...utils.model import PLMBaseModel, align_token_span
 from ...layers.dropout import MultiDropout
 from ...metrics.triple import TripleF1, Triple
 import torch.nn as nn

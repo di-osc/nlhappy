@@ -1,5 +1,5 @@
 from functools import lru_cache
-from ..utils.make_datamodule import char_idx_to_token, get_logger, PLMBaseDataModule
+from ..utils.datamodule import char_idx_to_token, get_logger, PLMBaseDataModule
 import torch
 from typing import Dict, List, Optional, Union
 import numpy as np

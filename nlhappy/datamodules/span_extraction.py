@@ -1,4 +1,4 @@
-from ..utils.make_datamodule import PLMBaseDataModule, char_idx_to_token
+from ..utils.datamodule import PLMBaseDataModule, char_idx_to_token
 import torch
 from functools import lru_cache
 

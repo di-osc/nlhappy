@@ -1,4 +1,4 @@
-from ..utils.make_datamodule import PLMBaseDataModule, get_logger, char_idx_to_token
+from ..utils.datamodule import PLMBaseDataModule, get_logger, char_idx_to_token
 from functools import lru_cache
 import torch
 import pandas as pd

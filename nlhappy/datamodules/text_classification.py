@@ -1,6 +1,6 @@
 from functools import lru_cache
 from typing import Tuple, List, Dict
-from ..utils.make_datamodule import PLMBaseDataModule
+from ..utils.datamodule import PLMBaseDataModule
 from ..utils import utils
 import torch
 

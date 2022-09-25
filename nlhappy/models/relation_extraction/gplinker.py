@@ -5,7 +5,7 @@ from ...metrics.triple import TripleF1, Triple
 import torch
 from torch import Tensor
 from typing import List, Set
-from ...utils.make_model import align_token_span, PLMBaseModel
+from ...utils.model import align_token_span, PLMBaseModel
 
 
 
