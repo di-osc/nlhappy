@@ -242,16 +242,3 @@ def get_entity_extraction_ds_from_doc(docs: List[Doc],
                 ents.append(e)
     ds = Dataset.from_dict({'text':text_ls, 'entities':ent_ls})
     return ds  
-
-
-def get_text_classification_ds_from_dict(data: Dict[str,List]) -> Dataset:
-    """文本分类数据集
-
-    Args:
-        data (Dict[str,List]): 文本分类格式的字典数据 
-    Example:
-        {'text':['今天天气真好!','北京天安门在哪?'], 'label':['天气','地点']}
-    Returns:
-        Dataset: 数据集对象
-    """
-    pass
