@@ -1,8 +1,0 @@
-_target_: nlhappy.models.GlobalPointer
-
-lr: 3e-5 
-dropout: 0.2
-hidden_size: 256 
-weight_decay: 0.0
-adv: ''
-
