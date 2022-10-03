@@ -32,7 +32,7 @@ class TextClassificationDataModule(PLMBaseDataModule):
         
         super().__init__()        
         self.transforms = {'bert': self.bert_transform}
-        assert self.hparams.transform in self.transforms.keys(), f'availabel models for text classification dm: {self.transforms.keys()}'
+        assert self.hparams.transform in self.transforms.keys(), f'available models for text classification dm: {self.transforms.keys()}'
         
         
     def setup(self, stage: str = 'fit') -> None:
@@ -72,7 +72,7 @@ class TextClassificationDataModule(PLMBaseDataModule):
 
         
     @classmethod
-    def show_one_example(cls):
+    def get_one_example(cls):
         return {'label': '新闻', 'text': '怎么给这个图片添加超级链接呢？'}
     
     

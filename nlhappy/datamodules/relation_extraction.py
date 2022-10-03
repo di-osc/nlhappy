@@ -233,9 +233,8 @@ class RelationExtractionDataModule(PLMBaseDataModule):
         return batch
         
 
-    
     @classmethod
-    def show_one_example(cls):
+    def get_one_example(cls):
         return {'text':'小明是小花的朋友',
                 'triples': [{'object': {'offset': [0, 2], 'text': '小明'},
                              'predicate': '朋友',

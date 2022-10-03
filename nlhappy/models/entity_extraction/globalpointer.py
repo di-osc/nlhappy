@@ -4,15 +4,21 @@ from ...metrics.span import SpanF1
 from ...utils.model import PLMBaseModel, align_token_span
 from ...layers import MultiLabelCategoricalCrossEntropy, EfficientGlobalPointer, MultiDropout
 from ...tricks.adversarial_training import adversical_tricks
+from typing import Optional
 
 
 class GlobalPointerForEntityExtraction(PLMBaseModel):
+    """基于globalpointer的实体识别模型,可以统一处理嵌套和非嵌套模型
+
+    参考:
+        - https://kexue.fm/archives/8373
+    """
     def __init__(self,
                  hidden_size: int,
                  lr: float,
                  scheduler: str = 'linear_warmup_step',
                  weight_decay: float = 0.01,
-                 adv: str = None,
+                 adv: Optional[str] = None,
                  threshold: float = 0.0,
                  **kwargs) : 
         super().__init__()
@@ -62,13 +68,13 @@ class GlobalPointerForEntityExtraction(PLMBaseModel):
         scheduler = self.lr_schedulers()
         loss, pred, true = self.shared_step(batch)
         self.manual_backward(loss)
-        if self.hparams.adv == 'FGM':
+        if self.hparams.adv == 'fgm':
             self.adv.attack()
             loss_adv,  _,  _ = self.shared_step(batch)
             self.manual_backward(loss_adv)
             self.adv.restore()
             self.log_dict({'train_loss': loss, 'adv_loss': loss_adv}, prog_bar=True)
-        elif self.hparams.adv == "PGD":
+        elif self.hparams.adv == "pgd":
             self.adv.backup_grad()
             K=3
             for t in range(K):

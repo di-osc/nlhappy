@@ -25,7 +25,7 @@ class EntityExtractionDataModule(PLMBaseDataModule):
 
 
     @classmethod
-    def show_one_example(cls):
+    def get_one_example(cls):
         return '{"text":"这是一个长颈鹿","entities":[{"indexes":[4,5,6],"label":"动物", "text":"长颈鹿"}]}'
     
     
@@ -152,7 +152,7 @@ class EntityExtractionDataModule(PLMBaseDataModule):
         return batch_inputs
 
 
-    def setup(self, stage):
+    def setup(self, stage: str = 'fit'):
         self.hparams.max_length = self.get_max_length()
         if self.hparams.transform == 'w2ner':
             labels = list(self.label2id.keys())
@@ -165,5 +165,4 @@ class EntityExtractionDataModule(PLMBaseDataModule):
         else:
             self.hparams.label2id = self.label2id
             self.hparams.id2label = self.id2label
-        self.dataset.set_transform(self.transforms.get(self.hparams.transform))
-        
+        self.dataset.set_transform(self.transforms.get(self.hparams.transform))    

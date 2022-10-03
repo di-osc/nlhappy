@@ -1,4 +1,3 @@
-import os
 import torch
 from torchmetrics import Metric
 from typing import Optional
