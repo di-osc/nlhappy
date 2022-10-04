@@ -1,7 +1,7 @@
 from typing import Any
 from torch.utils.data import DataLoader
 from datasets import load_from_disk
-from ..utils.datamodule import PLMBaseDataModule
+from ..utils.make_datamodule import PLMBaseDataModule
 
 class TextMultiClassification(PLMBaseDataModule):
     """多标签多分类的数据模块, 每个标签下有多重选择的情况"""

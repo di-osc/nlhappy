@@ -1,4 +1,4 @@
-from ..utils.datamodule import align_char_span_text_b, PLMBaseDataModule
+from ..utils.make_datamodule import align_char_span_text_b, PLMBaseDataModule
 import torch
 from typing import Dict, Union
 import logging

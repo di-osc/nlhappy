@@ -1,6 +1,6 @@
 from functools import lru_cache
 import torch
-from ..utils.datamodule import PLMBaseDataModule
+from ..utils.make_datamodule import PLMBaseDataModule
 
 
 class TokenClassificationDataModule(PLMBaseDataModule):

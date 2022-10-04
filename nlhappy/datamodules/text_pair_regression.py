@@ -2,7 +2,7 @@ import torch
 from transformers import AutoConfig, AutoTokenizer
 from datasets import load_from_disk
 import os
-from ..utils.datamodule import PLMBaseDataModule
+from ..utils.make_datamodule import PLMBaseDataModule
 
 
 class TextPairRegressionDataModule(PLMBaseDataModule):
