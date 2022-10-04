@@ -1,4 +1,4 @@
-from ...utils.model import PLMBaseModel
+from ...utils.make_model import PLMBaseModel
 from ...layers.classifier import EfficientGlobalPointer
 from ...layers.loss import MultiLabelCategoricalCrossEntropy
 from ...layers.dropout import MultiDropout

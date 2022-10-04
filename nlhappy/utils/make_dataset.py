@@ -6,7 +6,6 @@ import random
 from tqdm import tqdm
 
 
-
 def train_val_split(dataset: Dataset, 
                     val_frac: float =0.1,
                     return_dataset_dict: bool =True) -> Union[Tuple[Dataset, Dataset], DatasetDict]:
@@ -30,6 +29,7 @@ def train_val_split(dataset: Dataset,
         return train_ds, val_ds
     else:
         return DatasetDict({'train': train_ds, 'validation': val_ds})
+
 
 def train_val_test_split(dataset: Dataset,
                          val_frac: float =0.1,
@@ -62,19 +62,19 @@ def train_val_test_split(dataset: Dataset,
         
 
 def get_text_match_dataset_with_bm25(corpus: List[str],
-                                      synonym_dict: Dict[str, set],
-                                      num_positive_samples: int=10,
-                                      num_negative_samples: int=20,
-                                      recall_topk: int = 1000,
-                                      reverse_sample: bool = False,
-                                      positive_label: str = '1',
-                                      negative_label: str='0',
-                                      tokenizer = None,
-                                      k1: float = 1.5,
-                                      b: float=0.75,
-                                      epsilon: float=0.25,
-                                      is_retrain_docs=True,
-                                      return_bm25: bool = False):
+                                     synonym_dict: Dict[str, set],
+                                     num_positive_samples: int=10,
+                                     num_negative_samples: int=20,
+                                     recall_topk: int = 1000,
+                                     reverse_sample: bool = False,
+                                     positive_label: str = '1',
+                                     negative_label: str='0',
+                                     tokenizer = None,
+                                     k1: float = 1.5,
+                                     b: float=0.75,
+                                     epsilon: float=0.25,
+                                     is_retrain_docs=True,
+                                     return_bm25: bool = False):
     """制作文本匹配二分类数据集, 此数据集适用于text_pair_classification任务
 
     Args:
@@ -124,9 +124,9 @@ def get_text_match_dataset_with_bm25(corpus: List[str],
         return ds, bm25
     
 
-def get_re_dataset_from_docs(docs: List[Doc], 
-                              prompt_type: bool=False,
-                              num_negative: int = 2): 
+def get_relation_extraction_dataset_from_docs(docs: List[Doc], 
+                                              prompt_type: bool=False,
+                                              num_negative: int = 2): 
     """将doc._.relations 转换为relation extraction任务数据
 
     Args:
@@ -210,8 +210,8 @@ def get_event_extraction_ds_from_doc(docs: List[Doc]):
 
 
 def get_entity_extraction_ds_from_doc(docs: List[Doc], 
-                              from_ent_or_span:str = 'ent',
-                              span_key: str = 'all'):
+                                      from_ent_or_span:str = 'ent',
+                                      span_key: str = 'all'):
     """制作entity extraction 格式的数据集,只能得到连续的实体
 
     Args:

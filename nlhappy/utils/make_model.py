@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import Dict, Union
+from typing import Dict, Tuple, Union, List
 import os
 from transformers import AutoTokenizer, AutoConfig, AutoModel
 from transformers.optimization import get_linear_schedule_with_warmup, get_cosine_schedule_with_warmup
@@ -45,7 +45,7 @@ def get_hf_config_object(config: Union[DictConfig , Dict]):
 
     
 
-def align_token_span(token_span_offset, token_offset_mapping):
+def align_token_span(token_span_offset: Tuple, token_offset_mapping: List[Tuple]) -> Tuple:
     '''将词符级别的下标对齐为字符级别的下标
     参数
     - token_span_offset: 例如(0, 1) 下标指的是字符的下标
@@ -66,14 +66,19 @@ def align_token_span(token_span_offset, token_offset_mapping):
     
     
 class PLMBaseModel(LightningModule):
-    """基于预训练语音模型的基类
-    内置功能:
-    - 
+    """基于预训练语音模型的基类,在继承类的时候需要传入plm和plm_dir
+    
+    - 内置了scheduler,可以通过cls.scheduler_names查看所有的scheduler,通过self.get_scheduler_config方法得到pl的scheduler config
+    - 通过self.tokenizer直接调用tokenizer
+    - 通过self.get_plm_architecture可以得到预训练模型的架构,主要并没有加载预训练参数
     """
+    
+    scheduler_names = ['linear_warmup_step', 'cosine_warmup_step', 'harmonic_epoch']
     
     def __init__(self) -> None:
         super().__init__()
         self.save_hyperparameters()
+        assert 'plm' in self.hparams and 'plm_dir' in self.hparams, 'you have to at least pass in plm and plm_dir'
         if 'label2id' not in self.hparams and 'id2label' in self.hparams:
             self.hparams.label2id = {l:i for i,l in self.hparams.id2label.items()}
         
@@ -96,6 +101,7 @@ class PLMBaseModel(LightningModule):
             plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
             plm_config = AutoConfig.from_pretrained(plm_path)    
             return plm_config
+    
     
     def get_plm_architecture(self):
         if 'trf_config' in self.hparams.keys():
@@ -131,6 +137,16 @@ class PLMBaseModel(LightningModule):
         return scheduler_config
     
     
+    @property
+    def epoch_schedulers(self):
+        return [scheduler for scheduler in self.scheduler_names if scheduler.endswith('epoch')]
+
+
+    @property
+    def step_schedulers(self):
+        return [scheduler for scheduler in self.scheduler_names if scheduler.endswith('step')]
+    
+    
     def get_one_epoch_steps(self):
         devices = self.trainer.num_devices
         if type(devices) == int:
@@ -139,7 +155,7 @@ class PLMBaseModel(LightningModule):
         if type(devices) == list:
             steps_per_epoch = len(self.trainer.datamodule.train_dataloader()) // len(devices)
             return steps_per_epoch
-    
+        
     
     def get_scheduler_config(self, optimizer, name: str):
         """
@@ -151,10 +167,10 @@ class PLMBaseModel(LightningModule):
         Returns:
             dict: scheduler配置字典
         """
-        availabel_names = ['harmonic_epoch', 'linear_warmup_step', 'cosine_warmup_step']
+        availabel_names = self.scheduler_names
         assert name in availabel_names, f'availabel names {availabel_names}'
         if name == 'harmonic_epoch':
-            return self.get_harmonic_epoch_scheduler_config(optimizer)
+            return self.get_harmonic_epoch_scheduler_config(optimizer=optimizer)
         elif name == 'linear_warmup_step':
             return self.get_linear_warmup_step_scheduler_config(optimizer=optimizer)
         elif name == 'cosine_warmup_step':

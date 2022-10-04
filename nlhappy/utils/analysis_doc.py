@@ -207,8 +207,3 @@ def analysis_text_badcase(examples: List[Example], return_prf: bool=True):
         return badcases, scores
     else:
         return badcases
-    
-            
-        
-        
-    

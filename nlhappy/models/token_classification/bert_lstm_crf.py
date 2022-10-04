@@ -3,7 +3,6 @@ from ...layers import CRF, SimpleDense
 from ...metrics.chunk import ChunkF1, get_entities
 from transformers import BertModel, BertTokenizer
 import torch.nn as nn
-from ...utils.preprocessing import fine_grade_tokenize
 import os
 import torch
 
@@ -126,10 +125,8 @@ class BertLstmCRF(pl.LightningModule):
 
 
     def predict(self, text: str, device):
-        tokens = fine_grade_tokenize(text, self.tokenizer)
-        inputs = self.tokenizer.encode_plus(
-            tokens,
-            is_pretokenized=True,
+        inputs = self.tokenizer(
+            text,
             add_special_tokens=True,
             return_tensors='pt')
         inputs.to(device)
@@ -140,15 +137,3 @@ class BertLstmCRF(pl.LightningModule):
         for ent in ents:
             new_ents.append([ent[1], ent[2], ent[0], text[ent[1]:ent[2]+1]])
         return new_ents
-
-        
-
-    def _init_tokenizer(self):
-        with open('./vocab.txt', 'w') as f:
-            for k in self.hparams.token2id.keys():
-                f.writelines(k + '\n')
-        self.hparams.bert_config.to_json_file('./config.json')
-        tokenizer = BertTokenizer.from_pretrained('./')
-        os.remove('./vocab.txt')
-        os.remove('./config.json')
-        return tokenizer

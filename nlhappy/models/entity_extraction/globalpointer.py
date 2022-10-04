@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch
 from ...metrics.span import SpanF1
-from ...utils.model import PLMBaseModel, align_token_span
+from ...utils.make_model import PLMBaseModel, align_token_span
 from ...layers import MultiLabelCategoricalCrossEntropy, EfficientGlobalPointer, MultiDropout
 from ...tricks.adversarial_training import adversical_tricks
 from typing import Optional

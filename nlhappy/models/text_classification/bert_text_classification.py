@@ -2,9 +2,8 @@ import torch
 from torchmetrics import F1Score
 from typing import List, Any
 from ...layers import SimpleDense, MultiDropout
-from ...utils.model import PLMBaseModel
+from ...utils.make_model import PLMBaseModel
 from typing import List, Dict
-import torch.nn.functional as F
 from transformers import AutoModel
 
 class BertTextClassification(PLMBaseModel):

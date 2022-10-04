@@ -5,8 +5,6 @@ from tqdm import tqdm
 import random
 
 
-
-
 def convert_spans_to_dataset(docs: List[Doc], 
                              sentence_level: bool =False,
                              user_ents_set_span: bool = True) -> Dataset:

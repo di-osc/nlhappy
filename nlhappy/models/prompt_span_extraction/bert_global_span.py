@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch
 from ...metrics.span import SpanF1
 from ...layers import MultiLabelCategoricalCrossEntropy, EfficientGlobalPointer, MultiDropout
-from ...utils.model import get_hf_tokenizer
+from ...utils.make_model import get_hf_tokenizer
 from typing import List
 
 
