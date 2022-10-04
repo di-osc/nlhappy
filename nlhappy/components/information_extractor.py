@@ -152,7 +152,7 @@ default_config = {'threshold': 0.5,
         
         
 @Chinese.factory('information_extractor',assigns=['doc.spans','doc.ents','doc._.relations','doc._.events'],default_config=default_config)
-def make_ie(nlp: Language,
+def get_information_extractor(nlp: Language,
             name:str, 
             schemas: Dict,  
             num_sentences:bool,

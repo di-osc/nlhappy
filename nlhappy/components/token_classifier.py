@@ -73,5 +73,5 @@ class Tokenclassifier:
         self.model.freeze()
 
 @Chinese.factory('token_classifier',assigns=['doc.ents'],default_config={'model':'bert_crf', 'device':'cpu'})
-def make_tokencat(nlp, name, ckpt, model, device, sentence_level):
+def get_tokencat(nlp, name, ckpt, model, device, sentence_level):
     return Tokenclassifier(nlp, name, ckpt, model, device, sentence_level)

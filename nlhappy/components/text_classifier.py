@@ -63,7 +63,7 @@ class BertTextClassifier:
 
 default_config = {'model': 'bert_tc', 'device':'cpu', 'threshold':0.8}
 @Chinese.factory('text_classifier', default_config=default_config)
-def make_text_classification(nlp, name:str, device:str, model: str, threshold: float):
+def get_text_classification(nlp, name:str, device:str, model: str, threshold: float):
     if model == 'bert_tc':
         return BertTextClassifier(nlp, name=name, device=device, threshold=threshold)
 

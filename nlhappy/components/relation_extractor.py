@@ -129,7 +129,7 @@ default_config = {'threshold':0.0,
                   'model':'global_relation'}
 
 @Chinese.factory('relation_extractor',assigns=['doc._.relations'],default_config=default_config)
-def make_relation_extractor(nlp, 
+def get_relation_extractor(nlp, 
                           name:str, 
                           device:str, 
                           threshold:float,
@@ -147,6 +147,3 @@ def make_relation_extractor(nlp,
                                        device=device,
                                        threshold=threshold,
                                        prompts=prompts)
-
-
-

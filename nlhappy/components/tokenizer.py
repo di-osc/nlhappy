@@ -4,7 +4,6 @@ from spacy.tokens import Doc
 import unicodedata
 
 
-
 class CharTokenizer:
     def __init__(self, vocab) -> None:
         self.vocab = vocab
@@ -20,8 +19,6 @@ class CharTokenizer:
         pass 
     
 
-    
-        
 class BasicTokenizer(object):
     """基础分词器
     - 中文按照字切分

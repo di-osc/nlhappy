@@ -75,7 +75,7 @@ class SpanClassification:
 default_config={'device':'cpu', 'sentence_level':False, 'threshold':0.5,'set_ents':True}
 
 @Chinese.factory('span_classifier',assigns=['doc.spans'],default_config=default_config)
-def make_spancat(nlp, name:str, device:str, sentence_level:bool, threshold:float, set_ents: bool):
+def get_spancat(nlp, name:str, device:str, sentence_level:bool, threshold:float, set_ents: bool):
     """句子级别的文本片段分类"""
     return SpanClassification(nlp=nlp, name=name, device=device, sentence_level=sentence_level, threshold=threshold, set_ents=set_ents)
 

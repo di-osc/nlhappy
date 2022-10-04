@@ -64,6 +64,3 @@ def load(path: str, config: dict = {}, disable: list=[]):
     import spacy
     nlp = spacy.load(name=path, disable=disable, config=config)
     return nlp
-
-    
-    

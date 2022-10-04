@@ -177,7 +177,7 @@ default_config = {
         
         
 @Chinese.factory('entity_normalizer',assigns=['span._.norm_name'],default_config=default_config)
-def make_entity_normalizer(nlp: Language,
+def get_entity_normalizer(nlp: Language,
                             name: str,
                             norm_labels: List,
                             topk: int =20,
@@ -193,7 +193,4 @@ def make_entity_normalizer(nlp: Language,
                             positive_label=positive_label,
                             strategy=strategy,
                             threshold=threshold,
-                            device=device)
-
-        
-        
+                            device=device)    

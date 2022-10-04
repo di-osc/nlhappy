@@ -19,7 +19,7 @@ default_punct_chars = ['!',  '?', '։', '؟', '۔', '܀', '܁', '܂', '߹',
             '｡', '。', '？', '！', '......', '……', ';', '；', '.']
 
 @Chinese.factory(name='sentence_segmenter', default_config={'punct_chars': default_punct_chars})
-def make_sentence_segmenter(nlp, name, punct_chars):
+def get_sentence_segmenter(nlp, name, punct_chars):
     return Sentencizer(name, punct_chars=punct_chars)
 
 

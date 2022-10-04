@@ -1,17 +1,13 @@
 from typing import List, Optional
-
-import hydra
 from omegaconf import DictConfig
-from pytorch_lightning import (
-    Callback,
-    LightningDataModule,
-    LightningModule,
-    Trainer,
-    seed_everything,
-)
-from pytorch_lightning.loggers import LightningLoggerBase
-
 from .utils import utils
+from pytorch_lightning import (Callback,
+                               LightningDataModule,
+                               LightningModule,
+                               Trainer,
+                               seed_everything)
+from pytorch_lightning.loggers import LightningLoggerBase
+import hydra
 import os
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -71,19 +67,19 @@ def train(config: DictConfig) -> Optional[float]:
 
     # Init lightning trainer
     log.info(f"Instantiating trainer <{config.trainer._target_}>")
-    trainer: Trainer = hydra.utils.instantiate(
-        config.trainer, callbacks=callbacks, logger=logger, _convert_="partial"
-    )
+    trainer: Trainer = hydra.utils.instantiate(config.trainer, 
+                                               callbacks=callbacks, 
+                                               logger=logger, 
+                                               _convert_="partial")
 
     # Send some parameters from config to all lightning loggers
     log.info("Logging hyperparameters!")
-    utils.log_hyperparameters(
-        config=config,
-        model=model,
-        datamodule=datamodule,
-        trainer=trainer,
-        callbacks=callbacks,
-        logger=logger)
+    utils.log_hyperparameters(config=config,
+                              model=model,
+                              datamodule=datamodule,
+                              trainer=trainer,
+                              callbacks=callbacks,
+                              logger=logger)
 
 
     # Train the model
@@ -107,14 +103,12 @@ def train(config: DictConfig) -> Optional[float]:
 
     # Make sure everything closed properly
     log.info("Finalizing!")
-    utils.finish(
-        config=config,
-        model=model,
-        datamodule=datamodule,
-        trainer=trainer,
-        callbacks=callbacks,
-        logger=logger,
-    )
+    utils.finish(config=config,
+                 model=model,
+                 datamodule=datamodule,
+                 trainer=trainer,
+                 callbacks=callbacks,
+                 logger=logger)
 
     # Print path to best checkpoint
     if not config.trainer.get("fast_dev_run"):
