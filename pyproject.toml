@@ -2,9 +2,10 @@
 name = "nlhappy"
 version = "2022.09.18"
 description = "自然语言处理(NLP)"
-authors = ["善若水 <790990241@qq.om>"]
+authors = ["wangmengdi <790990241@qq.om>"]
 license = "MIT"
 readme = "README.md"
+documentation = "https://wangmengdi.notion.site/NLHAPPY-264f05d1084848efa42068c83539904a"
 
 [tool.poetry.dependencies]
 python = "^3.7"
@@ -12,7 +13,7 @@ torch = ">=1.11.0"
 pytorch-lightning = "1.6.3"
 datasets = ">=2.0.0"
 transformers = ">=4.17.0"
-hydra-core = ">=1.1.1"
+hydra-core = "1.1"
 hydra-colorlog = ">=1.1.0"
 spacy = ">=3.3.0"
 rich = "^12.4.3"
@@ -21,7 +22,7 @@ googletrans = "4.0.0rc1"
 
 
 [tool.poetry.plugins."spacy_factories"]
-"span_classifier" = "nlhappy.components:make_spancat"
+"span_classifier" = "nlhappy.components:get_spancat"
 
 
 [tool.poetry.scripts]
