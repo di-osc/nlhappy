@@ -4,13 +4,11 @@
 defaults:
   - _self_
   - trainer: default
-  - task: null
-  - model: 
+  - model: null 
   - datamodule: 
   - callbacks: finetune
   - logger: null # set logger here or use command line (e.g. `python run.py logger=wandb`)
   - log_dir: default
-  - experiment: null
 
   # enable color logging
   - override hydra/hydra_logging: colorlog
@@ -57,5 +55,3 @@ hydra:
   sweep:
     dir: logs/experiments/multiruns/${datamodule.dataset}/${now:%Y-%m-%d}_${now:%H-%M-%S}
     subdir: ${hydra.job.num}
-
-
