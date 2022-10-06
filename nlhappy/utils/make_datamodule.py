@@ -143,7 +143,7 @@ def prepare_data_from_huffingface(dataset: str,
 
 
 class PLMBaseDataModule(pl.LightningModule):
-    """数据模块的基类,子类需要完成setup方法,子类初始化的时候至少包含dataset,plm,batch_size,auto_length参数,
+    """数据模块的基类,子类需要完成setup方法,子类初始化的时候至少包含dataset,plm,batch_size参数,
     内置功能:
     - 自动保存超参数
     - 不同策略自动获取最大文本长度,超过512则取512

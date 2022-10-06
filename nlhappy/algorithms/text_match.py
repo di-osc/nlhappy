@@ -132,7 +132,4 @@ class BM25(object):
         if self.docs is None:
             return [[i, scores[i]] for i in indexs]
         else:
-            return [[self.docs[i], scores[i]] for i in indexs]
-        
-        
-        
+            return [[self.docs[i], scores[i]] for i in indexs]     
