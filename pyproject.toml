@@ -10,7 +10,7 @@ documentation = "https://wangmengdi.notion.site/NLHAPPY-264f05d1084848efa42068c8
 [tool.poetry.dependencies]
 python = "^3.7"
 torch = ">=1.11.0"
-pytorch-lightning = "1.6.3"
+pytorch-lightning = "1.7.7"
 datasets = ">=2.0.0"
 transformers = ">=4.17.0"
 hydra-core = "1.1"
