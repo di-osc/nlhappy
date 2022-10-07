@@ -1,10 +1,8 @@
 import torch
 from torchmetrics import F1Score
-from typing import List, Any
+from typing import List, Tuple
 from ...layers import SimpleDense, MultiDropout
 from ...utils.make_model import PLMBaseModel
-from typing import List, Dict
-from transformers import AutoModel
 
 class BertTextClassification(PLMBaseModel):
     '''
@@ -19,9 +17,7 @@ class BertTextClassification(PLMBaseModel):
         super(BertTextClassification, self).__init__()  
 
         # 模型架构
-        plm_config = self.get_plm_config()
-        plm_config.add_pooler_layer=True
-        self.bert = AutoModel.from_config(plm_config)
+        self.bert = self.get_plm_architecture(add_pooler_layer=True)
         self.classifier = SimpleDense(input_size=self.bert.config.hidden_size, 
                                       hidden_size=hidden_size, 
                                       output_size=len(self.hparams.label2id))
@@ -58,7 +54,6 @@ class BertTextClassification(PLMBaseModel):
         loss, pred_ids, label_ids = self.shared_step(batch)
         self.train_f1(pred_ids, label_ids)
         self.log('train/f1', self.train_f1, on_step=True, on_epoch=True, prog_bar=True)
-        self.log('train/loss',loss)
         return {'loss': loss}
     
     def validation_step(self, batch, batch_idx):
@@ -92,14 +87,14 @@ class BertTextClassification(PLMBaseModel):
         return [optimizer], [scheduler_config]
 
 
-    def predict(self, text: str, device: str='cpu') -> Dict[str, float]:
+    def predict(self, text: str, device: str='cpu') -> List[Tuple[str, int]]:
         device = torch.device(device)
-        inputs = self.tokenizer(
-                text,
-                padding='max_length',
-                max_length=self.hparams.max_length,
-                return_tensors='pt',
-                truncation=True)
+        inputs = self.tokenizer(text,
+                                padding='max_length',
+                                max_length=self.hparams.max_length,
+                                return_tensors='pt',
+                                truncation=True)
+        self.to(device)
         inputs.to(device)
         self.eval()
         with torch.no_grad():

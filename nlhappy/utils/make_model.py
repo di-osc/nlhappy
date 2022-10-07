@@ -103,17 +103,16 @@ class PLMBaseModel(LightningModule):
             return plm_config
     
     
-    def get_plm_architecture(self):
+    def get_plm_architecture(self, add_pooler_layer: bool = False):
         if 'trf_config' in self.hparams.keys():
             plm_config = get_hf_config_object(self.hparams.trf_config)
-            return AutoModel.from_config(plm_config)
         elif 'plm' in self.hparams.keys() and 'plm_dir' in self.hparams.keys():
             plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
             plm_config = AutoConfig.from_pretrained(plm_path)
             self.hparams.trf_config = plm_config.to_dict()
             self.hparams.vocab = dict(sorted(self.tokenizer.vocab.items(), key=lambda x: x[1]))
-            return AutoModel.from_config(plm_config)
-    
+        plm_config.add_pooler_layer = add_pooler_layer
+        return AutoModel.from_config(plm_config)    
     
     def get_linear_warmup_step_scheduler_config(self, optimizer, warmup_rate: float = 0.5):
         steps_per_epoch = self.get_one_epoch_steps()

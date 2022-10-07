@@ -15,7 +15,7 @@ class TextClassificationDataModule(PLMBaseDataModule):
                 dataset: str,
                 batch_size: int ,
                 plm: str = 'hfl/chinese-roberta-wwm-ext',
-                transform: str = 'bert',
+                transform: str = 'bert_tc',
                 **kwargs):
         """单文本分类数据模块
 
@@ -31,7 +31,7 @@ class TextClassificationDataModule(PLMBaseDataModule):
         """
         
         super().__init__()        
-        self.transforms = {'bert': self.bert_transform}
+        self.transforms = {'bert_tc': self.bert_transform}
         assert self.hparams.transform in self.transforms.keys(), f'available models for text classification dm: {self.transforms.keys()}'
         
         
