@@ -8,4 +8,4 @@ from .text_pair_regression import SentenceBERT
 from .prompt_span_extraction import BERTGlobalSpan
 from .prompt_relation_extraction import GPLinkerForPromptRelationExtraction
 from .event_extraction import GPLinkerForEventExtraction
-from .entity_extraction import W2NERForEntityExtraction, GlobalPointerForEntityExtraction
+from .entity_extraction import W2NERForEntityExtraction, GlobalPointerForEntityExtraction, BiaffineForEntityExtraction
