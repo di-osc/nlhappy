@@ -84,9 +84,3 @@ class PromptSpanExtractionDataModule(PLMBaseDataModule):
             batch['inputs'].append(inputs)
             batch['span_ids'].append(span_ids)
         return batch
-    
-            
-
-    
-    
-    

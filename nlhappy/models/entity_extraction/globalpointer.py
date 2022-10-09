@@ -14,8 +14,8 @@ class GlobalPointerForEntityExtraction(PLMBaseModel):
         - https://kexue.fm/archives/8373
     """
     def __init__(self,
-                 hidden_size: int,
                  lr: float,
+                 hidden_size: int = 256,
                  scheduler: str = 'linear_warmup_step',
                  weight_decay: float = 0.01,
                  adv: Optional[str] = None,

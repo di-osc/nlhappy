@@ -30,4 +30,3 @@ class OneRelClassifier(nn.Module):
         pairs = self.activation(pairs)
         scores = self.linear2(pairs).reshape(batch_size, seq_len, seq_len, self.output_size, self.tag_size)
         return scores
-        

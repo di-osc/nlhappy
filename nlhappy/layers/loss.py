@@ -1,4 +1,3 @@
-from turtle import forward
 import torch
 from torch import Tensor
 
@@ -17,6 +16,12 @@ class MultiLabelCategoricalCrossEntropy(torch.nn.Module):
         super().__init__()
 
     def forward(self, y_pred, y_true):
+        """
+
+        Args:
+            y_pred : [batch_size, num_classes, seq_len, seq_len]
+            y_true : [batch_size, num_classes, seq_len, seq_len]
+        """
         y_pred = (1 - 2 * y_true) * y_pred  # -1 -> pos classes, 1 -> neg classes
         y_pred_neg = y_pred - y_true * 1e-12  # mask the pred outputs of pos classes
         y_pred_pos =  y_pred - (1 - y_true) * 1e-12  # mask the pred outputs of neg classes

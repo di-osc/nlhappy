@@ -34,13 +34,12 @@ class GlobalPointer(Module):
     """全局指针模块
     将序列的每个(start, end)作为整体来进行判断
     """
-    def __init__(
-        self,
-        input_size: int, 
-        hidden_size: int,
-        output_size: int,  
-        RoPE: bool =True,
-        tril_mask: bool = True):
+    def __init__(self,
+                 input_size: int, 
+                 hidden_size: int,
+                 output_size: int,  
+                 RoPE: bool =True,
+                 tril_mask: bool = True):
         super(GlobalPointer, self).__init__()
         self.output_size = output_size
         self.hidden_size = hidden_size
@@ -94,13 +93,12 @@ class EfficientGlobalPointer(Module):
     将序列的每个(start, end)作为整体来进行判断
     https://kexue.fm/archives/8877
     """
-    def __init__(
-        self, 
-        input_size: int, 
-        hidden_size: int,
-        output_size: int,
-        RoPE: bool =True,
-        tril_mask: bool =True):
+    def __init__(self, 
+                 input_size: int, 
+                 hidden_size: int,
+                 output_size: int,
+                 RoPE: bool =True,
+                 tril_mask: bool =True):
         super(EfficientGlobalPointer, self).__init__()
         self.output_size = output_size
         self.hidden_size = hidden_size

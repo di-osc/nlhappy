@@ -1,4 +1,4 @@
-from datasets import Dataset, DatasetDict
+from datasets import Dataset, DatasetDict, load_from_disk
 from typing import Dict, Tuple, Union, List
 from ..algorithms.text_match import BM25
 from spacy.tokens import Doc
