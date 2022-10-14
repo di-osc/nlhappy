@@ -2,10 +2,10 @@ _target_: nlhappy.datamodules.TextPairClassificationDataModule
 dataset_dir: ${dataset_dir} 
 plm_dir: ${plm_dir}
 
-dataset: 
+dataset:
+batch_size:  
 plm: hfl/chinese-roberta-wwm-ext
 auto_length: max
-batch_size: 
 return_pair: False
 num_workers: 0
 pin_memory: False

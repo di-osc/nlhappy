@@ -1,11 +1,11 @@
 _target_: nlhappy.datamodules.TokenClassificationDataModule
+dataset_dir: ${dataset_dir}
+plm_dir: ${plm_dir}
 
 dataset: 
-auto_length: max
-batch_size: 
+batch_size:
+auto_length: max 
 label_pad_id: -100
 plm: hfl/chinese-macbert-base
 pin_memory: False
 num_workers: 0
-dataset_dir: ${dataset_dir}
-plm_dir: ${plm_dir}

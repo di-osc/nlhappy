@@ -3,9 +3,9 @@ dataset_dir: ${dataset_dir}
 plm_dir: ${plm_dir}
 
 dataset: 
-auto_length: max
 batch_size: 
 plm: hfl/chinese-roberta-wwm-ext
 transform: prompt_gplinker
+auto_length: max
 pin_memory: False
 num_workers: 0

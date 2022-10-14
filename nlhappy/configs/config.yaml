@@ -44,14 +44,15 @@ seed: null
 
 # name of the run is accessed by loggers
 # should be used along with experiment mode
-name: ${datamodule.transform}:plm=${datamodule.plm}&lr=${model.lr}&bs=${datamodule.batch_size}
+model_info: ${model.name}:lr=${model.lr}
+name: ${model_info}&plm=${datamodule.plm}&bs=${datamodule.batch_size}
 
 # monitor of all callbacks
 monitor: val/f1
 
 hydra:
   run:
-    dir: logs/experiments/runs/${datamodule.dataset}/${now:%Y-%m-%d}_${now:%H-%M-%S}
+    dir: logs/runs/${datamodule.dataset}/${model.name}/${now:%Y-%m-%d}_${now:%H-%M-%S}
   sweep:
-    dir: logs/experiments/multiruns/${datamodule.dataset}/${now:%Y-%m-%d}_${now:%H-%M-%S}
+    dir: logs/multiruns/${datamodule.dataset}/${model.name}/${now:%Y-%m-%d}_${now:%H-%M-%S}
     subdir: ${hydra.job.num}
