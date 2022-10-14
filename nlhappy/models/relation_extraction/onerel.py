@@ -229,5 +229,3 @@ class OneRelForRelationExtraction(PLMBaseModel):
                     obj = align_token_span((triple[3], triple[4]), offset_mapping)
                     rels.append((sub[0],sub[1],triple[2],obj[0],obj[1]))
         return rels
-
-        

@@ -2,7 +2,7 @@ import torch.nn as nn
 import torch
 from ...metrics.span import SpanF1
 from ...utils.make_model import PLMBaseModel, align_token_span
-from ...layers import MultiLabelCategoricalCrossEntropy, EfficientGlobalPointer, MultiDropout
+from ...layers import MultiLabelCategoricalCrossEntropy, EfficientGlobalPointer, MultiDropout, GlobalPointer
 from ...tricks.adversarial_training import adversical_tricks
 from typing import Optional
 
@@ -16,10 +16,12 @@ class GlobalPointerForEntityExtraction(PLMBaseModel):
     def __init__(self,
                  lr: float,
                  hidden_size: int = 256,
+                 use_efficient: bool = True,
                  scheduler: str = 'linear_warmup_step',
                  weight_decay: float = 0.01,
                  adv: Optional[str] = None,
                  threshold: float = 0.0,
+                 add_rope: bool = True,
                  **kwargs) : 
         super().__init__()
         ## 手动optimizer 可参考https://pytorch-lightning.readthedocs.io/en/stable/common/optimizers.html#manual-optimization
@@ -27,9 +29,16 @@ class GlobalPointerForEntityExtraction(PLMBaseModel):
 
 
         self.bert = self.get_plm_architecture()
-        self.classifier = EfficientGlobalPointer(input_size=self.bert.config.hidden_size, 
+        if use_efficient:
+            self.classifier = EfficientGlobalPointer(input_size=self.bert.config.hidden_size, 
                                                  hidden_size=hidden_size,
-                                                 output_size=len(self.hparams.label2id))
+                                                 output_size=len(self.hparams.label2id),
+                                                 RoPE=self.hparams.add_rope)
+        else:
+            self.classifier = GlobalPointer(input_size=self.bert.config.hidden_size,
+                                            hidden_size=hidden_size,
+                                            output_size=len(self.hparams.label2id),
+                                            RoPE=self.hparams.add_rope)
 
         self.dropout = MultiDropout()
         self.criterion = MultiLabelCategoricalCrossEntropy()

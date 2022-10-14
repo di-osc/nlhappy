@@ -20,8 +20,7 @@ class EntityNormalizer:
                 positive_label: str='1',
                 strategy: str='pre',
                 threshold: float = 0.5,
-                device:str = 'cpu'
-                ) -> None:
+                device:str = 'cpu') -> None:
         super().__init__()
         self.name = name
         self.positive_label = positive_label
