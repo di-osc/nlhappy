@@ -11,8 +11,10 @@ log = get_logger()
 class EntityExtractionDataModule(PLMBaseDataModule):
     """实体抽取数据模块
     可以解决嵌套实体和非连续实体
-    globalpointer: 可以解决嵌套实体问题,不能解决非连续问题
-    w2ner: 可以解决非连续喝嵌套问题
+    globalpointer: 可以抽取嵌套实体,不能抽取非连续实体
+    w2ner: 可以抽取非连续和嵌套实体
+    
+    数据集格式: {"text":"这是一个长颈鹿","entities":[{"indexes":[4,5,6],"label":"动物", "text":"长颈鹿"}]}
     """
         
     def __init__(self,
