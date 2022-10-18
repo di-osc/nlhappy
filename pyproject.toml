@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "nlhappy"
-version = "2022.09.18"
+version = "2022.10.18"
 description = "自然语言处理(NLP)"
 authors = ["wangmengdi <790990241@qq.om>"]
 license = "MIT"
@@ -15,10 +15,17 @@ datasets = ">=2.0.0"
 transformers = ">=4.17.0"
 hydra-core = "1.1"
 hydra-colorlog = ">=1.1.0"
-spacy = ">=3.3.0"
-rich = "^12.4.3"
-wandb = ">=0.12.18"
 googletrans = "4.0.0rc1"
+rich = "^12.4.3"
+
+spacy = ">=3.3.0"
+wandb = ">=0.12.18"
+
+
+[tool.poetry.extras]
+spacy = ["spacy"]
+wandb = ["wandb"]
+all = ["spacy", "wandb"]
 
 
 [tool.poetry.plugins."spacy_factories"]
