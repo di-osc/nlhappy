@@ -18,6 +18,7 @@ class GlobalPointerForEntityExtraction(PLMBaseModel):
                  hidden_size: int = 256,
                  use_efficient: bool = True,
                  scheduler: str = 'linear_warmup_step',
+                 span_get_type: str = 'dot',
                  weight_decay: float = 0.01,
                  adv: Optional[str] = None,
                  threshold: float = 0.0,
@@ -38,7 +39,8 @@ class GlobalPointerForEntityExtraction(PLMBaseModel):
             self.classifier = GlobalPointer(input_size=self.bert.config.hidden_size,
                                             hidden_size=hidden_size,
                                             output_size=len(self.hparams.label2id),
-                                            RoPE=self.hparams.add_rope)
+                                            add_rope=self.hparams.add_rope,
+                                            span_get_type=self.hparams.span_get_type)
 
         self.dropout = MultiDropout()
         self.criterion = MultiLabelCategoricalCrossEntropy()

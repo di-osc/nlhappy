@@ -33,7 +33,7 @@ class LayerNorm(nn.Module):
     def forward(self, inputs, cond=None):
         """
         Args:
-            inputs (_type_): 特征输入.
+            inputs (B, L, H): 特征输入.
             cond (_type_, optional): 条件输入. Defaults to None.
         """
         if self.norm_mode == 'rmsnorm':
@@ -53,10 +53,8 @@ class LayerNorm(nn.Module):
 
         if self.conditional_size:
             # 三者的形状都是一致的
-            # print(inputs.shape, cond.shape, o.shape)
             for _ in range(len(inputs.shape) - len(cond.shape)):
                 cond = cond.unsqueeze(dim=1)
-            
             return (self.weight + self.dense1(cond)) * o + (self.bias + self.dense2(cond))
         else:
             return self.weight * o + self.bias

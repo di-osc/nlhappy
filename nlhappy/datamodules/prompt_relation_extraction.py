@@ -87,4 +87,3 @@ class PromptRelationExtractionDataModule(PLMBaseDataModule):
         batch_inputs['tail_ids'] = torch.stack(batch_inputs['tail_ids'], dim=0)
         batch = dict(zip(batch_inputs.keys(), map(torch.tensor, batch_inputs.values())))
         return batch
-        

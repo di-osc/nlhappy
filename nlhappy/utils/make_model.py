@@ -5,7 +5,6 @@ from transformers import AutoTokenizer, AutoConfig, AutoModel
 from transformers.optimization import get_linear_schedule_with_warmup, get_cosine_schedule_with_warmup
 from pytorch_lightning import LightningModule
 import torch
-from typing import Any
 import tempfile
 import json
 from omegaconf import OmegaConf, DictConfig
@@ -73,7 +72,7 @@ class PLMBaseModel(LightningModule):
     - 通过self.get_plm_architecture可以得到预训练模型的架构,主要并没有加载预训练参数
     """
     
-    scheduler_names = ['linear_warmup_step', 'cosine_warmup_step', 'harmonic_epoch']
+    scheduler_names = ['linear_warmup_step', 'cosine_warmup_step', 'harmonic_epoch', '1cycle_step']
     
     def __init__(self) -> None:
         super().__init__()
@@ -129,10 +128,16 @@ class PLMBaseModel(LightningModule):
         scheduler_config = {'scheduler': scheduler, 'interval':'step'}
         return scheduler_config
     
-    
     def get_harmonic_epoch_scheduler_config(self, optimizer):
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 1.0 / (epoch + 1.0))
         scheduler_config = {'scheduler': scheduler, 'interval':'epoch'}
+        return scheduler_config
+    
+    def get_one_cycle_scheduler_config(self, optimizer):
+        steps_per_epoch = self.get_one_epoch_steps()
+        total_steps = self.trainer.max_epochs * steps_per_epoch
+        scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer=optimizer, max_lr=self.hparams.lr*3, total_steps=total_steps)
+        scheduler_config = {'scheduler': scheduler, 'interval':'step'}
         return scheduler_config
     
     
@@ -147,13 +152,7 @@ class PLMBaseModel(LightningModule):
     
     
     def get_one_epoch_steps(self):
-        devices = self.trainer.num_devices
-        if type(devices) == int:
-            steps_per_epoch = len(self.trainer.datamodule.train_dataloader()) // devices
-            return steps_per_epoch
-        if type(devices) == list:
-            steps_per_epoch = len(self.trainer.datamodule.train_dataloader()) // len(devices)
-            return steps_per_epoch
+        return self.trainer.estimated_stepping_batches
         
     
     def get_scheduler_config(self, optimizer, name: str):
@@ -174,6 +173,8 @@ class PLMBaseModel(LightningModule):
             return self.get_linear_warmup_step_scheduler_config(optimizer=optimizer)
         elif name == 'cosine_warmup_step':
             return self.get_cosine_warmup_step_scheduler_config(optimizer=optimizer)
+        elif name == '1cycle':
+            return self.get_one_cycle_scheduler_config(optimizer=optimizer)
 
     
     def to_onnx(self, 

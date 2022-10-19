@@ -3,80 +3,119 @@ from torch import nn
 from torch.nn import Module
 from ..embedding import SinusoidalPositionEmbedding
 
-def sequence_masking(x, mask, value='-inf', axis=None):
-    if mask is None:
-        return x
-    else:
-        if value == '-inf':
-            value = -1e12
-        elif value == 'inf':
-            value = 1e12
-        assert axis > 0, 'axis must be greater than 0'
-        for _ in range(axis - 1):
-            mask = torch.unsqueeze(mask, 1)
-        for _ in range(x.ndim - mask.ndim):
-            mask = torch.unsqueeze(mask, mask.ndim)
-        return x * mask + value * (1 - mask)
-
-
-def add_mask_tril(logits, mask):
-    if mask.dtype != logits.dtype:
-        mask = mask.type(logits.dtype)
-    logits = sequence_masking(logits, mask, '-inf', logits.ndim - 2)
-    logits = sequence_masking(logits, mask, '-inf', logits.ndim - 1)
-    # 排除下三角
-    mask = torch.tril(torch.ones_like(logits), diagonal=-1)
-    logits = logits - mask * 1e12
-    return logits
-
 
 class GlobalPointer(Module):
-    """全局指针模块
-    将序列的每个(start, end)作为整体来进行判断
+    """全局指针模块,将序列的每个(start, end)作为整体来进行判断
+    
+    更改
+    - 原版模型用矩阵点乘来得到span的表征,这里增加了叉乘,相加和拼接的方法,用来做对比实验
     """
     def __init__(self,
                  input_size: int, 
                  hidden_size: int,
                  output_size: int,  
-                 RoPE: bool =True,
-                 tril_mask: bool = True):
+                 add_rope: bool =True,
+                 tril_mask: bool = True,
+                 span_get_type: str = 'dot'):
+        """
+
+        Args:
+            input_size (int): 输入维度大小一般为bert输出的hidden size
+            hidden_size (int): 内部隐层的维度大小
+            output_size (int): 一般为分类的span类型
+            RoPE (bool, optional): 是否添加RoPE. Defaults to True.
+            tril_mask (bool, optional): 是否遮掩下三角. Defaults to True.
+            span_get_type (str, optional): span表征的获得方式.可以为'dot' 'element-product' 'concat' 'element-add',默认'dot',实验dot也是最好.
+        """
         super(GlobalPointer, self).__init__()
         self.output_size = output_size
         self.hidden_size = hidden_size
-        self.RoPE = RoPE
+        self.add_rope = add_rope
         self.tril_mask = tril_mask
-        self.fc = nn.Linear(input_size, hidden_size * output_size * 2)
+        self.span_get_type = span_get_type
+        if self.span_get_type == 'dot':
+        # 加了relu激活函数在hidden_size很小(32)的情况下,损失不下降,所以去掉了ReLU激活函数
+        # self.q = nn.Sequential(nn.Linear(input_size, hidden_size * output_size), nn.ReLU())
+        # self.k = nn.Sequential(nn.Linear(input_size, hidden_size * output_size), nn.ReLU())
+            self.q = nn.Linear(input_size, hidden_size * output_size)
+            self.k = nn.Linear(input_size, hidden_size * output_size)
+        if self.span_get_type == 'element-product' or self.span_get_type == 'element-add':
+            self.start = nn.Linear(input_size, hidden_size)
+            self.end = nn.Linear(input_size, hidden_size) 
+            self.span = nn.Linear(hidden_size, output_size)
+        if self.span_get_type == 'concat':
+            self.start = nn.Linear(input_size, hidden_size)
+            self.end = nn.Linear(input_size, hidden_size) 
+            self.span =  nn.Linear(hidden_size*2, output_size)
 
-#     def reset_params(self):
-#         nn.init.xavier_uniform_(self.fc.weight)
 
     def forward(self, inputs, mask=None):
-        inputs = self.fc(inputs)
-        inputs = torch.split(inputs, self.hidden_size * 2, dim=-1)
-        # 按照-1这个维度去分，每块包含x个小块
-        inputs = torch.stack(inputs, dim=-2)
-        # 沿着一个新维度对输入张量序列进行连接。 序列中所有的张量都应该为相同形状
-        qw, kw = inputs[..., :self.hidden_size], inputs[..., self.hidden_size:]
-        # 分出qw和kw
-        # RoPE编码
-        if self.RoPE:
-            pos = SinusoidalPositionEmbedding(self.hidden_size, 'zero')(inputs)
-            cos_pos = pos[..., None, 1::2].repeat(1, 1, 1, 2)
-            sin_pos = pos[..., None, ::2].repeat(1, 1, 1, 2)
-            qw2 = torch.stack([-qw[..., 1::2], qw[..., ::2]], 4)
-            qw2 = torch.reshape(qw2, qw.shape)
-            qw = qw * cos_pos + qw2 * sin_pos
-            kw2 = torch.stack([-kw[..., 1::2], kw[..., ::2]], 4)
-            kw2 = torch.reshape(kw2, kw.shape)
-            kw = kw * cos_pos + kw2 * sin_pos
-        # 计算内积
-        logits = torch.einsum('bmhd , bnhd -> bhmn', qw, kw)
+        if self.span_get_type == 'dot':
+            batch_size, seq_length, input_size = inputs.shape
+            qw = self.q(inputs).reshape(batch_size, seq_length, self.output_size, self.hidden_size)
+            kw = self.k(inputs).reshape(batch_size, seq_length, self.output_size, self.hidden_size)
+            # 分出qw和kw
+            # RoPE编码
+            if self.add_rope:
+                pos = SinusoidalPositionEmbedding(self.hidden_size, 'zero')(inputs)
+                cos_pos = pos[..., None, 1::2].repeat(1, 1, 1, 2)
+                sin_pos = pos[..., None, ::2].repeat(1, 1, 1, 2)
+                qw2 = torch.stack([-qw[..., 1::2], qw[..., ::2]], 4)
+                qw2 = torch.reshape(qw2, qw.shape)
+                qw = qw * cos_pos + qw2 * sin_pos
+                kw2 = torch.stack([-kw[..., 1::2], kw[..., ::2]], 4)
+                kw2 = torch.reshape(kw2, kw.shape)
+                kw = kw * cos_pos + kw2 * sin_pos
+            # 计算内积
+            logits = torch.einsum('bmhd , bnhd -> bhmn', qw, kw)
+            logits = logits / self.hidden_size ** 0.5
+        elif self.span_get_type == 'element-product' or self.span_get_type == 'element-add':
+            start_logits = self.start(inputs)
+            end_logits = self.end(inputs)
+            if self.add_rope:
+                pos = SinusoidalPositionEmbedding(self.hidden_size, 'zero')(inputs)
+                cos_pos = pos[..., 1::2].repeat(1, 1, 2)
+                sin_pos = pos[..., ::2].repeat(1, 1, 2)
+                start2 = torch.stack([-start_logits[..., 1::2], start_logits[..., ::2]], 3)
+                start2 = torch.reshape(start2, start_logits.shape)
+                start_logits = start_logits * cos_pos + start2 * sin_pos
+                end2 = torch.stack([-end_logits[..., 1::2], end_logits[..., ::2]], 3)
+                end2 = torch.reshape(end2, end_logits.shape)
+                end_logits = end_logits * cos_pos + end2 * sin_pos
+            start_logits = start_logits.unsqueeze(1)
+            end_logits = end_logits.unsqueeze(2)
+            if self.span_get_type == 'element-product':
+                logits = self.span(start_logits * end_logits).permute(0,3,2,1) # batch output seq seq
+            elif self.span_get_type == 'element-add':
+                logits = self.span(start_logits + end_logits).permute(0,3,2,1)
+                
+        elif self.span_get_type == 'concat':
+            batch_size, seq_len, input_size = inputs.size()
+            # head: [batch_size, seq_len * seq_len, hidden_size] 重复样式为1,1,1, 2,2,2, 3,3,3
+            start_logits = self.start(inputs)
+            end_logits = self.end(inputs)
+            if self.add_rope:
+                pos = SinusoidalPositionEmbedding(self.hidden_size, 'zero')(inputs)
+                cos_pos = pos[..., 1::2].repeat(1, 1, 2)
+                sin_pos = pos[..., ::2].repeat(1, 1, 2)
+                start2 = torch.stack([-start_logits[..., 1::2], start_logits[..., ::2]], 3)
+                start2 = torch.reshape(start2, start_logits.shape)
+                start_logits = start_logits * cos_pos + start2 * sin_pos
+                end2 = torch.stack([-end_logits[..., 1::2], end_logits[..., ::2]], 3)
+                end2 = torch.reshape(end2, end_logits.shape)
+                end_logits = end_logits * cos_pos + end2 * sin_pos
+            start_logits = start_logits.unsqueeze(2).expand(batch_size, seq_len, seq_len, self.hidden_size).reshape(batch_size, seq_len*seq_len, self.hidden_size)
+            # end: [batch_size, seq_len * seq_len, hidden_size] 重复样式为1,2,3, 1,2,3, 1,2,3
+            end_logits = end_logits.repeat(1, seq_len, 1)
+            pairs = torch.cat([start_logits, end_logits], dim=-1)
+            logits = self.span(pairs).reshape(batch_size, self.output_size, seq_len, seq_len)
+            
         # padding mask
-        batch_size = inputs.size()[0]
-        seq_len = inputs.size()[1]
-        pad_mask = mask.unsqueeze(1).unsqueeze(1).expand(batch_size, self.output_size, seq_len, seq_len)
-    
-        logits = logits*pad_mask - (1-pad_mask)*1e12
+        if mask is not None:
+            batch_size = inputs.size()[0]
+            seq_len = inputs.size()[1]
+            pad_mask = mask.unsqueeze(1).unsqueeze(1).expand(batch_size, self.output_size, seq_len, seq_len)
+            logits = logits*pad_mask - (1-pad_mask)*1e12
 
         # 排除下三角
         if self.tril_mask:
@@ -84,7 +123,7 @@ class GlobalPointer(Module):
             logits = logits - mask * 1e12
 
         # scale返回
-        return logits / self.hidden_size ** 0.5
+        return logits
 
 
 

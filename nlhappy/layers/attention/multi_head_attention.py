@@ -94,4 +94,3 @@ class MultiHeadAttentionLayer(nn.Module):
         x = x.view(*new_x_size)
         x = x.permute(0, 2, 1, 3)
         return x         
-
