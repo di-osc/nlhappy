@@ -6,3 +6,4 @@ dropout: 0.2
 scheduler: linear_warmup_step
 threshold: 0.5
 weight_decay: 0.01
+name: casrel
