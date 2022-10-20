@@ -8,7 +8,7 @@ import torch
 
 class BiaffineForEntityExtraction(PLMBaseModel):
     def __init__(self,
-                 lr: float,
+                 lr: float = 3e-5,
                  hidden_size: int = 128,
                  add_rope: bool = True,
                  threshold: float = 0.0,

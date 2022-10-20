@@ -23,7 +23,7 @@ class GlobalPointer(Module):
             input_size (int): 输入维度大小一般为bert输出的hidden size
             hidden_size (int): 内部隐层的维度大小
             output_size (int): 一般为分类的span类型
-            RoPE (bool, optional): 是否添加RoPE. Defaults to True.
+            add_rope (bool, optional): 是否添加RoPE. Defaults to True.
             tril_mask (bool, optional): 是否遮掩下三角. Defaults to True.
             span_get_type (str, optional): span表征的获得方式.可以为'dot' 'element-product' 'concat' 'element-add',默认'dot',实验dot也是最好.
         """
@@ -37,8 +37,8 @@ class GlobalPointer(Module):
         # 加了relu激活函数在hidden_size很小(32)的情况下,损失不下降,所以去掉了ReLU激活函数
         # self.q = nn.Sequential(nn.Linear(input_size, hidden_size * output_size), nn.ReLU())
         # self.k = nn.Sequential(nn.Linear(input_size, hidden_size * output_size), nn.ReLU())
-            self.q = nn.Linear(input_size, hidden_size * output_size)
-            self.k = nn.Linear(input_size, hidden_size * output_size)
+            self.start = nn.Linear(input_size, hidden_size * output_size)
+            self.end = nn.Linear(input_size, hidden_size * output_size)
         if self.span_get_type == 'element-product' or self.span_get_type == 'element-add':
             self.start = nn.Linear(input_size, hidden_size)
             self.end = nn.Linear(input_size, hidden_size) 
@@ -52,22 +52,22 @@ class GlobalPointer(Module):
     def forward(self, inputs, mask=None):
         if self.span_get_type == 'dot':
             batch_size, seq_length, input_size = inputs.shape
-            qw = self.q(inputs).reshape(batch_size, seq_length, self.output_size, self.hidden_size)
-            kw = self.k(inputs).reshape(batch_size, seq_length, self.output_size, self.hidden_size)
+            start_logits = self.start(inputs).reshape(batch_size, seq_length, self.output_size, self.hidden_size)
+            end_logits = self.end(inputs).reshape(batch_size, seq_length, self.output_size, self.hidden_size)
             # 分出qw和kw
             # RoPE编码
             if self.add_rope:
                 pos = SinusoidalPositionEmbedding(self.hidden_size, 'zero')(inputs)
                 cos_pos = pos[..., None, 1::2].repeat(1, 1, 1, 2)
                 sin_pos = pos[..., None, ::2].repeat(1, 1, 1, 2)
-                qw2 = torch.stack([-qw[..., 1::2], qw[..., ::2]], 4)
-                qw2 = torch.reshape(qw2, qw.shape)
-                qw = qw * cos_pos + qw2 * sin_pos
-                kw2 = torch.stack([-kw[..., 1::2], kw[..., ::2]], 4)
-                kw2 = torch.reshape(kw2, kw.shape)
-                kw = kw * cos_pos + kw2 * sin_pos
+                start_logits2 = torch.stack([-start_logits[..., 1::2], start_logits[..., ::2]], 4)
+                start_logits2 = torch.reshape(start_logits2, start_logits.shape)
+                start_logits = start_logits * cos_pos + start_logits2 * sin_pos
+                end_logits2 = torch.stack([-end_logits[..., 1::2], end_logits[..., ::2]], 4)
+                end_logits2 = torch.reshape(end_logits2, end_logits.shape)
+                end_logits = end_logits * cos_pos + end_logits2 * sin_pos
             # 计算内积
-            logits = torch.einsum('bmhd , bnhd -> bhmn', qw, kw)
+            logits = torch.einsum('bmhd , bnhd -> bhmn', start_logits, end_logits)
             logits = logits / self.hidden_size ** 0.5
         elif self.span_get_type == 'element-product' or self.span_get_type == 'element-add':
             start_logits = self.start(inputs)

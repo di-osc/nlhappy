@@ -9,15 +9,27 @@ from typing import Optional
 
 class GlobalPointerForEntityExtraction(PLMBaseModel):
     """基于globalpointer的实体识别模型,可以统一处理嵌套和非嵌套模型
-
+    
     参考:
         - https://kexue.fm/archives/8373
+        
+    参数:
+        - lr (float): 学习率
+        - hidden_size (int): globalpointer中间层维度
+        - use_efficient (bool): 是否用Efficient globalpointer
+        - scheduler (str): 学习率变化器,[harmonic_epoch, linear_warmup_step, cosine_warmup_step]之一
+        - span_get_type (str): globalpointer得到span特征的方式,[dot, element-product, element-add]之一
+        - weight_decay (float): 权重衰减
+        - adv Optinal[str]: 对抗训练方式, fgm, pgd之一
+        - threshold (float): 阈值
+        - add_rope (bool): 是否添加RoPE位置矩阵
+        - **kwargs datamodule的hparams
     """
     def __init__(self,
-                 lr: float,
-                 hidden_size: int = 256,
-                 use_efficient: bool = True,
-                 scheduler: str = 'linear_warmup_step',
+                 lr: float = 3e-5,
+                 hidden_size: int = 128,
+                 use_efficient: bool = False,
+                 scheduler: str = 'harmonic_epoch',
                  span_get_type: str = 'dot',
                  weight_decay: float = 0.01,
                  adv: Optional[str] = None,

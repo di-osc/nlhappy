@@ -106,14 +106,29 @@ class CoPredictor(nn.Module):
 
 class W2NERForEntityExtraction(PLMBaseModel):
     """w2ner 统一解决嵌套非连续实体, 模型复现
+    
     修改:
         - 去除了lstm层
-    reference: 
+        
+    参考: 
         - https://github.com/ljynlp/W2NER
+        
+    参数:
+        - lr (float): 学习率
+        - scheduler (str, optional): 学习率调度器名称. Defaults to 'linear_warmup_step'.
+        - weight_decay (float, optional): 权重衰减. Defaults to 0.01.
+        - conv_hidden_size (int, optional): 卷积层维度. Defaults to 96.
+        - dilation (List[int], optional): . Defaults to [1,2,3].
+        - dist_emb_size (int, optional): 距离编码维度. Defaults to 20.
+        - reg_emb_size (int, optional): 区域编码维度. Defaults to 20.
+        - biaffine_size (int, optional): 放射变换维度. Defaults to 512.
+        - dropout (float, optional): dropout比率. Defaults to 0.2.
+        - ffnn_hidden_size (int, optional): . Defaults to 288.
+        - **kwargs : datamodule.hparams.
     """
     def __init__(self,
-                 lr: float,
-                 scheduler: str = 'linear_warmup_step',
+                 lr: float =3e-5,
+                 scheduler: str = 'harmonic_epoch',
                  weight_decay: float = 0.01,
                  conv_hidden_size: int = 96,
                  dilation: List[int] = [1,2,3],
@@ -123,20 +138,6 @@ class W2NERForEntityExtraction(PLMBaseModel):
                  dropout: float = 0.2,
                  ffnn_hidden_size: int = 288,
                  **kwargs):
-        """
-
-        Args:
-            lr (float): 学习率
-            scheduler (str, optional): 学习率调度器名称. Defaults to 'linear_warmup_step'.
-            weight_decay (float, optional): 权重衰减. Defaults to 0.01.
-            conv_hidden_size (int, optional): 卷积层维度. Defaults to 96.
-            dilation (List[int], optional): . Defaults to [1,2,3].
-            dist_emb_size (int, optional): 距离编码维度. Defaults to 20.
-            reg_emb_size (int, optional): 区域编码维度. Defaults to 20.
-            biaffine_size (int, optional): 放射变换维度. Defaults to 512.
-            dropout (float, optional): dropout比率. Defaults to 0.2.
-            ffnn_hidden_size (int, optional): . Defaults to 288.
-        """
                 
         super().__init__()
         self.plm = self.get_plm_architecture()

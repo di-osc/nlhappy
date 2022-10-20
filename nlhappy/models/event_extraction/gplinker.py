@@ -1,5 +1,5 @@
 from ...utils.make_model import PLMBaseModel
-from ...layers.classifier import EfficientGlobalPointer
+from ...layers.classifier import EfficientGlobalPointer, GlobalPointer
 from ...layers.loss import MultiLabelCategoricalCrossEntropy
 from ...layers.dropout import MultiDropout
 from ...metrics.event import EventF1, Event, Role
@@ -47,26 +47,27 @@ def clique_search(argus, links):
 
 class GPLinkerForEventExtraction(PLMBaseModel):
     def __init__(self, 
-                 lr: float,
-                 hidden_size: int,
-                 weight_decay: float,
-                 threshold: float,
-                 scheduler: str,
+                 lr: float = 3e-5,
+                 hidden_size: int = 64,
+                 weight_decay: float = 0.01,
+                 threshold: float = 0.0,
+                 scheduler: str = 'harmonic_epoch',
                  **kwargs: Any) -> None:
         super().__init__()
         self.plm = self.get_plm_architecture()
 
-        self.role_classifier = EfficientGlobalPointer(input_size=self.plm.config.hidden_size,
-                                                      hidden_size=hidden_size,
-                                                      output_size=len(self.hparams.label2id))
-        self.head_classifier = EfficientGlobalPointer(input_size=self.plm.config.hidden_size,
-                                                      hidden_size=hidden_size,
-                                                      output_size=1,
-                                                      RoPE=False)
-        self.tail_classifier = EfficientGlobalPointer(input_size=self.plm.config.hidden_size,
-                                                      hidden_size=hidden_size,
-                                                      output_size=1,
-                                                      RoPE=False)
+        self.role_classifier = GlobalPointer(input_size=self.plm.config.hidden_size,
+                                             hidden_size=hidden_size,
+                                             output_size=len(self.hparams.label2id),
+                                             add_rope=True)
+        self.head_classifier = GlobalPointer(input_size=self.plm.config.hidden_size,
+                                             hidden_size=hidden_size,
+                                             output_size=1,
+                                             add_rope=True)
+        self.tail_classifier = GlobalPointer(input_size=self.plm.config.hidden_size,
+                                             hidden_size=hidden_size,
+                                             output_size=1,
+                                             add_rope=True)
         self.dropout = MultiDropout()
         self.role_criterion = MultiLabelCategoricalCrossEntropy()
         self.head_criterion = MultiLabelCategoricalCrossEntropy()
@@ -124,16 +125,18 @@ class GPLinkerForEventExtraction(PLMBaseModel):
 
 
     def extract_events(self, role_logits: torch.Tensor, head_logits: torch.Tensor, tail_logits: torch.Tensor, threshold: Union[None, float]=None):
+        if threshold == None:
+            threshold = self.hparams.threshold
         role_logits = role_logits.chunk(role_logits.shape[0])
         head_logits = head_logits.chunk(head_logits.shape[0])
         tail_logits = tail_logits.chunk(tail_logits.shape[0])
         assert len(head_logits) == len(tail_logits) == len(role_logits)
         batch_events = []
         for i in range(len(role_logits)):
-            roles = set()
+            roles = []
             for l, h, t in zip(*torch.where(role_logits[i].squeeze(0) > threshold)):
-                # roles.add(Role(start=h.item(), end=t.item(), label=l.item()))
-                roles.add(self.hparams.id2label[l.item()] + (h.item(), t.item()))
+                roles.append(tuple(self.hparams.id2label[l.item()]) + (h.item(), t.item()))
+            roles = sorted(set(roles))
             links = set()
             for i1, role1 in enumerate(roles):
                 for i2, role2 in enumerate(roles):
@@ -143,15 +146,15 @@ class GPLinkerForEventExtraction(PLMBaseModel):
                             if tail_logits[i][0][0][min(role1[3], role2[3])][max(role1[3], role2[3])] > threshold:
                                 links.add((role1[2], role1[3], role2[2], role2[3]))
                                 links.add((role2[2], role2[3], role1[2], role1[3]))
-            events = []
-            for e_label, sub_argus in groupby(sorted(roles), key=lambda role: role[0]):
+            events = set()
+            for e_label, sub_argus in groupby(roles, key=lambda x: x[0]):
                 for event in clique_search(list(sub_argus), links):
-                    roles = set()
+                    r = set()
                     for argu in event:
                         start, end = argu[2], argu[3]
-                        roles.add(Role(start=start, end=end, label=argu[1]))
-                    event = Event(label=e_label, roles=roles)
-                    events.append(event)
+                        r.add(Role(start=start, end=end, label=argu[1]))
+                    event = Event(label=e_label, roles=r)
+                    events.add(event)
             batch_events.append(events)
         return batch_events
 

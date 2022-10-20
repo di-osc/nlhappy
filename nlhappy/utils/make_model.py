@@ -113,6 +113,7 @@ class PLMBaseModel(LightningModule):
         plm_config.add_pooler_layer = add_pooler_layer
         return AutoModel.from_config(plm_config)    
     
+    
     def get_linear_warmup_step_scheduler_config(self, optimizer, warmup_rate: float = 0.5):
         steps_per_epoch = self.get_one_epoch_steps()
         total_steps = self.trainer.max_epochs * steps_per_epoch
@@ -128,10 +129,12 @@ class PLMBaseModel(LightningModule):
         scheduler_config = {'scheduler': scheduler, 'interval':'step'}
         return scheduler_config
     
+    
     def get_harmonic_epoch_scheduler_config(self, optimizer):
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 1.0 / (epoch + 1.0))
         scheduler_config = {'scheduler': scheduler, 'interval':'epoch'}
         return scheduler_config
+    
     
     def get_one_cycle_scheduler_config(self, optimizer):
         steps_per_epoch = self.get_one_epoch_steps()

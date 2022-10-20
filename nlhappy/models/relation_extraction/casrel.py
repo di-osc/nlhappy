@@ -1,4 +1,3 @@
-from re import T
 from typing import List
 from ...utils.make_model import PLMBaseModel
 from ...layers.dropout import MultiDropout
@@ -6,7 +5,6 @@ from ...metrics.triple import TripleF1, Triple
 from ...metrics.span import SpanOffsetF1
 import torch.nn as nn
 import torch
-import torch.nn.functional as F
 
 
 class CasRelLoss(nn.BCELoss):
@@ -36,13 +34,13 @@ class CasRelForRelationExtraction(PLMBaseModel):
         - dropout: dropout的比率
         - scheduler: 学习率衰减策略必须
         - threshold: 阈值
+        
     Reference:
         [1] https://github.com/xiangking/ark-nlp/blob/main/ark_nlp/model/re/prgc_bert/prgc_bert.py
     """
     
     def __init__(self,
                  lr: float,
-                 dropout: float = 0.2,
                  weight_decay: float = 0.01,
                  scheduler: str = 'linear_warmup_step',
                  threshold: float = 0.5,

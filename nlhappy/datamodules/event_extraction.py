@@ -25,7 +25,7 @@ class EventExtractionDataModule(PLMBaseDataModule):
         self.transforms = {'gplinker': self.gplinker_transform}
 
 
-    def setup(self, stage: str) -> None:
+    def setup(self, stage: str = 'fit') -> None:
         self.hparams.max_length = self.get_max_length()
         if self.hparams.transform == 'gplinker':
             self.hparams.id2label = {i:l for l,i in self.combined2id.items()}

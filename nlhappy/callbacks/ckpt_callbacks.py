@@ -19,7 +19,11 @@ class LoadModelStateDict(Callback):
         
 
 class LoadPLMStateDict(Callback):
-    """Load model from checkpoint."""
+    """训练开始前加载预训练模型
+    
+    - 预训练模型的名称必须为plm bert encoder decoder 之一
+    
+    """
 
     def on_train_start(self, trainer, pl_module):
         ckpt_path = os.path.join(pl_module.hparams.plm_dir, pl_module.hparams.plm, 'pytorch_model.bin')
@@ -41,4 +45,3 @@ class LoadPLMStateDict(Callback):
         except Exception:
             pass
         log.info('all weights loaded')
-        
