@@ -1,5 +1,5 @@
 from ...utils.make_model import PLMBaseModel
-from ...layers.classifier import EfficientGlobalPointer, GlobalPointer
+from ...layers.classifier import GlobalPointer, EfficientGlobalPointer
 from ...layers.loss import MultiLabelCategoricalCrossEntropy
 from ...layers.dropout import MultiDropout
 from ...metrics.event import EventF1, Event, Role
@@ -56,18 +56,18 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         super().__init__()
         self.plm = self.get_plm_architecture()
 
-        self.role_classifier = GlobalPointer(input_size=self.plm.config.hidden_size,
+        self.role_classifier = EfficientGlobalPointer(input_size=self.plm.config.hidden_size,
                                              hidden_size=hidden_size,
                                              output_size=len(self.hparams.label2id),
-                                             add_rope=True)
-        self.head_classifier = GlobalPointer(input_size=self.plm.config.hidden_size,
+                                             RoPE=True)
+        self.head_classifier = EfficientGlobalPointer(input_size=self.plm.config.hidden_size,
                                              hidden_size=hidden_size,
                                              output_size=1,
-                                             add_rope=True)
-        self.tail_classifier = GlobalPointer(input_size=self.plm.config.hidden_size,
+                                             RoPE=False)
+        self.tail_classifier = EfficientGlobalPointer(input_size=self.plm.config.hidden_size,
                                              hidden_size=hidden_size,
                                              output_size=1,
-                                             add_rope=True)
+                                             RoPE=False)
         self.dropout = MultiDropout()
         self.role_criterion = MultiLabelCategoricalCrossEntropy()
         self.head_criterion = MultiLabelCategoricalCrossEntropy()
@@ -76,7 +76,8 @@ class GPLinkerForEventExtraction(PLMBaseModel):
 
         
     def forward(self, input_ids, token_type_ids, attention_mask):
-        x = self.plm(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask).last_hidden_state
+        hiddens = self.plm(input_ids, token_type_ids, attention_mask, output_hidden_states=True).hidden_states
+        x = torch.stack(hiddens[-4:], dim=-1).mean(-1) 
         x = self.dropout(x)
         role_logits = self.role_classifier(x, mask=attention_mask)
         head_logits = self.head_classifier(x, mask=attention_mask)
@@ -171,13 +172,13 @@ class GPLinkerForEventExtraction(PLMBaseModel):
             {'params': [p for n, p in self.role_classifier.named_parameters() if any(nd in n for nd in no_decay)],
             'lr': self.hparams.lr* 10, 'weight_decay': 0.0},
             {'params': [p for n, p in self.head_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr* 10, 'weight_decay': self.hparams.weight_decay},
+            'lr': self.hparams.lr* 5, 'weight_decay': self.hparams.weight_decay},
             {'params': [p for n, p in self.head_classifier.named_parameters() if any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr* 10, 'weight_decay': 0.0},
+            'lr': self.hparams.lr* 5, 'weight_decay': 0.0},
             {'params': [p for n, p in self.tail_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr* 10, 'weight_decay': self.hparams.weight_decay},
+            'lr': self.hparams.lr* 5, 'weight_decay': self.hparams.weight_decay},
             {'params': [p for n, p in self.tail_classifier.named_parameters() if any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr* 10, 'weight_decay': 0.0}
+            'lr': self.hparams.lr* 5, 'weight_decay': 0.0}
         ]
         optimizer = torch.optim.AdamW(grouped_parameters, eps=1e-5)
         scheduler_config = self.get_scheduler_config(optimizer=optimizer, name=self.hparams.scheduler)
