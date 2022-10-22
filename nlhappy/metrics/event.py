@@ -49,5 +49,5 @@ class EventF1(Metric):
     
     def compute(self):
         # 下面这个公式可以通过化简得到
-        f1 =  2 * self.correct / (self.all_pred + self.all_true + 1e-10)
+        f1 =  2 * self.correct / (self.all_pred + self.all_true)
         return f1
