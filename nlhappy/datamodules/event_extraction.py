@@ -62,26 +62,23 @@ class EventExtractionDataModule(PLMBaseDataModule):
     def gplinker_transform(self, examples):
         batch_text = examples['text']
         batch_events = examples['events']
-        batch_inputs = {'input_ids':[], 
-                        'token_type_ids':[],
-                        'attention_mask':[]}
         batch_role_ids = []
         batch_head_ids = []
         batch_tail_ids = []
+        max_length = self.get_max_length()
+        batch_inputs = self.tokenizer(batch_text,
+                                      max_length=max_length,
+                                      padding='max_length',
+                                      truncation=True,
+                                      return_offsets_mapping=True,
+                                      return_tensors='pt')
+        batch_mappings = batch_inputs.pop('offset_mapping').tolist()
         for i, text in enumerate(batch_text):
-            inputs = self.tokenizer(text, 
-                                    padding='max_length',  
-                                    max_length=self.hparams.max_length,
-                                    truncation=True,
-                                    return_offsets_mapping=True)
-            batch_inputs['input_ids'].append(inputs['input_ids'])
-            batch_inputs['attention_mask'].append(inputs['attention_mask'])
-            batch_inputs['token_type_ids'].append(inputs['token_type_ids'])
-            offset_mapping = inputs['offset_mapping']
+            offset_mapping = batch_mappings[i]
             events = batch_events[i]
-            role_ids = torch.zeros(len(self.combined2id), self.hparams.max_length, self.hparams.max_length)
-            head_ids = torch.zeros(1, self.hparams.max_length, self.hparams.max_length)
-            tail_ids = torch.zeros(1, self.hparams.max_length, self.hparams.max_length)
+            role_ids = torch.zeros(len(self.combined2id), max_length, max_length)
+            head_ids = torch.zeros(1, max_length, max_length)
+            tail_ids = torch.zeros(1, max_length, max_length)
             for event in events:
                 e_label = event['label']
                 for i, role in enumerate(event['roles']):
@@ -111,11 +108,10 @@ class EventExtractionDataModule(PLMBaseDataModule):
             batch_role_ids.append(role_ids)
             batch_head_ids.append(head_ids)
             batch_tail_ids.append(tail_ids)
-        batch = dict(zip(batch_inputs.keys(), map(torch.tensor, batch_inputs.values())))
-        batch['role_ids'] = torch.stack(batch_role_ids, dim=0)
-        batch['head_ids'] = torch.stack(batch_head_ids, dim=0)
-        batch['tail_ids'] = torch.stack(batch_tail_ids, dim=0)
-        return batch
+        batch_inputs['role_ids'] = torch.stack(batch_role_ids, dim=0)
+        batch_inputs['head_ids'] = torch.stack(batch_head_ids, dim=0)
+        batch_inputs['tail_ids'] = torch.stack(batch_tail_ids, dim=0)
+        return batch_inputs
 
 
     @staticmethod
