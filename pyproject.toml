@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "nlhappy"
-version = "2022.10.18"
+version = "2022.10.20"
 description = "自然语言处理(NLP)"
 authors = ["wangmengdi <790990241@qq.om>"]
 license = "MIT"
@@ -23,9 +23,7 @@ wandb = ">=0.12.18"
 
 
 [tool.poetry.extras]
-spacy = ["spacy"]
-wandb = ["wandb"]
-all = ["spacy", "wandb"]
+all = ["spacy", "wandb", "d-oss"]
 
 
 [tool.poetry.plugins."spacy_factories"]
