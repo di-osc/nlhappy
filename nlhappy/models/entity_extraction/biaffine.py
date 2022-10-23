@@ -4,6 +4,7 @@ from ...layers.dropout import MultiDropout
 from ...layers.loss import MultiLabelCategoricalCrossEntropy
 from ...metrics.span import SpanF1
 import torch
+from torch.nn import BCEWithLogitsLoss
 
 
 class BiaffineForEntityExtraction(PLMBaseModel):
@@ -11,7 +12,7 @@ class BiaffineForEntityExtraction(PLMBaseModel):
                  lr: float = 3e-5,
                  hidden_size: int = 128,
                  add_rope: bool = True,
-                 threshold: float = 0.0,
+                 threshold: float = 0.5,
                  scheduler: str = 'linear_warmup_step',
                  weight_decay: float = 0.01,
                  **kwargs) -> None:
@@ -21,10 +22,11 @@ class BiaffineForEntityExtraction(PLMBaseModel):
         self.classifier = BiaffineSpanClassifier(input_size=self.plm.config.hidden_size,
                                                  hidden_size=hidden_size,
                                                  output_size=len(self.hparams.label2id),
-                                                 add_rope=add_rope)
+                                                 add_rope=add_rope,
+                                                 tril_mask=True)
         self.dropout = MultiDropout()
         
-        self.criterion = MultiLabelCategoricalCrossEntropy()
+        self.criterion = BCEWithLogitsLoss(reduce=None)
 
         self.train_metric = SpanF1()
         self.val_metric = SpanF1()
@@ -42,14 +44,11 @@ class BiaffineForEntityExtraction(PLMBaseModel):
         input_ids = batch['input_ids']
         token_type_ids = batch['token_type_ids']
         attention_mask = batch['attention_mask']
-        span_ids = batch['label_ids']
+        span_ids = batch['label_ids'].permute(0,2,3,1)
         logits = self(input_ids, token_type_ids, attention_mask)
-        pred = logits.ge(self.hparams.threshold).float()
-        batch_size, ent_type_size = logits.shape[:2]
-        y_true = span_ids.reshape(batch_size*ent_type_size, -1)
-        y_pred = logits.reshape(batch_size*ent_type_size, -1)
-        loss = self.criterion(y_pred, y_true)
-        return loss, pred, span_ids
+        loss = self.criterion(logits, span_ids)
+        probs = torch.sigmoid(logits) > self.hparams.threshold
+        return loss, probs, span_ids
 
         
     def training_step(self, batch, batch_idx):
@@ -67,7 +66,7 @@ class BiaffineForEntityExtraction(PLMBaseModel):
     
     
     def test_step(self, batch, batch_idx):
-        loss, pred, true = self.shared_step(batch)
+        loss, pred, true = self.step(batch)
         self.test_metric(pred, true)
         self.log('test/f1', self.test_metric, on_step=False, on_epoch=True, prog_bar=True)
         return {'loss': loss}
@@ -102,8 +101,8 @@ class BiaffineForEntityExtraction(PLMBaseModel):
         mapping = inputs.pop('offset_mapping')
         mapping = mapping[0].tolist()
         inputs.to(device)
-        logits = self(**inputs)
-        spans_ls = torch.nonzero(logits>threshold).tolist()
+        preds = self(**inputs)
+        spans_ls = torch.nonzero(preds>threshold).tolist()
         spans = []
         for span in spans_ls :
             start = span[2]

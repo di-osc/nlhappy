@@ -2,7 +2,6 @@ from typing import List
 from ...utils.make_model import PLMBaseModel
 from ...layers.dropout import MultiDropout
 from ...metrics.triple import TripleF1, Triple
-from ...metrics.span import SpanOffsetF1
 import torch.nn as nn
 import torch
 

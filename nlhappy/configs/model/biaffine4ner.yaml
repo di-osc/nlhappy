@@ -3,7 +3,7 @@ _target_: nlhappy.models.BiaffineForEntityExtraction
 lr: 3e-5 
 hidden_size: 128
 weight_decay: 0.0
-threshold: 0.0
+threshold: 0.5
 scheduler: linear_warmup_step
 add_rope: True
 name: biaffine4ner

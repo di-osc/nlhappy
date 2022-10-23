@@ -51,8 +51,8 @@ class BiaffineSpanClassifier(nn.Module):
         self.hidden_size = hidden_size
         self.tril_mask = tril_mask
         self.add_rope = add_rope
-        self.start_repr = nn.Sequential(nn.Linear(input_size, hidden_size), nn.ReLU())
-        self.end_repr = nn.Sequential(nn.Linear(input_size, hidden_size), nn.ReLU())
+        self.start_repr = nn.Linear(input_size, hidden_size)
+        self.end_repr = nn.Linear(input_size, hidden_size)
         weight = torch.zeros((output_size, hidden_size, hidden_size))
         nn.init.xavier_normal_(weight)                                          #将权重变为正态分布
         self.weight = nn.Parameter(weight, requires_grad=True)
@@ -95,5 +95,4 @@ class BiaffineSpanClassifier(nn.Module):
             mask_tril = torch.tril(torch.ones_like(span_logits), diagonal=-1)
             span_logits = span_logits - mask_tril * 1e12
             
-
-        return span_logits  
+        return span_logits.permute(0,2,3,1)
