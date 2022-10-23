@@ -114,18 +114,18 @@ class PLMBaseModel(LightningModule):
         return AutoModel.from_config(plm_config)    
     
     
-    def get_linear_warmup_step_scheduler_config(self, optimizer, warmup_rate: float = 0.5):
-        steps_per_epoch = self.get_one_epoch_steps()
-        total_steps = self.trainer.max_epochs * steps_per_epoch
-        scheduler = get_linear_schedule_with_warmup(optimizer=optimizer, num_training_steps=total_steps, num_warmup_steps=warmup_rate * steps_per_epoch)
+    def get_linear_warmup_step_scheduler_config(self, optimizer):
+        total_steps = self.get_total_steps()
+        warmup_steps = self.get_one_epoch_steps() // 3
+        scheduler = get_linear_schedule_with_warmup(optimizer=optimizer, num_training_steps=total_steps, num_warmup_steps=warmup_steps)
         scheduler_config = {'scheduler': scheduler, 'interval':'step'}
         return scheduler_config
     
     
-    def get_cosine_warmup_step_scheduler_config(self, optimizer, warmup_rate: float = 0.5):
-        steps_per_epoch = self.get_one_epoch_steps()
-        total_steps = self.trainer.max_epochs * steps_per_epoch
-        scheduler = get_cosine_schedule_with_warmup(optimizer=optimizer, num_training_steps=total_steps, num_warmup_steps=warmup_rate * steps_per_epoch)
+    def get_cosine_warmup_step_scheduler_config(self, optimizer):
+        total_steps = self.get_total_steps()
+        warmup_steps = self.get_one_epoch_steps() // 3
+        scheduler = get_cosine_schedule_with_warmup(optimizer=optimizer, num_training_steps=total_steps, num_warmup_steps=warmup_steps)
         scheduler_config = {'scheduler': scheduler, 'interval':'step'}
         return scheduler_config
     
@@ -137,8 +137,7 @@ class PLMBaseModel(LightningModule):
     
     
     def get_one_cycle_scheduler_config(self, optimizer):
-        steps_per_epoch = self.get_one_epoch_steps()
-        total_steps = self.trainer.max_epochs * steps_per_epoch
+        total_steps = self.get_total_steps()
         scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer=optimizer, max_lr=self.hparams.lr*3, total_steps=total_steps)
         scheduler_config = {'scheduler': scheduler, 'interval':'step'}
         return scheduler_config
@@ -154,8 +153,14 @@ class PLMBaseModel(LightningModule):
         return [scheduler for scheduler in self.scheduler_names if scheduler.endswith('step')]
     
     
-    def get_one_epoch_steps(self):
+    def get_total_steps(self):
         return self.trainer.estimated_stepping_batches
+    
+    
+    def get_one_epoch_steps(self):
+        total_steps = self.get_total_steps()
+        max_epochs = self.trainer.max_epochs
+        return total_steps // max_epochs
         
     
     def get_scheduler_config(self, optimizer, name: str):
