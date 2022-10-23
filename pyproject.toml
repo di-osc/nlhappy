@@ -8,22 +8,22 @@ readme = "README.md"
 documentation = "https://wangmengdi.notion.site/NLHAPPY-264f05d1084848efa42068c83539904a"
 
 [tool.poetry.dependencies]
-python = "^3.7"
-torch = ">=1.11.0"
+python = ">=3.7"
+torch = ">=1.8.0"
 pytorch-lightning = "1.7.7"
 datasets = ">=2.0.0"
 transformers = ">=4.17.0"
 hydra-core = "1.1"
 hydra-colorlog = ">=1.1.0"
-googletrans = "4.0.0rc1"
 rich = "^12.4.3"
 
+googletrans = "4.0.0rc1"
 spacy = ">=3.3.0"
 wandb = ">=0.12.18"
 
 
 [tool.poetry.extras]
-all = ["spacy", "wandb", "d-oss"]
+all = ["spacy", "wandb", "d-oss", "googletrans"]
 
 
 [tool.poetry.plugins."spacy_factories"]
