@@ -56,13 +56,17 @@ class TextClassificationDataModule(PLMBaseDataModule):
             batch_label_ids.append(label_id)
         batch_inputs['label_ids'] = torch.LongTensor(batch_label_ids)        
         return batch_inputs
+    
+    
+    @property
+    @lru_cache()
+    def labels(self):
+        return sorted(set(self.train_df.label.values))
 
 
     @property
-    @lru_cache()
     def label2id(self):
-        labels = sorted(set(self.train_df.label.values))
-        label2id = {l : i for i,l in enumerate(labels)}
+        label2id = {l : i for i,l in enumerate(self.labels)}
         return label2id
 
 
@@ -79,4 +83,3 @@ class TextClassificationDataModule(PLMBaseDataModule):
     @classmethod
     def get_available_transforms(cls):
         return ['bert']
-        

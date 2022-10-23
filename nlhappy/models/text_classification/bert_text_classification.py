@@ -4,17 +4,18 @@ from typing import List, Tuple
 from ...layers import SimpleDense, MultiDropout
 from ...utils.make_model import PLMBaseModel
 
-class BertTextClassification(PLMBaseModel):
+
+class BertForTextClassification(PLMBaseModel):
     '''
     文本分类模型
     '''
     def __init__(self, 
-                 lr: float ,
+                 lr: float = 3e-5,
                  hidden_size: int = 256,
                  scheduler: str = 'linear_warmup_step',
                  weight_decay: float = 0.1,
                  **kwargs):
-        super(BertTextClassification, self).__init__()  
+        super().__init__()  
 
         # 模型架构
         self.bert = self.get_plm_architecture(add_pooler_layer=True)

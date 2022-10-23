@@ -118,15 +118,15 @@ class GPLinkerForEventExtraction(PLMBaseModel):
     def validation_step(self, batch, batch_idx):
         role_true, head_true, tail_true = batch['role_ids'], batch['head_ids'], batch['tail_ids']
         loss, role_logits, head_logits, tail_logits = self.step(batch)
-        batch_events = self.extract_events(role_logits, head_logits, tail_logits, threshold=self.hparams.threshold)
-        batch_true_events = self.extract_events(role_true, head_true, tail_true, threshold=self.hparams.threshold)
+        batch_events = self.extract_events(role_logits, head_logits, tail_logits)
+        batch_true_events = self.extract_events(role_true, head_true, tail_true)
         self.val_metric(batch_events, batch_true_events)
         self.log('val/f1', self.val_metric, on_step=False, on_epoch=True, prog_bar=True)
         return {'val_loss': loss}
 
 
     def extract_events(self, role_logits: torch.Tensor, head_logits: torch.Tensor, tail_logits: torch.Tensor, threshold: Union[None, float]=None):
-        if threshold == None:
+        if threshold is None:
             threshold = self.hparams.threshold
         role_logits = role_logits.chunk(role_logits.shape[0])
         head_logits = head_logits.chunk(head_logits.shape[0])

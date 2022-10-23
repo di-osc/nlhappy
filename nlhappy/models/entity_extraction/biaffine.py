@@ -8,6 +8,15 @@ from torch.nn import BCEWithLogitsLoss
 
 
 class BiaffineForEntityExtraction(PLMBaseModel):
+    """span级别的实体识别,支持嵌套实体识别
+
+    Args:
+        lr: 学习率. 默认3e-5
+        scheduler: 学习率衰减器. 
+        hidden_size: 中间层维度. 默认128
+        threshold: 抽取阈值.抽取大于这个值的span
+        weight_decay: 权重衰减
+    """
     def __init__(self,
                  lr: float = 3e-5,
                  hidden_size: int = 128,

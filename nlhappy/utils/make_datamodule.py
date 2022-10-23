@@ -6,6 +6,7 @@ from datasets import load_from_disk, load_dataset
 import pytorch_lightning as pl
 from transformers import AutoConfig, AutoTokenizer, AutoModel
 from functools import lru_cache
+from pathlib import Path
 
 
 log = get_logger()
@@ -104,42 +105,48 @@ def align_char_span_text_b(char_span_offset: tuple,
     return token_span_offset
 
 
-def prepare_data_from_huffingface(dataset: str,
+def prepare_dataset(dataset_name: str, dataset_dir) -> None:
+    path = Path(dataset_dir, dataset_name)
+    if path.exists():
+        pass
+    else:
+        log.info('cannot found dataset in {}.'.format(path))
+        try:
+            log.info(f'download dataset {dataset} from huffingface')
+            dataset = load_dataset(dataset)
+            dataset.save_to_disk(path)
+            log.info(f'download dataset succeed')
+        except:
+            log.error('download dataset failed')
+            
+            
+def prepare_plm(plm_name: str, plm_dir: str) -> None:
+    path = Path(plm_dir, plm_name)
+    if path.exists():
+        pass
+    else : 
+        log.info('cannot found plm in {}'.format(path))
+        try:
+            log.info(f'download plm {plm_name} from huffingface')
+            model = AutoModel.from_pretrained(plm_name)
+            tokenizer = AutoTokenizer.from_pretrained(plm_name)
+            model.save_pretrained(path)
+            tokenizer.save_pretrained(path)
+            log.info(f'download plm succeed')
+        except:
+            log.error('download plm failed')
+        
+
+
+def prepare_from_huffingface(dataset: str, 
+                             dataset_dir: str,
                              plm: str,
-                             dataset_dir: str ='./datasets/',
-                             plm_dir: str = './plms/') -> None:
+                             plm_dir: str) -> None:
         '''
-        下载数据集.这个方法只会在一个GPU上执行一次.
+        下载数据集和预训练模型这个方法只会在一个GPU上执行一次.
         '''
-        dataset_path = os.path.join(dataset_dir, dataset)
-        plm_path = os.path.join(plm_dir, plm)
-        # 检测数据
-        if os.path.exists(dataset_path):
-            pass
-        else:
-            log.info('cannot found dataset in {}.'.format(dataset_path))
-            try:
-                log.info(f'download dataset {dataset} from huffingface')
-                dataset = load_dataset(dataset)
-                dataset.save_to_disk(dataset_path)
-                log.info(f'download dataset succeed')
-            except:
-                log.error('download dataset failed')
-
-        if os.path.exists(plm_path):
-            pass 
-        else : 
-            log.info('cannot found plm in {}'.format(plm_path))
-            try:
-                log.info(f'download plm {plm} from huffingface')
-                model = AutoModel.from_pretrained(plm)
-                tokenizer = AutoTokenizer.from_pretrained(plm)
-                model.save_pretrained(plm_path)
-                tokenizer.save_pretrained(plm_path)
-                log.info(f'download plm succeed')
-            except:
-                log.error('download plm failed')
-
+        prepare_dataset(dataset_name=dataset, dataset_dir=dataset_dir)
+        prepare_plm(plm_name=plm, plm_dir=plm_dir)
 
 
 class PLMBaseDataModule(pl.LightningModule):
@@ -168,10 +175,10 @@ class PLMBaseDataModule(pl.LightningModule):
     
     
     def prepare_data(self) -> None:
-        prepare_data_from_huffingface(dataset=self.hparams.dataset,
-                                      plm=self.hparams.plm,
-                                      dataset_dir=self.hparams.dataset_dir,
-                                      plm_dir=self.hparams.plm_dir)
+        prepare_from_huffingface(dataset=self.hparams.dataset, 
+                                 dataset_dir=self.hparams.dataset_dir,
+                                 plm=self.hparams.plm,
+                                 plm_dir=self.hparams.plm_dir)
     
     
     @property
@@ -206,7 +213,7 @@ class PLMBaseDataModule(pl.LightningModule):
     
         
     @lru_cache()
-    def get_max_length(self, set_to_hparams: bool = True):
+    def get_max_length(self):
         """根据auto_length参数自动获取最大token的长度,并将其添加进hparams
         Args:
             set_to_hparam (bool): 调用该方法时自动设置为self.hparams.max_length,默认为True
@@ -222,11 +229,9 @@ class PLMBaseDataModule(pl.LightningModule):
         if type(self.hparams.auto_length) == int:
             assert self.hparams.auto_length >0, 'max_length length  must > 0'
             max_length = self.hparams.auto_length
-        max_length_ = min(self.hparams.plm_max_input_length, max_length+2)
-        log.info(f'current max token length: {max_length_}')
-        if set_to_hparams:
-            self.hparams.max_length = max_length_
-        return max_length_
+        # max_length_ = min(self.hparams.plm_max_input_length, max_length+2)
+        log.info(f'current max token length: {max_length}')
+        return max_length
     
     
     @property
