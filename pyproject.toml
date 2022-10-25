@@ -23,7 +23,7 @@ wandb = ">=0.12.18"
 
 
 [tool.poetry.extras]
-all = ["spacy", "wandb", "d-oss", "googletrans"]
+all = ["spacy", "wandb", "googletrans"]
 
 
 [tool.poetry.plugins."spacy_factories"]

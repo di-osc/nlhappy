@@ -7,7 +7,7 @@ defaults:
   - model: null 
   - datamodule: 
   - callbacks: finetune
-  - logger: null # set logger here or use command line (e.g. `python run.py logger=wandb`)
+  - logger: csv # set logger here or use command line (e.g. `python run.py logger=wandb`)
   - log_dir: default
 
   # enable color logging

@@ -6,6 +6,7 @@ from ...metrics.event import EventF1, Event, Role
 import torch
 from itertools import groupby
 from typing import Any, Union
+import numpy as np
 
 
 class DedupList(list):
@@ -56,21 +57,19 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         super().__init__()
         self.plm = self.get_plm_architecture()
 
-        self.role_classifier = EfficientGlobalPointer(input_size=self.plm.config.hidden_size,
+        self.role_classifier = GlobalPointer(input_size=self.plm.config.hidden_size,
                                              hidden_size=hidden_size,
                                              output_size=len(self.hparams.label2id),
-                                             RoPE=True,
+                                             add_rope=True,
                                              tril_mask=True)
-        self.head_classifier = EfficientGlobalPointer(input_size=self.plm.config.hidden_size,
+        self.head_classifier = GlobalPointer(input_size=self.plm.config.hidden_size,
                                              hidden_size=hidden_size,
                                              output_size=1,
-                                             RoPE=False,
-                                             tril_mask=False)
-        self.tail_classifier = EfficientGlobalPointer(input_size=self.plm.config.hidden_size,
+                                             add_rope=False)
+        self.tail_classifier = GlobalPointer(input_size=self.plm.config.hidden_size,
                                              hidden_size=hidden_size,
                                              output_size=1,
-                                             RoPE=False,
-                                             tril_mask=False)
+                                             add_rope=False)
         self.dropout = MultiDropout()
         self.role_criterion = MultiLabelCategoricalCrossEntropy()
         self.head_criterion = MultiLabelCategoricalCrossEntropy()
@@ -78,8 +77,8 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         self.val_metric = EventF1()                  
 
         
-    def forward(self, input_ids, token_type_ids, attention_mask):
-        x = self.plm(input_ids, token_type_ids, attention_mask).last_hidden_state
+    def forward(self, input_ids, attention_mask):
+        x = self.plm(input_ids=input_ids,attention_mask=attention_mask).last_hidden_state
         x = self.dropout(x)
         role_logits = self.role_classifier(x, mask=attention_mask)
         head_logits = self.head_classifier(x, mask=attention_mask)
@@ -89,12 +88,11 @@ class GPLinkerForEventExtraction(PLMBaseModel):
 
     def step(self, batch):
         input_ids = batch['input_ids']
-        token_type_ids = batch['token_type_ids']
         attention_mask = batch['attention_mask']
         role_true = batch['role_ids']
         head_true = batch['head_ids']
         tail_true = batch['tail_ids']
-        role_logits, head_logits, tail_logits = self(input_ids, token_type_ids, attention_mask)
+        role_logits, head_logits, tail_logits = self(input_ids, attention_mask)
         role_logits_ = role_logits.reshape(role_logits.shape[0] * role_logits.shape[1], -1)
         role_true_ = role_true.reshape(role_true.shape[0] * role_true.shape[1], -1)
         role_loss = self.role_criterion(role_logits_, role_true_)
@@ -130,33 +128,34 @@ class GPLinkerForEventExtraction(PLMBaseModel):
     def extract_events(self, role_logits: torch.Tensor, head_logits: torch.Tensor, tail_logits: torch.Tensor, threshold: Union[None, float]=None):
         if threshold is None:
             threshold = self.hparams.threshold
-        role_logits = role_logits.chunk(role_logits.shape[0])
-        head_logits = head_logits.chunk(head_logits.shape[0])
-        tail_logits = tail_logits.chunk(tail_logits.shape[0])
+        role_logits = role_logits.cpu().detach().numpy()
+        head_logits = head_logits.cpu().detach().numpy()
+        tail_logits = tail_logits.cpu().detach().numpy()
         assert len(head_logits) == len(tail_logits) == len(role_logits)
         batch_events = []
-        for i in range(len(role_logits)):
-            roles = []
-            for l, h, t in zip(*torch.where(role_logits[i].squeeze(0) > threshold)):
-                roles.append(tuple(self.hparams.id2label[l.item()]) + (h.item(), t.item()))
-            roles = sorted(set(roles))
+        for role_logit, head_logit, tail_logit in zip(role_logits, head_logits, tail_logits):
+            roles = set()
+            role_logit[:, [0, -1]] -= np.inf
+            role_logit[:, :, [0, -1]] -= np.inf
+            for l, h, t in zip(*np.where(role_logit > threshold)):
+                roles.add(tuple(self.hparams.id2label[l.item()]) + (h.item(), t.item()))
             links = set()
-            for i1, role1 in enumerate(roles):
-                for i2, role2 in enumerate(roles):
+            for i1, (_, _, h1, t1) in enumerate(roles):
+                for i2, (_, _, h2, t2) in enumerate(roles):
                     if i2 > i1:
                         # head_logits[i] 1,1,seq_len, seq_len
-                        if head_logits[i][0][0][min(role1[2], role2[2])][max(role1[2], role2[2])] > threshold:
-                            if tail_logits[i][0][0][min(role1[3], role2[3])][max(role1[3], role2[3])] > threshold:
-                                links.add((role1[2], role1[3], role2[2], role2[3]))
-                                links.add((role2[2], role2[3], role1[2], role1[3]))
+                        if head_logit[0, min(h1, h2), max(h1, h2)] > threshold:
+                            if tail_logit[0, min(t1, t2), max(t1, t2)] > threshold:
+                                links.add((h1, t1, h2, t2))
+                                links.add((h2, t2, h1, t1))
             events = set()
-            for e_label, sub_argus in groupby(roles, key=lambda x: x[0]):
+            for e_label, sub_argus in groupby(sorted(roles), key=lambda x: x[0]):
                 for event in clique_search(list(sub_argus), links):
-                    roles = set()
+                    role_ls = []
                     for argu in event:
-                        role_label, start, end =argu[1], argu[2], argu[3]
-                        roles.add(Role(start=start, end=end, label=role_label))
-                    event = Event(label=e_label, roles=roles)
+                        role_label, start, end =argu[1], argu[2], argu[3]+1
+                        role_ls.append(Role(start=start, end=end, label=role_label))
+                    event = Event(label=e_label, roles=role_ls)
                     events.add(event)
             batch_events.append(events)
         return batch_events
@@ -164,25 +163,31 @@ class GPLinkerForEventExtraction(PLMBaseModel):
     
     def configure_optimizers(self)  :
         no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
-        grouped_parameters = [
-            {'params': [p for n, p in self.plm.named_parameters() if not any(nd in n for nd in no_decay)],
+        # grouped_parameters = [
+        #     {'params': [p for n, p in self.plm.named_parameters() if not any(nd in n for nd in no_decay)],
+        #     'lr': self.hparams.lr, 'weight_decay': self.hparams.weight_decay},
+        #     {'params': [p for n, p in self.plm.named_parameters() if any(nd in n for nd in no_decay)],
+        #     'lr': self.hparams.lr, 'weight_decay': 0.0},
+        #     {'params': [p for n, p in self.role_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
+        #     'lr': self.hparams.lr, 'weight_decay': self.hparams.weight_decay},
+        #     {'params': [p for n, p in self.role_classifier.named_parameters() if any(nd in n for nd in no_decay)],
+        #     'lr': self.hparams.lr, 'weight_decay': 0.0},
+        #     {'params': [p for n, p in self.head_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
+        #     'lr': self.hparams.lr, 'weight_decay': self.hparams.weight_decay},
+        #     {'params': [p for n, p in self.head_classifier.named_parameters() if any(nd in n for nd in no_decay)],
+        #     'lr': self.hparams.lr, 'weight_decay': 0.0},
+        #     {'params': [p for n, p in self.tail_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
+        #     'lr': self.hparams.lr, 'weight_decay': self.hparams.weight_decay},
+        #     {'params': [p for n, p in self.tail_classifier.named_parameters() if any(nd in n for nd in no_decay)],
+        #     'lr': self.hparams.lr, 'weight_decay': 0.0}
+        # ]
+        grouped_params = [
+            {'params': [p for n, p in self.named_parameters() if not any(nd in n for nd in no_decay)],
             'lr': self.hparams.lr, 'weight_decay': self.hparams.weight_decay},
-            {'params': [p for n, p in self.plm.named_parameters() if any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr, 'weight_decay': 0.0},
-            {'params': [p for n, p in self.role_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr* 10, 'weight_decay': self.hparams.weight_decay},
-            {'params': [p for n, p in self.role_classifier.named_parameters() if any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr* 10, 'weight_decay': 0.0},
-            {'params': [p for n, p in self.head_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr* 5, 'weight_decay': self.hparams.weight_decay},
-            {'params': [p for n, p in self.head_classifier.named_parameters() if any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr* 5, 'weight_decay': 0.0},
-            {'params': [p for n, p in self.tail_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr* 5, 'weight_decay': self.hparams.weight_decay},
-            {'params': [p for n, p in self.tail_classifier.named_parameters() if any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr* 5, 'weight_decay': 0.0}
+            {'params': [p for n, p in self.named_parameters() if any(nd in n for nd in no_decay)],
+            'lr': self.hparams.lr, 'weight_decay': 0.0}
         ]
-        optimizer = torch.optim.AdamW(grouped_parameters, eps=1e-5)
+        optimizer = torch.optim.AdamW(grouped_params)
         scheduler_config = self.get_scheduler_config(optimizer=optimizer, name=self.hparams.scheduler)
         return [optimizer], [scheduler_config]
 

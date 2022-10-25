@@ -2,7 +2,9 @@ from ..utils.make_datamodule import PLMBaseDataModule, get_logger, char_idx_to_t
 from functools import lru_cache
 import torch
 import pandas as pd
+from pandas import Series
 import numpy as np
+from typing import List
 
 
 log = get_logger()
@@ -30,33 +32,51 @@ class EventExtractionDataModule(PLMBaseDataModule):
         if self.hparams.transform == 'gplinker':
             self.hparams.id2label = {i:l for l,i in self.combined2id.items()}
             self.dataset.set_transform(self.gplinker_transform)
-
-
+            
+            
     @property
     @lru_cache()
-    def event2id(self):
+    def event_labels(self):
         labels = pd.Series(np.concatenate(self.train_df.events.values)).apply(lambda x: x['label']).drop_duplicates().values
-        return {l:i for i, l in enumerate(labels)}
-
+        return labels
+    
+    
+    @property
+    def event2id(self):
+        return {l:i for i, l in enumerate(self.event_labels)}
+    
+    
     @property
     @lru_cache()
-    def role2id(self):
+    def role_labels(self):
         labels = pd.Series(np.concatenate(pd.Series(np.concatenate(self.train_df.events.values)).apply(lambda x: x['roles']).values)).apply(lambda x: x['label']).drop_duplicates().values
-        return {l:i for i, l in enumerate(labels)}
+        return labels
+    
+    
+    @property
+    def role2id(self):
+        return {l:i for i, l in enumerate(self.role_labels)}
+
 
     @property
     @lru_cache()
-    def combined2id(self):
+    def combined_labels(self):
         def get_labels(e):
             labels = []
             label = e['label']
             for r in e['roles']:
-                labels.append((label,r['label']))
+                pair_label = (label,r['label'])
+                if pair_label not in labels:
+                    labels.append(pair_label)
             return labels
         df = pd.DataFrame(np.concatenate(pd.Series(np.concatenate(self.train_df.events.values)).apply(get_labels).values).tolist()).drop_duplicates()
         labels = sorted([tuple(v) for v in df.values])
-        return {l:i for i,l in enumerate(labels)}
+        return labels
 
+
+    @property
+    def combined2id(self):
+        return {l:i for i,l in enumerate(self.combined_labels)}
 
 
     def gplinker_transform(self, examples):
@@ -71,7 +91,8 @@ class EventExtractionDataModule(PLMBaseDataModule):
                                       padding='max_length',
                                       truncation=True,
                                       return_offsets_mapping=True,
-                                      return_tensors='pt')
+                                      return_tensors='pt',
+                                      return_token_type_ids=False)
         batch_mappings = batch_inputs.pop('offset_mapping').tolist()
         for i, text in enumerate(batch_text):
             offset_mapping = batch_mappings[i]
