@@ -33,7 +33,7 @@ class MultiLabelCategoricalCrossEntropy(torch.nn.Module):
         neg_loss = torch.logsumexp(y_pred_neg, dim=-1)
         pos_loss = torch.logsumexp(y_pred_pos, dim=-1)
 
-        return (neg_loss + pos_loss).sum(dim=1).mean()
+        return (neg_loss + pos_loss).mean()
 
 
 class SparseMultiLabelCrossEntropy(torch.nn.Module):
