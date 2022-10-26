@@ -136,12 +136,12 @@ class EfficientGlobalPointer(Module):
                  input_size: int, 
                  hidden_size: int,
                  output_size: int,
-                 RoPE: bool =True,
+                 add_rope: bool =True,
                  tril_mask: bool =True):
         super(EfficientGlobalPointer, self).__init__()
         self.output_size = output_size
         self.hidden_size = hidden_size
-        self.RoPE = RoPE
+        self.RoPE = add_rope
         self.tril_mask = tril_mask
         self.input_size = input_size
         self.linear_1 = nn.Linear(input_size, hidden_size * 2)
