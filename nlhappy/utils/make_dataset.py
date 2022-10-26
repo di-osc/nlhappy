@@ -1,7 +1,7 @@
-from datasets import Dataset, DatasetDict, load_from_disk
+from datasets import Dataset, DatasetDict
+import pandas as pd
 from typing import Dict, Tuple, Union, List
 from ..algorithms.text_match import BM25
-from spacy.tokens import Doc
 import random
 from tqdm import tqdm
 
@@ -122,123 +122,12 @@ def make_text_match_dataset_with_bm25(corpus: List[str],
         return ds
     else:
         return ds, bm25
-    
 
-def make_relation_extraction_dataset_from_docs(docs: List[Doc], 
-                                              prompt_type: bool=False,
-                                              num_negative: int = 2): 
-    """将doc._.relations 转换为relation extraction任务数据
+def make_event_dataset_from_examples(examples: List[Dict[str]]) -> Dataset:
+    raise NotImplementedError
 
-    Args:
-        docs (List[Doc]): 待转换docs
-        prompt_type (bool, optional): 是否为prompt形式. Defaults to False.
+def make_entity_dataset_from_examples(examples: List[Dict[str]]) -> Dataset:
+    raise NotImplementedError
 
-    Returns:
-        Dataset: all convert dataset
-        
-    Example:
-        dataset: 
-        {'text': '小张毕业于河北工程大学',
-        'triples': [{'object': {'offset': [5,11], 'text': '河北工程大学'},
-                    'predicate': '毕业院校',
-                    'subject': {'offset': [0, 2], 'text': '小张'}}]},
-    """
-    if not prompt_type:
-        text_ls = []
-        triple_ls = []
-        for doc in tqdm(docs):
-            text_ls.append(doc.text)
-            triples = []
-            for rel in doc._.relations:
-                sub = rel.sub
-                pred = rel.label
-                for obj in rel.objs:
-                    triples.append({'subject':{'offset':(sub.start_char, sub.end_char), 'text':sub.text},
-                                    'predicate': pred,
-                                    'object':{'offset':(obj.start_char, obj.end_char), 'text':obj.text}})
-            triple_ls.append(triples)
-        ds = Dataset.from_dict({'text':text_ls, 'triples':triple_ls})
-        return ds
-    else:
-        text_ls = []
-        triple_ls = []
-        prompt_ls = []
-        all_labels = set([rel.label for doc in docs for rel in doc._.relations])
-        for doc in tqdm(docs):
-            triple_dict = {}
-            for rel in doc._.relations:
-                sub = rel.sub
-                p = rel.label
-                if p not in triple_dict:
-                    triple_dict[p] = []
-                for obj in rel.objs:
-                    triple_dict[p].append({'subject':{'offset':(sub.start_char, sub.end_char), 'text':sub.text},
-                                    'object':{'offset':(obj.start_char, obj.end_char), 'text':obj.text}})
-            
-            for p in triple_dict:
-                text_ls.append(doc.text)
-                triple_ls.append(triple_dict[p])
-                prompt_ls.append(p)
-            other_labels = list(all_labels - triple_dict.keys())
-            for l in other_labels[:num_negative]:
-                text_ls.append(doc.text)
-                triple_ls.append([])
-                prompt_ls.append(l)
-                
-        ds = Dataset.from_dict({'text':text_ls, 'triples':triple_ls, 'prompts': prompt_ls})
-        return ds
-
-
-def make_event_extraction_ds_from_doc(docs: List[Doc]):
-    text_ls = []
-    event_ls = []
-    for doc in tqdm(docs):
-        text_ls.append(doc.text)
-        events = []
-        for event in doc._.events:
-            e = {'label':event.label, 'roles':[]}
-            for role in event.roles:
-                spans = event.roles[role]
-                for span in spans:
-                    e['roles'].append({'label':role, 
-                                    'offset':(span.start_char, span.end_char), 
-                                    'text':span.text})
-            events.append(e)
-        event_ls.append(events)
-    ds = Dataset.from_dict({'text':text_ls, 'events':event_ls})
-    return ds
-
-
-def make_entity_extraction_ds_from_doc(docs: List[Doc], 
-                                      from_ent_or_span:str = 'ent',
-                                      span_key: str = 'all'):
-    """制作entity extraction 格式的数据集,只能得到连续的实体
-
-    Args:
-        docs (List[Doc]): 含有ent标记的spacy文档
-        from_ent_or_span (str): 实体标记,ent为doc.ent,span为doc.spans,当为span时请确保span_key正确
-        span_key (str): doc.spans的主键,即doc.spans[span_key]
-
-    Returns:
-        ds (Dataset): 数据模块EntityExtraction格式的数据集
-    """
-    assert from_ent_or_span in ['ent', 'span'], 'only ent or span available'
-    text_ls = []
-    ent_ls = []
-    if from_ent_or_span == 'ent':
-        for doc in tqdm(docs):
-            text_ls.append(doc.text)
-            ents = []
-            for ent in doc.ents:
-                e = {'label': ent.label_,'indexes':[i for i in range(ent.start_char, ent.end_char)], 'text':ent.text}
-                ents.append(e)
-            ent_ls.append(ents)
-    elif from_ent_or_span == 'span':
-        for doc in tqdm(docs):
-            text_ls.append(doc.text)
-            ents = []
-            for span in doc.spans[span_key]:
-                e = {'label': span.label_, 'indexes':[i for i in range(span.start_char, span.end_char)], 'text':span.text}
-                ents.append(e)
-    ds = Dataset.from_dict({'text':text_ls, 'entities':ent_ls})
-    return ds  
+def make_relation_dataset_from_examples(examples: List[Dict[str]]) -> Dataset:
+    raise NotImplementedError
