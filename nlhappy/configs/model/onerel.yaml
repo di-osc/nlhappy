@@ -1,6 +1,6 @@
 _target_: nlhappy.models.relation_extraction.OneRelForRelationExtraction
 
 lr: 3e-5
-scheduler: linear_warmup_step
+scheduler: linear_warmup
 dropout: 0.1
 weight_decay: 0.01

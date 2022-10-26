@@ -2,7 +2,7 @@ _target_: nlhappy.models.entity_extraction.W2NERForEntityExtraction
 
 
 lr: 3e-5
-scheduler: 'linear_warmup_step'
+scheduler: 'linear_warmup'
 weight_decay: 0.01
 conv_hidden_size: 96
 dilation: [1,2,3]

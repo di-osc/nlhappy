@@ -5,4 +5,4 @@ lr: 3e-5
 dropout: 0.2
 weight_decay: 0.01
 threshold: 0.5
-scheduler: linear_warmup_step
+scheduler: linear_warmup

@@ -4,6 +4,6 @@ lr: 3e-5
 hidden_size: 128
 weight_decay: 0.0
 threshold: 0.5
-scheduler: linear_warmup_step
+scheduler: linear_warmup
 add_rope: True
 name: biaffine4ner

@@ -2,7 +2,7 @@ _target_: nlhappy.models.text_classification.BertTextClassification
 
 hidden_size: 256
 lr: 3e-5
-scheduler: linear_warmup_step
+scheduler: linear_warmup
 weight_decay: 0.00
 name: bert4tc
 
