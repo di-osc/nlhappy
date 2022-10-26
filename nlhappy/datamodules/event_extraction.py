@@ -2,9 +2,7 @@ from ..utils.make_datamodule import PLMBaseDataModule, get_logger, char_idx_to_t
 from functools import lru_cache
 import torch
 import pandas as pd
-from pandas import Series
 import numpy as np
-from typing import List
 
 
 log = get_logger()
