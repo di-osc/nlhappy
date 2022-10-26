@@ -72,11 +72,15 @@ class PLMBaseModel(LightningModule):
     - 通过self.get_plm_architecture可以得到预训练模型的架构,主要并没有加载预训练参数
     """
     
-    scheduler_names = ['linear_warmup_step', 'cosine_warmup_step', 'harmonic_epoch', '1cycle_step']
+    scheduler_names = ['linear_warmup', 
+                       'cosine_warmup', 
+                       'harmonic', 
+                       '1cycle']
     
     def __init__(self) -> None:
         super().__init__()
         self.save_hyperparameters()
+        assert self.hparams.scheduler in self.scheduler_names, f'availabel names {self.scheduler_names}'
         assert 'plm' in self.hparams and 'plm_dir' in self.hparams, 'you have to at least pass in plm and plm_dir'
         if 'label2id' not in self.hparams and 'id2label' in self.hparams:
             self.hparams.label2id = {l:i for i,l in self.hparams.id2label.items()}
@@ -143,16 +147,6 @@ class PLMBaseModel(LightningModule):
         return scheduler_config
     
     
-    @property
-    def epoch_schedulers(self):
-        return [scheduler for scheduler in self.scheduler_names if scheduler.endswith('epoch')]
-
-
-    @property
-    def step_schedulers(self):
-        return [scheduler for scheduler in self.scheduler_names if scheduler.endswith('step')]
-    
-    
     def get_total_steps(self):
         return self.trainer.estimated_stepping_batches
     
@@ -173,13 +167,11 @@ class PLMBaseModel(LightningModule):
         Returns:
             dict: scheduler配置字典
         """
-        availabel_names = self.scheduler_names
-        assert name in availabel_names, f'availabel names {availabel_names}'
-        if name == 'harmonic_epoch':
+        if name == 'harmonic':
             return self.get_harmonic_epoch_scheduler_config(optimizer=optimizer)
-        elif name == 'linear_warmup_step':
+        elif name == 'linear_warmup':
             return self.get_linear_warmup_step_scheduler_config(optimizer=optimizer)
-        elif name == 'cosine_warmup_step':
+        elif name == 'cosine_warmup':
             return self.get_cosine_warmup_step_scheduler_config(optimizer=optimizer)
         elif name == '1cycle':
             return self.get_one_cycle_scheduler_config(optimizer=optimizer)

@@ -107,22 +107,10 @@ class GPLinkerForRelationExtraction(PLMBaseModel):
     def configure_optimizers(self)  :
         no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
         grouped_parameters = [
-            {'params': [p for n, p in self.bert.named_parameters() if not any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr, 'weight_decay': self.hparams.weight_decay},
-            {'params': [p for n, p in self.bert.named_parameters() if any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr, 'weight_decay': 0.0},
-            {'params': [p for n, p in self.so_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr* 1.5, 'weight_decay': self.hparams.weight_decay},
-            {'params': [p for n, p in self.so_classifier.named_parameters() if any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr* 1.5, 'weight_decay': 0.0},
-            {'params': [p for n, p in self.head_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr* 3, 'weight_decay': self.hparams.weight_decay},
-            {'params': [p for n, p in self.head_classifier.named_parameters() if any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr* 3, 'weight_decay': 0.0},
-            {'params': [p for n, p in self.tail_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr* 3, 'weight_decay': self.hparams.weight_decay},
-            {'params': [p for n, p in self.tail_classifier.named_parameters() if any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr* 3, 'weight_decay': 0.0}
+            {'params': [p for n, p in self.named_parameters() if not any(nd in n for nd in no_decay)],
+            'weight_decay': self.hparams.weight_decay},
+            {'params': [p for n, p in self.named_parameters() if any(nd in n for nd in no_decay)],
+            'weight_decay': 0.0},
         ]
         optimizer = torch.optim.AdamW(grouped_parameters)
         scheduler_config = self.get_scheduler_config(optimizer=optimizer, name=self.hparams.scheduler)
