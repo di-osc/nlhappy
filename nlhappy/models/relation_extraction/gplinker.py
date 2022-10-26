@@ -30,9 +30,9 @@ class GPLinkerForRelationExtraction(PLMBaseModel):
         # 主语 宾语分类器
         self.so_classifier = EfficientGlobalPointer(self.bert.config.hidden_size, hidden_size, 2)
         # 主语 宾语 头对齐
-        self.head_classifier = EfficientGlobalPointer(self.bert.config.hidden_size, hidden_size, len(self.hparams.label2id), RoPE=False, tril_mask=False)
+        self.head_classifier = EfficientGlobalPointer(self.bert.config.hidden_size, hidden_size, len(self.hparams.label2id), add_rope=False, tril_mask=False)
         # 主语 宾语 尾对齐
-        self.tail_classifier = EfficientGlobalPointer(self.bert.config.hidden_size, hidden_size, len(self.hparams.label2id), RoPE=False, tril_mask=False)
+        self.tail_classifier = EfficientGlobalPointer(self.bert.config.hidden_size, hidden_size, len(self.hparams.label2id), add_rope=False, tril_mask=False)
 
         self.so_criterion = MultiLabelCategoricalCrossEntropy()
         self.head_criterion = MultiLabelCategoricalCrossEntropy()
@@ -57,12 +57,12 @@ class GPLinkerForRelationExtraction(PLMBaseModel):
         #inputs为bert常规输入, span_ids: [batch_size, 2, seq_len, seq_len],
         #head_ids: [batch_size, len(label2id), seq_len, seq_len], tail_ids: [batch_size, len(label2id), seq_len, seq_len]
         input_ids, token_type_ids, attention_mask = batch['input_ids'], batch['token_type_ids'], batch['attention_mask']
-        so_ture, head_true, tail_true = batch['so_ids'],  batch['head_ids'], batch['tail_ids']
+        so_true, head_true, tail_true = batch['so_ids'],  batch['head_ids'], batch['tail_ids']
         so_logits, head_logits, tail_logits = self(input_ids, token_type_ids, attention_mask)
 
 
         so_logits_ = so_logits.reshape(so_logits.shape[0] * so_logits.shape[1], -1)
-        so_true_ = so_ture.reshape(so_ture.shape[0] * so_ture.shape[1], -1)
+        so_true_ = so_true.reshape(so_true.shape[0] * so_true.shape[1], -1)
         so_loss = self.so_criterion(so_logits_, so_true_)
         
         head_logits_ = head_logits.reshape(head_logits.shape[0] * head_logits.shape[1], -1)
@@ -73,7 +73,7 @@ class GPLinkerForRelationExtraction(PLMBaseModel):
         tail_true_ = tail_true.reshape(tail_true.shape[0] * tail_true.shape[1], -1)
         tail_loss = self.tail_criterion(tail_logits_, tail_true_)
         
-        loss = so_loss + head_loss + tail_loss
+        loss = sum([so_loss, head_loss, tail_loss]) / 3
         return loss, so_logits, head_logits, tail_logits
 
         
@@ -112,19 +112,19 @@ class GPLinkerForRelationExtraction(PLMBaseModel):
             {'params': [p for n, p in self.bert.named_parameters() if any(nd in n for nd in no_decay)],
             'lr': self.hparams.lr, 'weight_decay': 0.0},
             {'params': [p for n, p in self.so_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr* 10, 'weight_decay': self.hparams.weight_decay},
+            'lr': self.hparams.lr* 1.5, 'weight_decay': self.hparams.weight_decay},
             {'params': [p for n, p in self.so_classifier.named_parameters() if any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr* 10, 'weight_decay': 0.0},
+            'lr': self.hparams.lr* 1.5, 'weight_decay': 0.0},
             {'params': [p for n, p in self.head_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr* 10, 'weight_decay': self.hparams.weight_decay},
+            'lr': self.hparams.lr* 3, 'weight_decay': self.hparams.weight_decay},
             {'params': [p for n, p in self.head_classifier.named_parameters() if any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr* 10, 'weight_decay': 0.0},
+            'lr': self.hparams.lr* 3, 'weight_decay': 0.0},
             {'params': [p for n, p in self.tail_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr* 10, 'weight_decay': self.hparams.weight_decay},
+            'lr': self.hparams.lr* 3, 'weight_decay': self.hparams.weight_decay},
             {'params': [p for n, p in self.tail_classifier.named_parameters() if any(nd in n for nd in no_decay)],
-            'lr': self.hparams.lr* 10, 'weight_decay': 0.0}
+            'lr': self.hparams.lr* 3, 'weight_decay': 0.0}
         ]
-        optimizer = torch.optim.AdamW(grouped_parameters, eps=1e-5)
+        optimizer = torch.optim.AdamW(grouped_parameters)
         scheduler_config = self.get_scheduler_config(optimizer=optimizer, name=self.hparams.scheduler)
         return [optimizer], [scheduler_config]
 
