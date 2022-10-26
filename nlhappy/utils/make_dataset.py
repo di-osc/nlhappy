@@ -1,9 +1,9 @@
-from datasets import Dataset, DatasetDict
-import pandas as pd
+from datasets import Dataset, DatasetDict, load_from_disk
 from typing import Dict, Tuple, Union, List
 from ..algorithms.text_match import BM25
 import random
 from tqdm import tqdm
+
 
 
 def train_val_split(dataset: Dataset, 
@@ -122,12 +122,3 @@ def make_text_match_dataset_with_bm25(corpus: List[str],
         return ds
     else:
         return ds, bm25
-
-def make_event_dataset_from_examples(examples: List[Dict[str]]) -> Dataset:
-    raise NotImplementedError
-
-def make_entity_dataset_from_examples(examples: List[Dict[str]]) -> Dataset:
-    raise NotImplementedError
-
-def make_relation_dataset_from_examples(examples: List[Dict[str]]) -> Dataset:
-    raise NotImplementedError

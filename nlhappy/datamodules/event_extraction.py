@@ -114,11 +114,11 @@ class EventExtractionDataModule(PLMBaseDataModule):
                         # 这个role 跟 其他的每个role 头头 尾尾 联系起来
                     for j, role1 in enumerate(event['roles']):
                         if j>i:
-                            start1 = role1['offset'][0]
-                            end1 = role1['offset'][1]-1
+                            start1_ = role1['offset'][0]
+                            end1_ = role1['offset'][1]-1
                             try:
-                                start1 = char_idx_to_token(start1, offset_mapping=offset_mapping)
-                                end1 = char_idx_to_token(end1, offset_mapping=offset_mapping)
+                                start1 = char_idx_to_token(start1_, offset_mapping=offset_mapping)
+                                end1 = char_idx_to_token(end1_, offset_mapping=offset_mapping)
                             except:
                                 log.warning(f'role {role1["text"]} offset {(start1, end1)} align to token offset failed in \n{text}')
                                 continue
