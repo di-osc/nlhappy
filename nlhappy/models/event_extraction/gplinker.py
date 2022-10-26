@@ -52,7 +52,7 @@ class GPLinkerForEventExtraction(PLMBaseModel):
                  hidden_size: int = 64,
                  weight_decay: float = 0.01,
                  threshold: float = 0.0,
-                 scheduler: str = 'harmonic_epoch',
+                 scheduler: str = 'linear_warmup_step',
                  **kwargs: Any) -> None:
         super().__init__()
         self.plm = self.get_plm_architecture()
@@ -60,23 +60,25 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         self.role_classifier = EfficientGlobalPointer(input_size=self.plm.config.hidden_size,
                                                       hidden_size=hidden_size,
                                                       output_size=len(self.hparams.label2id),
-                                                      RoPE=True,
+                                                      add_rope=True,
                                                       tril_mask=True)
+        
         self.head_classifier = EfficientGlobalPointer(input_size=self.plm.config.hidden_size,
                                                       hidden_size=hidden_size,
                                                       output_size=1,
-                                                      RoPE=False)
+                                                      add_rope=False)
+        
         self.tail_classifier = EfficientGlobalPointer(input_size=self.plm.config.hidden_size,
                                                       hidden_size=hidden_size,
                                                       output_size=1,
-                                                      RoPE=False)
+                                                      add_rope=False)
+        
         self.dropout = MultiDropout()
-        # self.role_criterion = MultiLabelCategoricalCrossEntropy()
-        # self.head_criterion = MultiLabelCategoricalCrossEntropy()
-        # self.tail_criterion = MultiLabelCategoricalCrossEntropy()
+        
         self.role_criterion = SparseMultiLabelCrossEntropy()
         self.head_criterion = SparseMultiLabelCrossEntropy()
         self.tail_criterion = SparseMultiLabelCrossEntropy()
+    
         self.val_metric = EventF1()                  
 
         
@@ -99,22 +101,12 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         head_true = batch['head_ids']
         tail_true = batch['tail_ids']
         
-        # role_logits_ = role_logits.reshape(role_logits.shape[0] * role_logits.shape[1], -1)
-        # role_true_ = role_true.reshape(role_true.shape[0] * role_true.shape[1], -1)
-        # role_loss = self.role_criterion(role_logits_, role_true_)
         role_loss = self.role_criterion(role_logits, role_true)
-        
-        # head_logits_ = head_logits.reshape(head_logits.shape[0] * head_logits.shape[1], -1)
-        # head_true_ = head_true.reshape(head_true.shape[0] * head_true.shape[1], -1)
-        # head_loss = self.head_criterion(head_logits_, head_true_)
         head_loss = self.head_criterion(head_logits, head_true)
-        
-        # tail_logits_ = tail_logits.reshape(tail_logits.shape[0] * tail_logits.shape[1], -1)
-        # tail_true_ = tail_true.reshape(tail_true.shape[0] * tail_true.shape[1], -1)
-        # tail_loss = self.tail_criterion(tail_logits_, tail_true_)
         tail_loss = self.tail_criterion(tail_logits, tail_true)
         
         loss = sum([role_loss, head_loss, tail_loss]) / 3
+        
         return loss, role_logits, head_logits, tail_logits
 
 
@@ -127,8 +119,10 @@ class GPLinkerForEventExtraction(PLMBaseModel):
     def validation_step(self, batch, batch_idx):
         role_true, head_true, tail_true = batch['role_ids'], batch['head_ids'], batch['tail_ids']
         loss, role_logits, head_logits, tail_logits = self.step(batch)
-        batch_events = self.extract_events(role_logits, head_logits, tail_logits)
         batch_true_events = self.extract_events(role_true, head_true, tail_true)
+        self.print('true:', batch_true_events)
+        batch_events = self.extract_events(role_logits, head_logits, tail_logits)
+        self.print('pred:', batch_events)
         self.val_metric(batch_events, batch_true_events)
         self.log('val/f1', self.val_metric, on_step=False, on_epoch=True, prog_bar=True)
         return {'val_loss': loss}
@@ -180,5 +174,18 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         scheduler_config = self.get_scheduler_config(optimizer=optimizer, name=self.hparams.scheduler)
         return [optimizer], [scheduler_config]
 
-    def predict(self):
-        pass
+
+    def predict(self, text: str, device: str = 'cpu'):
+        inputs = self.tokenizer(text,
+                                add_special_tokens=True,
+                                max_length=self.hparams.max_length,
+                                truncation=True,
+                                return_offsets_mapping=True,
+                                return_tensors='pt',
+                                return_token_type_ids=False)
+        mapping = inputs.pop('offset_mapping')
+        mapping = mapping[0].tolist()
+        inputs.to(device)
+        role_logits, head_logits, tail_logits = self(**inputs)
+        events = self.extract_events(role_logits, head_logits, tail_logits)
+        return events
