@@ -1,10 +1,12 @@
 import torch
 from torch import Tensor
+import numpy as np
 
 
 class MultiLabelCategoricalCrossEntropy(torch.nn.Module):
-    '''多标签分类的交叉熵
+    '''用于多标签分类的交叉熵
     说明:
+    - 阈值应为0
     - y_true和y_pred的shape一致,y_true的元素非0即1,1表示对应的类为目标类,0表示对应的类为非目标类;
     - 请保证y_pred的值域是全体实数;换言之一般情况下y_pred不用加激活函数,尤其是不能加sigmoid或者softmax;
     - 预测阶段则输出y_pred大于0的类;
@@ -31,7 +33,7 @@ class MultiLabelCategoricalCrossEntropy(torch.nn.Module):
         neg_loss = torch.logsumexp(y_pred_neg, dim=-1)
         pos_loss = torch.logsumexp(y_pred_pos, dim=-1)
 
-        return (neg_loss + pos_loss).mean()
+        return (neg_loss + pos_loss).sum(dim=1).mean()
 
 
 class SparseMultiLabelCrossEntropy(torch.nn.Module):
@@ -43,22 +45,24 @@ class SparseMultiLabelCrossEntropy(torch.nn.Module):
     - https://kexue.fm/archives/7359 。
     - https://github.com/bojone/bert4keras/blob/4dcda150b54ded71420c44d25ff282ed30f3ea42/bert4keras/backend.py#L272
     """
-    def __init__(self):
+    def __init__(self, eposilon: float = 1e-5, inf: float =1e4):
         super().__init__()
+        self.eposilon = eposilon
+        self.inf = inf
 
-    def forward(
-        self, 
-        y_pred: Tensor, 
-        y_true: Tensor, 
-        mask_zero: bool =True, 
-        epsilon: float =1e-7
-        ) -> Tensor:
+    def forward(self, y_pred: Tensor, y_true: Tensor, mask_zero: bool =True) -> Tensor:
+        shape = y_pred.shape
+        # bs, nclass, max_spo_num
+        y_true = y_true[..., 0] * shape[2] + y_true[..., 1]
+        # bs, nclass, seqlen * seqlen
+        y_pred = y_pred.reshape(shape[0], -1, np.prod(shape[2:]))
+        
         zeros = torch.zeros_like(y_pred[..., :1])
         y_pred = torch.cat([y_pred, zeros], dim=-1)
         if mask_zero:
-            infs = zeros + 1e-12
+            infs = zeros + self.inf
             y_pred = torch.cat([infs, y_pred[..., 1:]], dim=-1)
-        y_true = y_true.long()
+
         y_pos_2 = torch.gather(y_pred, index=y_true, dim=-1)
         y_pos_1 = torch.cat([y_pos_2, zeros], dim=-1)
         if mask_zero:
@@ -67,9 +71,10 @@ class SparseMultiLabelCrossEntropy(torch.nn.Module):
         pos_loss = torch.logsumexp(-y_pos_1, dim=-1)
         all_loss = torch.logsumexp(y_pred, dim=-1)
         aux_loss = torch.logsumexp(y_pos_2, dim=-1) - all_loss
-        aux_loss = torch.clamp(1 - torch.exp(aux_loss), min=epsilon, max=1)
+        aux_loss = torch.clamp(1 - torch.exp(aux_loss), min=self.eposilon, max=1)
         neg_loss = all_loss + torch.log(aux_loss)
-        return pos_loss + neg_loss
+        loss = pos_loss + neg_loss
+        return loss.sum(dim=1).mean()
     
     
 class CoSentLoss(torch.nn.Module):
