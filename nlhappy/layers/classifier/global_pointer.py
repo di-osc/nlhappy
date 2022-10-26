@@ -144,8 +144,8 @@ class EfficientGlobalPointer(Module):
         self.RoPE = RoPE
         self.tril_mask = tril_mask
         self.input_size = input_size
-        self.linear_1 = nn.Linear(input_size, hidden_size * 2, bias=True)
-        self.linear_2 = nn.Linear(hidden_size * 2, output_size * 2, bias=True)
+        self.linear_1 = nn.Linear(input_size, hidden_size * 2)
+        self.linear_2 = nn.Linear(hidden_size * 2, output_size * 2)
 
     def forward(self, inputs, mask=None):
         inputs = self.linear_1(inputs)
@@ -166,10 +166,11 @@ class EfficientGlobalPointer(Module):
         logits = logits[:, None] + bias[:, ::2, None] + bias[:, 1::2, :, None]
         
         # padding mask
-        batch_size = inputs.size()[0]
-        seq_len = inputs.size()[1]
-        pad_mask = mask.unsqueeze(1).unsqueeze(1).expand(batch_size, self.output_size, seq_len, seq_len)
-        logits = logits*pad_mask - (1-pad_mask)*1e12
+        if mask is not None:
+            batch_size = inputs.size()[0]
+            seq_len = inputs.size()[1]
+            pad_mask = mask.unsqueeze(1).unsqueeze(1).expand(batch_size, self.output_size, seq_len, seq_len)
+            logits = logits*pad_mask - (1-pad_mask)*1e12
 
         # tril mask
         if self.tril_mask:
