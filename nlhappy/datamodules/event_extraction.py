@@ -97,9 +97,9 @@ class EventExtractionDataModule(PLMBaseDataModule):
         for i, text in enumerate(batch_text):
             offset_mapping = batch_mappings[i]
             events = batch_events[i]
-            role_ids = torch.zeros(len(self.combined2id), max_length, max_length)
-            head_ids = torch.zeros(1, max_length, max_length)
-            tail_ids = torch.zeros(1, max_length, max_length)
+            role_ids = torch.zeros(len(self.combined2id), max_length, max_length, dtype=torch.long)
+            head_ids = torch.zeros(1, max_length, max_length, dtype=torch.long)
+            tail_ids = torch.zeros(1, max_length, max_length, dtype=torch.long)
             for event in events:
                 e_label = event['label']
                 for i, role in enumerate(event['roles']):

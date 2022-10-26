@@ -1,6 +1,6 @@
 from ...utils.make_model import PLMBaseModel
 from ...layers.classifier import GlobalPointer, EfficientGlobalPointer
-from ...layers.loss import MultiLabelCategoricalCrossEntropy
+from ...layers.loss import MultiLabelCategoricalCrossEntropy, SparseMultiLabelCrossEntropy
 from ...layers.dropout import MultiDropout
 from ...metrics.event import EventF1, Event, Role
 import torch
@@ -57,23 +57,26 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         super().__init__()
         self.plm = self.get_plm_architecture()
 
-        self.role_classifier = GlobalPointer(input_size=self.plm.config.hidden_size,
-                                             hidden_size=hidden_size,
-                                             output_size=len(self.hparams.label2id),
-                                             add_rope=True,
-                                             tril_mask=True)
-        self.head_classifier = GlobalPointer(input_size=self.plm.config.hidden_size,
-                                             hidden_size=hidden_size,
-                                             output_size=1,
-                                             add_rope=False)
-        self.tail_classifier = GlobalPointer(input_size=self.plm.config.hidden_size,
-                                             hidden_size=hidden_size,
-                                             output_size=1,
-                                             add_rope=False)
+        self.role_classifier = EfficientGlobalPointer(input_size=self.plm.config.hidden_size,
+                                                      hidden_size=hidden_size,
+                                                      output_size=len(self.hparams.label2id),
+                                                      RoPE=True,
+                                                      tril_mask=True)
+        self.head_classifier = EfficientGlobalPointer(input_size=self.plm.config.hidden_size,
+                                                      hidden_size=hidden_size,
+                                                      output_size=1,
+                                                      RoPE=False)
+        self.tail_classifier = EfficientGlobalPointer(input_size=self.plm.config.hidden_size,
+                                                      hidden_size=hidden_size,
+                                                      output_size=1,
+                                                      RoPE=False)
         self.dropout = MultiDropout()
-        self.role_criterion = MultiLabelCategoricalCrossEntropy()
-        self.head_criterion = MultiLabelCategoricalCrossEntropy()
-        self.tail_criterion = MultiLabelCategoricalCrossEntropy()
+        # self.role_criterion = MultiLabelCategoricalCrossEntropy()
+        # self.head_criterion = MultiLabelCategoricalCrossEntropy()
+        # self.tail_criterion = MultiLabelCategoricalCrossEntropy()
+        self.role_criterion = SparseMultiLabelCrossEntropy()
+        self.head_criterion = SparseMultiLabelCrossEntropy()
+        self.tail_criterion = SparseMultiLabelCrossEntropy()
         self.val_metric = EventF1()                  
 
         
@@ -87,25 +90,31 @@ class GPLinkerForEventExtraction(PLMBaseModel):
 
 
     def step(self, batch):
+        
         input_ids = batch['input_ids']
         attention_mask = batch['attention_mask']
+        role_logits, head_logits, tail_logits = self(input_ids, attention_mask)
+        
         role_true = batch['role_ids']
         head_true = batch['head_ids']
         tail_true = batch['tail_ids']
-        role_logits, head_logits, tail_logits = self(input_ids, attention_mask)
-        role_logits_ = role_logits.reshape(role_logits.shape[0] * role_logits.shape[1], -1)
-        role_true_ = role_true.reshape(role_true.shape[0] * role_true.shape[1], -1)
-        role_loss = self.role_criterion(role_logits_, role_true_)
         
-        head_logits_ = head_logits.reshape(head_logits.shape[0] * head_logits.shape[1], -1)
-        head_true_ = head_true.reshape(head_true.shape[0] * head_true.shape[1], -1)
-        head_loss = self.head_criterion(head_logits_, head_true_)
+        # role_logits_ = role_logits.reshape(role_logits.shape[0] * role_logits.shape[1], -1)
+        # role_true_ = role_true.reshape(role_true.shape[0] * role_true.shape[1], -1)
+        # role_loss = self.role_criterion(role_logits_, role_true_)
+        role_loss = self.role_criterion(role_logits, role_true)
         
-        tail_logits_ = tail_logits.reshape(tail_logits.shape[0] * tail_logits.shape[1], -1)
-        tail_true_ = tail_true.reshape(tail_true.shape[0] * tail_true.shape[1], -1)
-        tail_loss = self.tail_criterion(tail_logits_, tail_true_)
+        # head_logits_ = head_logits.reshape(head_logits.shape[0] * head_logits.shape[1], -1)
+        # head_true_ = head_true.reshape(head_true.shape[0] * head_true.shape[1], -1)
+        # head_loss = self.head_criterion(head_logits_, head_true_)
+        head_loss = self.head_criterion(head_logits, head_true)
         
-        loss = role_loss + head_loss + tail_loss
+        # tail_logits_ = tail_logits.reshape(tail_logits.shape[0] * tail_logits.shape[1], -1)
+        # tail_true_ = tail_true.reshape(tail_true.shape[0] * tail_true.shape[1], -1)
+        # tail_loss = self.tail_criterion(tail_logits_, tail_true_)
+        tail_loss = self.tail_criterion(tail_logits, tail_true)
+        
+        loss = sum([role_loss, head_loss, tail_loss]) / 3
         return loss, role_logits, head_logits, tail_logits
 
 
@@ -135,8 +144,6 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         batch_events = []
         for role_logit, head_logit, tail_logit in zip(role_logits, head_logits, tail_logits):
             roles = set()
-            role_logit[:, [0, -1]] -= np.inf
-            role_logit[:, :, [0, -1]] -= np.inf
             for l, h, t in zip(*np.where(role_logit > threshold)):
                 roles.add(tuple(self.hparams.id2label[l.item()]) + (h.item(), t.item()))
             links = set()
@@ -163,24 +170,6 @@ class GPLinkerForEventExtraction(PLMBaseModel):
     
     def configure_optimizers(self)  :
         no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
-        # grouped_parameters = [
-        #     {'params': [p for n, p in self.plm.named_parameters() if not any(nd in n for nd in no_decay)],
-        #     'lr': self.hparams.lr, 'weight_decay': self.hparams.weight_decay},
-        #     {'params': [p for n, p in self.plm.named_parameters() if any(nd in n for nd in no_decay)],
-        #     'lr': self.hparams.lr, 'weight_decay': 0.0},
-        #     {'params': [p for n, p in self.role_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
-        #     'lr': self.hparams.lr, 'weight_decay': self.hparams.weight_decay},
-        #     {'params': [p for n, p in self.role_classifier.named_parameters() if any(nd in n for nd in no_decay)],
-        #     'lr': self.hparams.lr, 'weight_decay': 0.0},
-        #     {'params': [p for n, p in self.head_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
-        #     'lr': self.hparams.lr, 'weight_decay': self.hparams.weight_decay},
-        #     {'params': [p for n, p in self.head_classifier.named_parameters() if any(nd in n for nd in no_decay)],
-        #     'lr': self.hparams.lr, 'weight_decay': 0.0},
-        #     {'params': [p for n, p in self.tail_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
-        #     'lr': self.hparams.lr, 'weight_decay': self.hparams.weight_decay},
-        #     {'params': [p for n, p in self.tail_classifier.named_parameters() if any(nd in n for nd in no_decay)],
-        #     'lr': self.hparams.lr, 'weight_decay': 0.0}
-        # ]
         grouped_params = [
             {'params': [p for n, p in self.named_parameters() if not any(nd in n for nd in no_decay)],
             'lr': self.hparams.lr, 'weight_decay': self.hparams.weight_decay},
