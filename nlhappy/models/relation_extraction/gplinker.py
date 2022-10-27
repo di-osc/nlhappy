@@ -1,4 +1,4 @@
-from ...layers import GlobalPointer, MultiDropout
+from ...layers import MultiDropout, EfficientGlobalPointer
 from ...layers.loss import MultiLabelCategoricalCrossEntropy
 from ...metrics.triple import TripleF1, Triple
 import torch
@@ -27,11 +27,11 @@ class GPLinkerForRelationExtraction(PLMBaseModel):
         self.bert = self.get_plm_architecture()
         self.dropout = MultiDropout()       
         # 主语 宾语分类器
-        self.so_classifier = GlobalPointer(self.bert.config.hidden_size, hidden_size, 2)
+        self.so_classifier = EfficientGlobalPointer(self.bert.config.hidden_size, hidden_size, 2)
         # 主语 宾语 头对齐
-        self.head_classifier = GlobalPointer(self.bert.config.hidden_size, hidden_size, len(self.hparams.label2id), add_rope=False, tril_mask=False)
+        self.head_classifier = EfficientGlobalPointer(self.bert.config.hidden_size, hidden_size, len(self.hparams.label2id), add_rope=False, tril_mask=False)
         # 主语 宾语 尾对齐
-        self.tail_classifier = GlobalPointer(self.bert.config.hidden_size, hidden_size, len(self.hparams.label2id), add_rope=False, tril_mask=False)
+        self.tail_classifier = EfficientGlobalPointer(self.bert.config.hidden_size, hidden_size, len(self.hparams.label2id), add_rope=False, tril_mask=False)
 
         self.so_criterion = MultiLabelCategoricalCrossEntropy()
         self.head_criterion = MultiLabelCategoricalCrossEntropy()
@@ -60,11 +60,11 @@ class GPLinkerForRelationExtraction(PLMBaseModel):
         so_true, head_true, tail_true = batch['so_ids'],  batch['head_ids'], batch['tail_ids']
         so_logits, head_logits, tail_logits = self(input_ids=input_ids, attention_mask=attention_mask)
 
-        so_loss = self.so_criterion(so_logits.reshape(so_logits.shape[0] * so_logits.shape[1], -1), so_true)
+        so_loss = self.so_criterion(so_logits.reshape(so_logits.shape[0] * so_logits.shape[1], -1), so_true.reshape(so_true.shape[0]*so_true.shape[1], -1))
         
-        head_loss = self.head_criterion(head_logits.reshape(head_logits.shape[0] * head_logits.shape[1], -1), head_true)
+        head_loss = self.head_criterion(head_logits.reshape(head_logits.shape[0] * head_logits.shape[1], -1), head_true.reshape(head_true.shape[0]*head_true.shape[1], -1))
         
-        tail_loss = self.tail_criterion(tail_logits.reshape(tail_logits.shape[0] * tail_logits.shape[1], -1), tail_true)
+        tail_loss = self.tail_criterion(tail_logits.reshape(tail_logits.shape[0] * tail_logits.shape[1], -1), tail_true.reshape(tail_true.shape[0]*tail_true.shape[1], -1))
         
         loss = (so_loss + head_loss + tail_loss) / 3
         
