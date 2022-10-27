@@ -1,5 +1,5 @@
 from ...layers import MultiDropout, EfficientGlobalPointer
-from ...layers.loss import MultiLabelCategoricalCrossEntropy
+from ...layers.loss import MultiLabelCategoricalCrossEntropy, SparseMultiLabelCrossEntropy
 from ...metrics.triple import TripleF1, Triple
 import torch
 from torch import Tensor
@@ -61,10 +61,11 @@ class GPLinkerForRelationExtraction(PLMBaseModel):
         so_logits, head_logits, tail_logits = self(input_ids=input_ids, attention_mask=attention_mask)
 
         so_loss = self.so_criterion(so_logits.reshape(so_logits.shape[0] * so_logits.shape[1], -1), so_true.reshape(so_true.shape[0]*so_true.shape[1], -1))
-        
+        # so_loss = self.so_criterion(so_logits, so_true)
         head_loss = self.head_criterion(head_logits.reshape(head_logits.shape[0] * head_logits.shape[1], -1), head_true.reshape(head_true.shape[0]*head_true.shape[1], -1))
-        
+        # head_loss = self.head_criterion(head_logits, head_true)
         tail_loss = self.tail_criterion(tail_logits.reshape(tail_logits.shape[0] * tail_logits.shape[1], -1), tail_true.reshape(tail_true.shape[0]*tail_true.shape[1], -1))
+        # tail_loss = self.tail_criterion(tail_logits, tail_true)
         
         loss = (so_loss + head_loss + tail_loss) / 3
         
@@ -168,6 +169,7 @@ class GPLinkerForRelationExtraction(PLMBaseModel):
                 padding='max_length',  
                 max_length=max_length,
                 return_tensors='pt',
+                return_token_type_ids=False,
                 truncation=True)
         inputs.to(torch.device(device))
         so_logits, head_logits, tail_logits = self(**inputs)
