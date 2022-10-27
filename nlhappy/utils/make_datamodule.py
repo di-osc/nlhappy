@@ -1,6 +1,6 @@
 import os
 from .utils import get_logger
-from typing import List, Optional, Dict, Union
+from typing import Union
 from torch.utils.data import DataLoader
 from datasets import load_from_disk, load_dataset
 import pytorch_lightning as pl
@@ -215,9 +215,7 @@ class PLMBaseDataModule(pl.LightningModule):
     @lru_cache()
     def get_max_length(self):
         """根据auto_length参数自动获取最大token的长度,并将其添加进hparams
-        Args:
-            set_to_hparam (bool): 调用该方法时自动设置为self.hparams.max_length,默认为True
-
+        
         Returns:
             int: 最大token长度
         """
@@ -229,7 +227,6 @@ class PLMBaseDataModule(pl.LightningModule):
         if type(self.hparams.auto_length) == int:
             assert self.hparams.auto_length >0, 'max_length length  must > 0'
             max_length = self.hparams.auto_length
-        # max_length_ = min(self.hparams.plm_max_input_length, max_length+2)
         log.info(f'current max token length: {max_length}')
         return max_length
     
