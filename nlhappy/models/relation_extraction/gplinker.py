@@ -1,6 +1,5 @@
-import pytorch_lightning as pl
 from ...layers import EfficientGlobalPointer, MultiDropout
-from ...layers.loss import MultiLabelCategoricalCrossEntropy
+from ...layers.loss import MultiLabelCategoricalCrossEntropy, SparseMultiLabelCrossEntropy
 from ...metrics.triple import TripleF1, Triple
 import torch
 from torch import Tensor
@@ -34,9 +33,13 @@ class GPLinkerForRelationExtraction(PLMBaseModel):
         # 主语 宾语 尾对齐
         self.tail_classifier = EfficientGlobalPointer(self.bert.config.hidden_size, hidden_size, len(self.hparams.label2id), add_rope=False, tril_mask=False)
 
-        self.so_criterion = MultiLabelCategoricalCrossEntropy()
-        self.head_criterion = MultiLabelCategoricalCrossEntropy()
-        self.tail_criterion = MultiLabelCategoricalCrossEntropy()
+        # self.so_criterion = MultiLabelCategoricalCrossEntropy()
+        # self.head_criterion = MultiLabelCategoricalCrossEntropy()
+        # self.tail_criterion = MultiLabelCategoricalCrossEntropy()
+        self.so_criterion = SparseMultiLabelCrossEntropy()
+        self.head_criterion = SparseMultiLabelCrossEntropy()
+        self.tail_criterion = SparseMultiLabelCrossEntropy()
+        
 
         self.train_metric = TripleF1()
         self.val_metric = TripleF1()
@@ -61,17 +64,20 @@ class GPLinkerForRelationExtraction(PLMBaseModel):
         so_logits, head_logits, tail_logits = self(input_ids, token_type_ids, attention_mask)
 
 
-        so_logits_ = so_logits.reshape(so_logits.shape[0] * so_logits.shape[1], -1)
-        so_true_ = so_true.reshape(so_true.shape[0] * so_true.shape[1], -1)
-        so_loss = self.so_criterion(so_logits_, so_true_)
+        # so_logits_ = so_logits.reshape(so_logits.shape[0] * so_logits.shape[1], -1)
+        # so_true_ = so_true.reshape(so_true.shape[0] * so_true.shape[1], -1)
+        # so_loss = self.so_criterion(so_logits_, so_true_)
+        so_loss = self.so_criterion(so_logits, so_true)
         
-        head_logits_ = head_logits.reshape(head_logits.shape[0] * head_logits.shape[1], -1)
-        head_true_ = head_true.reshape(head_true.shape[0] * head_true.shape[1], -1)
-        head_loss = self.head_criterion(head_logits_, head_true_)
+        # head_logits_ = head_logits.reshape(head_logits.shape[0] * head_logits.shape[1], -1)
+        # head_true_ = head_true.reshape(head_true.shape[0] * head_true.shape[1], -1)
+        # head_loss = self.head_criterion(head_logits_, head_true_)
+        head_loss = self.head_criterion(head_logits, head_true)
         
-        tail_logits_ = tail_logits.reshape(tail_logits.shape[0] * tail_logits.shape[1], -1)
-        tail_true_ = tail_true.reshape(tail_true.shape[0] * tail_true.shape[1], -1)
-        tail_loss = self.tail_criterion(tail_logits_, tail_true_)
+        # tail_logits_ = tail_logits.reshape(tail_logits.shape[0] * tail_logits.shape[1], -1)
+        # tail_true_ = tail_true.reshape(tail_true.shape[0] * tail_true.shape[1], -1)
+        # tail_loss = self.tail_criterion(tail_logits_, tail_true_)
+        tail_loss = self.tail_criterion(tail_logits, tail_true)
         
         loss = sum([so_loss, head_loss, tail_loss]) / 3
         return loss, so_logits, head_logits, tail_logits
@@ -112,7 +118,7 @@ class GPLinkerForRelationExtraction(PLMBaseModel):
             {'params': [p for n, p in self.named_parameters() if any(nd in n for nd in no_decay)],
             'weight_decay': 0.0},
         ]
-        optimizer = torch.optim.AdamW(grouped_parameters)
+        optimizer = torch.optim.AdamW(grouped_parameters, lr=self.hparams.lr)
         scheduler_config = self.get_scheduler_config(optimizer=optimizer, name=self.hparams.scheduler)
         return [optimizer], [scheduler_config]
 

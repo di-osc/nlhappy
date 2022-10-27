@@ -81,9 +81,9 @@ class RelationExtractionDataModule(PLMBaseDataModule):
             batch_inputs['token_type_ids'].append(inputs['token_type_ids'])
             offset_mapping = inputs['offset_mapping']
             triples = batch_triples[i]
-            so_ids = torch.zeros(2, self.hparams.max_length, self.hparams.max_length)
-            head_ids = torch.zeros(len(self.hparams['label2id']), self.hparams.max_length, self.hparams.max_length)
-            tail_ids = torch.zeros(len(self.hparams['label2id']), self.hparams.max_length, self.hparams.max_length)
+            so_ids = torch.zeros(2, self.hparams.max_length, self.hparams.max_length, dtype=torch.long)
+            head_ids = torch.zeros(len(self.hparams['label2id']), self.hparams.max_length, self.hparams.max_length, dtype=torch.long)
+            tail_ids = torch.zeros(len(self.hparams['label2id']), self.hparams.max_length, self.hparams.max_length, dtype=torch.long)
             for triple in triples:
                 try:
                     sub_start = triple['subject']['offset'][0]
