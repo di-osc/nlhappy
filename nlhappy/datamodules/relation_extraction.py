@@ -1,7 +1,7 @@
 from functools import lru_cache
 from ..utils.make_datamodule import char_idx_to_token, get_logger, PLMBaseDataModule
 import torch
-from typing import Dict, List, Optional, Union
+from typing import Dict, Union
 import numpy as np
 import pandas as pd
 import random
@@ -43,7 +43,7 @@ class RelationExtractionDataModule(PLMBaseDataModule):
         assert self.hparams.transform in self.transforms.keys(), f'availabel models for relation extraction: {self.transforms.keys()}'
 
 
-    def setup(self, stage: str) -> None:
+    def setup(self, stage: str = 'fit') -> None:
         """对数据设置转换"""
         self.hparams.max_length = self.get_max_length()
         if self.hparams.transform == 'onerel':
@@ -66,20 +66,19 @@ class RelationExtractionDataModule(PLMBaseDataModule):
     def gplinker_transform(self, example) -> Dict:
         batch_text = example['text']
         batch_triples = example['triples']
-        batch_inputs = {'input_ids': [], 'attention_mask': [], 'token_type_ids': []}
         batch_so_ids = []
         batch_head_ids = []
         batch_tail_ids = []
+        batch_inputs = self.tokenizer(batch_text, 
+                                      padding='max_length',  
+                                      max_length=self.hparams.max_length,
+                                      truncation=True,
+                                      return_offsets_mapping=True,
+                                      return_token_type_ids=False,
+                                      return_tensors='pt')
+        mappings = batch_inputs.pop('offset_mapping').tolist()
         for i, text in enumerate(batch_text):
-            inputs = self.tokenizer(text, 
-                                    padding='max_length',  
-                                    max_length=self.hparams.max_length,
-                                    truncation=True,
-                                    return_offsets_mapping=True)
-            batch_inputs['input_ids'].append(inputs['input_ids'])
-            batch_inputs['attention_mask'].append(inputs['attention_mask'])
-            batch_inputs['token_type_ids'].append(inputs['token_type_ids'])
-            offset_mapping = inputs['offset_mapping']
+            offset_mapping = mappings[i]
             triples = batch_triples[i]
             so_ids = torch.zeros(2, self.hparams.max_length, self.hparams.max_length, dtype=torch.long)
             head_ids = torch.zeros(len(self.hparams['label2id']), self.hparams.max_length, self.hparams.max_length, dtype=torch.long)
@@ -104,11 +103,10 @@ class RelationExtractionDataModule(PLMBaseDataModule):
             batch_so_ids.append(so_ids)
             batch_head_ids.append(head_ids)
             batch_tail_ids.append(tail_ids)
-        batch = dict(zip(batch_inputs.keys(), map(torch.tensor, batch_inputs.values())))
-        batch['so_ids'] = torch.stack(batch_so_ids, dim=0)
-        batch['head_ids'] = torch.stack(batch_head_ids, dim=0)
-        batch['tail_ids'] = torch.stack(batch_tail_ids, dim=0)
-        return batch
+        batch_inputs['so_ids'] = torch.stack(batch_so_ids, dim=0)
+        batch_inputs['head_ids'] = torch.stack(batch_head_ids, dim=0)
+        batch_inputs['tail_ids'] = torch.stack(batch_tail_ids, dim=0)
+        return batch_inputs
     
     
     @property
