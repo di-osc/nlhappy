@@ -1,7 +1,6 @@
 import logging
 import warnings
-from typing import List, Sequence, Tuple
-import pandas as pd
+from typing import List, Sequence
 import pytorch_lightning as pl
 import rich.syntax
 import rich.tree
