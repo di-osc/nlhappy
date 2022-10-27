@@ -12,8 +12,8 @@ class BertForTextClassification(PLMBaseModel):
     def __init__(self, 
                  lr: float = 3e-5,
                  hidden_size: int = 256,
-                 scheduler: str = 'linear_warmup_step',
-                 weight_decay: float = 0.1,
+                 scheduler: str = 'linear_warmup',
+                 weight_decay: float = 0.01,
                  **kwargs):
         super().__init__()  
 
@@ -74,14 +74,10 @@ class BertForTextClassification(PLMBaseModel):
     def configure_optimizers(self):
         no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
         grouped_parameters = [
-            {'params': [p for n, p in self.bert.named_parameters() if not any(nd in n for nd in no_decay)],
+            {'params': [p for n, p in self.named_parameters() if not any(nd in n for nd in no_decay)],
              'lr': self.hparams.lr, 'weight_decay': self.hparams.weight_decay},
-            {'params': [p for n, p in self.bert.named_parameters() if any(nd in n for nd in no_decay)],
-             'lr': self.hparams.lr, 'weight_decay': 0.0},
-            {'params': [p for n, p in self.classifier.named_parameters() if not any(nd in n for nd in no_decay)],
-             'lr': self.hparams.lr *5, 'weight_decay': self.hparams.weight_decay},
-            {'params': [p for n, p in self.classifier.named_parameters() if any(nd in n for nd in no_decay)],
-             'lr': self.hparams.lr *5, 'weight_decay': 0.0}
+            {'params': [p for n, p in self.named_parameters() if any(nd in n for nd in no_decay)],
+             'lr': self.hparams.lr, 'weight_decay': 0.0}
         ]
         optimizer = torch.optim.AdamW(grouped_parameters)
         scheduler_config = self.get_scheduler_config(optimizer, self.hparams.scheduler)

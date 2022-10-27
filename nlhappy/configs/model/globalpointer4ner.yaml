@@ -6,8 +6,5 @@ threshold: 0.0
 hidden_size: 64 
 weight_decay: 0.0
 adv: ''
-use_efficient: True
-add_rope: True
-span_get_type: dot
 
 name: globalpointer4ner

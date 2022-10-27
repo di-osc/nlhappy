@@ -8,7 +8,7 @@ from typing import Optional
 
 
 class GlobalPointerForEntityExtraction(PLMBaseModel):
-    """基于globalpointer的实体识别模型,可以统一处理嵌套和非嵌套模型
+    """基于EfficientGlobalPointer的实体识别模型,可以统一处理嵌套和非嵌套模型
     
     参考:
         - https://kexue.fm/archives/8373
@@ -16,9 +16,7 @@ class GlobalPointerForEntityExtraction(PLMBaseModel):
     参数:
         - lr (float): 学习率
         - hidden_size (int): globalpointer中间层维度
-        - use_efficient (bool): 是否用Efficient globalpointer
         - scheduler (str): 学习率变化器,[harmonic_epoch, linear_warmup_step, cosine_warmup_step]之一
-        - span_get_type (str): globalpointer得到span特征的方式,[dot, element-product, element-add]之一
         - weight_decay (float): 权重衰减
         - adv Optinal[str]: 对抗训练方式, fgm, pgd之一
         - threshold (float): 阈值
@@ -26,33 +24,24 @@ class GlobalPointerForEntityExtraction(PLMBaseModel):
         - **kwargs datamodule的hparams
     """
     def __init__(self,
-                 lr: float = 3e-5,
-                 hidden_size: int = 128,
-                 use_efficient: bool = False,
-                 scheduler: str = 'harmonic_epoch',
-                 span_get_type: str = 'dot',
-                 weight_decay: float = 0.01,
+                 lr: float =3e-5,
+                 hidden_size: int = 64,
+                 scheduler: str = 'cosine_warmup',
+                 weight_decay: float =0.01,
                  adv: Optional[str] = None,
                  threshold: float = 0.0,
-                 add_rope: bool = True,
                  **kwargs) : 
         super().__init__()
         ## 手动optimizer 可参考https://pytorch-lightning.readthedocs.io/en/stable/common/optimizers.html#manual-optimization
         self.automatic_optimization = False    
 
 
-        self.bert = self.get_plm_architecture()
-        if use_efficient:
-            self.classifier = EfficientGlobalPointer(input_size=self.bert.config.hidden_size, 
-                                                 hidden_size=hidden_size,
-                                                 output_size=len(self.hparams.label2id),
-                                                 RoPE=self.hparams.add_rope)
-        else:
-            self.classifier = GlobalPointer(input_size=self.bert.config.hidden_size,
-                                            hidden_size=hidden_size,
-                                            output_size=len(self.hparams.label2id),
-                                            add_rope=self.hparams.add_rope,
-                                            span_get_type=self.hparams.span_get_type)
+        self.plm = self.get_plm_architecture()
+        
+        self.classifier = EfficientGlobalPointer(input_size=self.plm.config.hidden_size, 
+                                                hidden_size=hidden_size,
+                                                output_size=len(self.hparams.label2id),
+                                                add_rope=True)
 
         self.dropout = MultiDropout()
         self.criterion = MultiLabelCategoricalCrossEntropy()
@@ -63,7 +52,7 @@ class GlobalPointerForEntityExtraction(PLMBaseModel):
 
 
     def forward(self, input_ids, token_type_ids, attention_mask=None):
-        x = self.bert(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask).last_hidden_state
+        x = self.plm(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask).last_hidden_state
         x = self.dropout(x)
         logits = self.classifier(x, mask=attention_mask)
         return logits
@@ -138,14 +127,10 @@ class GlobalPointerForEntityExtraction(PLMBaseModel):
     def configure_optimizers(self):
         no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
         grouped_parameters = [
-            {'params': [p for n, p in self.bert.named_parameters() if not any(nd in n for nd in no_decay)],
+            {'params': [p for n, p in self.named_parameters() if not any(nd in n for nd in no_decay)],
              'lr': self.hparams.lr, 'weight_decay': self.hparams.weight_decay},
-            {'params': [p for n, p in self.bert.named_parameters() if any(nd in n for nd in no_decay)],
+            {'params': [p for n, p in self.named_parameters() if any(nd in n for nd in no_decay)],
              'lr': self.hparams.lr, 'weight_decay': 0.0},
-            {'params': [p for n, p in self.classifier.named_parameters() if not any(nd in n for nd in no_decay)],
-             'lr': self.hparams.lr * 5, 'weight_decay': self.hparams.weight_decay},
-            {'params': [p for n, p in self.classifier.named_parameters() if any(nd in n for nd in no_decay)],
-             'lr': self.hparams.lr * 5, 'weight_decay': 0.0}
         ]
         optimizer = torch.optim.AdamW(grouped_parameters)
         scheduler_config = self.get_scheduler_config(optimizer, self.hparams.scheduler)
