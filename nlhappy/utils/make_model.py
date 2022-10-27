@@ -72,13 +72,11 @@ class PLMBaseModel(LightningModule):
     - 通过self.get_plm_architecture可以得到预训练模型的架构,主要并没有加载预训练参数
     """
     
-    scheduler_names = ['linear_warmup', 
-                       'cosine_warmup', 
-                       'harmonic', 
-                       '1cycle']
+    scheduler_names = ['linear_warmup', 'cosine_warmup', 'harmonic']
     
     def __init__(self) -> None:
         super().__init__()
+        # 保存所有参数
         self.save_hyperparameters()
         assert self.hparams.scheduler in self.scheduler_names, f'availabel names {self.scheduler_names}'
         assert 'plm' in self.hparams and 'plm_dir' in self.hparams, 'you have to at least pass in plm and plm_dir'
@@ -140,13 +138,6 @@ class PLMBaseModel(LightningModule):
         return scheduler_config
     
     
-    def get_one_cycle_scheduler_config(self, optimizer):
-        total_steps = self.get_total_steps()
-        scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer=optimizer, max_lr=self.hparams.lr*3, total_steps=total_steps)
-        scheduler_config = {'scheduler': scheduler, 'interval':'step'}
-        return scheduler_config
-    
-    
     def get_total_steps(self):
         return self.trainer.estimated_stepping_batches
     
@@ -173,8 +164,6 @@ class PLMBaseModel(LightningModule):
             return self.get_linear_warmup_step_scheduler_config(optimizer=optimizer)
         elif name == 'cosine_warmup':
             return self.get_cosine_warmup_step_scheduler_config(optimizer=optimizer)
-        elif name == '1cycle':
-            return self.get_one_cycle_scheduler_config(optimizer=optimizer)
 
     
     def to_onnx(self, 
