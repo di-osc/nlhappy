@@ -10,7 +10,8 @@ documentation = "https://wangmengdi.notion.site/NLHAPPY-264f05d1084848efa42068c8
 [tool.poetry.dependencies]
 python = ">=3.7"
 torch = ">=1.8.0"
-pytorch-lightning = "1.7.7"
+# pl>1.6.5,<=1.7.7的版本,会出现checkpoint无法加载的问题,原因是实例化model的时候会有datamodule的hparams,暂时无法解决
+pytorch-lightning = "1.6.5" 
 datasets = ">=2.0.0"
 transformers = ">=4.17.0"
 hydra-core = "1.1"
