@@ -6,4 +6,5 @@ weight_decay: 0.01
 threshold: 0.0
 scheduler: linear_warmup
 add_rope: True
+use_efficient: True
 name: biaffine4ner
