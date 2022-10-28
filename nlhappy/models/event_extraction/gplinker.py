@@ -1,6 +1,6 @@
 from ...utils.make_model import PLMBaseModel
-from ...layers.classifier import GlobalPointer, EfficientGlobalPointer
-from ...layers.loss import MultiLabelCategoricalCrossEntropy, SparseMultiLabelCrossEntropy
+from ...layers.classifier import EfficientGlobalPointer
+from ...layers.loss import MultiLabelCategoricalCrossEntropy
 from ...layers.dropout import MultiDropout
 from ...metrics.event import EventF1, Event, Role
 import torch
@@ -75,9 +75,9 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         
         self.dropout = MultiDropout()
         
-        self.role_criterion = SparseMultiLabelCrossEntropy()
-        self.head_criterion = SparseMultiLabelCrossEntropy()
-        self.tail_criterion = SparseMultiLabelCrossEntropy()
+        self.role_criterion = MultiLabelCategoricalCrossEntropy()
+        self.head_criterion = MultiLabelCategoricalCrossEntropy()
+        self.tail_criterion = MultiLabelCategoricalCrossEntropy()
     
         self.val_metric = EventF1()                  
 
@@ -101,11 +101,11 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         head_true = batch['head_ids']
         tail_true = batch['tail_ids']
         
-        role_loss = self.role_criterion(role_logits, role_true)
-        head_loss = self.head_criterion(head_logits, head_true)
-        tail_loss = self.tail_criterion(tail_logits, tail_true)
+        role_loss = self.role_criterion(role_logits.reshape(role_logits.shape[0]*role_logits.shape[1], -1), role_true.reshape(role_true.shape[0]*role_true.shape[1], -1))
+        head_loss = self.head_criterion(head_logits.reshape(head_logits.shape[0]*head_logits.shape[1], -1), head_true.reshape(head_true.shape[0]*head_true.shape[1], -1))
+        tail_loss = self.tail_criterion(tail_logits.reshape(tail_logits.shape[0]*tail_logits.shape[1], -1), tail_true.reshape(tail_true.shape[0]*tail_true.shape[1], -1))
         
-        loss = sum([role_loss, head_loss, tail_loss]) / 3
+        loss = (role_loss + head_loss + tail_loss) / 3
         
         return loss, role_logits, head_logits, tail_logits
 
@@ -120,9 +120,7 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         role_true, head_true, tail_true = batch['role_ids'], batch['head_ids'], batch['tail_ids']
         loss, role_logits, head_logits, tail_logits = self.step(batch)
         batch_true_events = self.extract_events(role_true, head_true, tail_true)
-        self.print('true:', batch_true_events)
         batch_events = self.extract_events(role_logits, head_logits, tail_logits)
-        self.print('pred:', batch_events)
         self.val_metric(batch_events, batch_true_events)
         self.log('val/f1', self.val_metric, on_step=False, on_epoch=True, prog_bar=True)
         return {'val_loss': loss}
