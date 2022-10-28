@@ -26,7 +26,7 @@ class EntityExtractionDataModule(PLMBaseDataModule):
         super().__init__()
         self.transforms['w2ner'] = self.w2ner_transform
         self.transforms['globalpointer'] = self.gp_transform
-        self.transforms['tokenpair'] = self.token_pair_transform
+        self.transforms['biaffine'] = self.gp_transform
         assert self.hparams.transform in self.transforms.keys(), f'availabel transforms {list(self.transforms.keys())}'
 
 
@@ -37,7 +37,7 @@ class EntityExtractionDataModule(PLMBaseDataModule):
     
     @classmethod
     def get_available_transforms(cls):
-        return ['w2ner', 'globalpointer','tokenpair']
+        return ['w2ner', 'globalpointer']
 
 
     @property
@@ -155,36 +155,6 @@ class EntityExtractionDataModule(PLMBaseDataModule):
                 end = char_idx_to_token(end, mapping)
                 label_id = self.hparams.label2id[ent['label']]
                 label_ids[label_id,  start, end] = 1
-            batch_label_ids.append(label_ids)
-        batch_label_ids = torch.stack(batch_label_ids, dim=0)
-        batch_inputs['label_ids'] = batch_label_ids
-        return batch_inputs
-    
-    
-    def token_pair_transform(self, examples):
-        batch_text = examples['text']
-        batch_ents = examples['entities']
-        max_length = self.get_max_length()
-        batch_inputs = self.tokenizer(batch_text,
-                                      max_length=max_length,
-                                      padding='max_length',
-                                      truncation=True,
-                                      return_offsets_mapping=True,
-                                      add_special_tokens=False,
-                                      return_tensors='pt')
-        batch_mappings = batch_inputs.pop('offset_mapping').tolist()
-        batch_label_ids = []
-        for i, text in enumerate(batch_text):
-            ents = batch_ents[i]
-            mapping = batch_mappings[i]
-            label_ids = torch.zeros(max_length, max_length)
-            for ent in ents :
-                start = ent['indexes'][0]
-                start = char_idx_to_token(start, mapping)
-                end = ent['indexes'][-1] 
-                end = char_idx_to_token(end, mapping)
-                label_id = self.label2id[ent['label']]
-                label_ids[start, end] = label_id
             batch_label_ids.append(label_ids)
         batch_label_ids = torch.stack(batch_label_ids, dim=0)
         batch_inputs['label_ids'] = batch_label_ids
