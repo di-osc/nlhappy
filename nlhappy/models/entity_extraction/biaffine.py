@@ -1,10 +1,9 @@
 from ...utils.make_model import PLMBaseModel, align_token_span
-from ...layers.classifier import BiaffineSpanClassifier
+from ...layers.classifier.biaffine import EfficientBiaffine
 from ...layers.dropout import MultiDropout
 from ...layers.loss import MultiLabelCategoricalCrossEntropy
 from ...metrics.span import SpanF1
 import torch
-from torch.nn import BCEWithLogitsLoss
 
 
 class BiaffineForEntityExtraction(PLMBaseModel):
@@ -19,23 +18,24 @@ class BiaffineForEntityExtraction(PLMBaseModel):
     """
     def __init__(self,
                  lr: float = 3e-5,
-                 hidden_size: int = 128,
+                 hidden_size: int = 64,
                  add_rope: bool = True,
-                 threshold: float = 0.5,
+                 threshold: float = 0.0,
                  scheduler: str = 'linear_warmup_step',
                  weight_decay: float = 0.01,
                  **kwargs) -> None:
         super().__init__()
         
         self.plm = self.get_plm_architecture()
-        self.classifier = BiaffineSpanClassifier(input_size=self.plm.config.hidden_size,
-                                                 hidden_size=hidden_size,
-                                                 output_size=len(self.hparams.label2id),
-                                                 add_rope=add_rope,
-                                                 tril_mask=True)
+        
+        self.classifier = EfficientBiaffine(input_size=self.plm.config.hidden_size,
+                                            hidden_size=hidden_size,
+                                            output_size=len(self.hparams.label2id),
+                                            add_rope=add_rope,
+                                            tril_mask=True)
         self.dropout = MultiDropout()
         
-        self.criterion = BCEWithLogitsLoss(reduce=None)
+        self.criterion = MultiLabelCategoricalCrossEntropy()
 
         self.train_metric = SpanF1()
         self.val_metric = SpanF1()
@@ -53,11 +53,11 @@ class BiaffineForEntityExtraction(PLMBaseModel):
         input_ids = batch['input_ids']
         token_type_ids = batch['token_type_ids']
         attention_mask = batch['attention_mask']
-        span_ids = batch['label_ids'].permute(0,2,3,1)
+        span_ids = batch['label_ids']
         logits = self(input_ids, token_type_ids, attention_mask)
-        loss = self.criterion(logits, span_ids)
-        probs = torch.sigmoid(logits) > self.hparams.threshold
-        return loss, probs, span_ids
+        loss = self.criterion(logits.reshape(logits.shape[0]*logits.shape[1], -1), span_ids.reshape(span_ids.shape[0]*span_ids.shape[1], -1))
+        pred = logits.ge(self.hparams.threshold).float()
+        return loss, pred, span_ids
 
         
     def training_step(self, batch, batch_idx):
@@ -84,14 +84,10 @@ class BiaffineForEntityExtraction(PLMBaseModel):
     def configure_optimizers(self):
         no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
         grouped_parameters = [
-            {'params': [p for n, p in self.plm.named_parameters() if not any(nd in n for nd in no_decay)],
+            {'params': [p for n, p in self.named_parameters() if not any(nd in n for nd in no_decay)],
              'lr': self.hparams.lr, 'weight_decay': self.hparams.weight_decay},
-            {'params': [p for n, p in self.plm.named_parameters() if any(nd in n for nd in no_decay)],
-             'lr': self.hparams.lr, 'weight_decay': 0.0},
-            {'params': [p for n, p in self.classifier.named_parameters() if not any(nd in n for nd in no_decay)],
-             'lr': self.hparams.lr * 5, 'weight_decay': self.hparams.weight_decay},
-            {'params': [p for n, p in self.classifier.named_parameters() if any(nd in n for nd in no_decay)],
-             'lr': self.hparams.lr * 5, 'weight_decay': 0.0}
+            {'params': [p for n, p in self.named_parameters() if any(nd in n for nd in no_decay)],
+             'lr': self.hparams.lr, 'weight_decay': 0.0}
         ]
         optimizer = torch.optim.AdamW(grouped_parameters)
         scheduler_config = self.get_scheduler_config(optimizer, self.hparams.scheduler)
