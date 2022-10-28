@@ -18,10 +18,9 @@ class GPLinkerForRelationExtraction(PLMBaseModel):
                  hidden_size: int,
                  lr: float,
                  scheduler: str, 
-                 dropout: float,
                  weight_decay: float,
                  threshold: float,
-                 **data_params):
+                 **kwargs):
         super().__init__()
         
         self.bert = self.get_plm_architecture()
