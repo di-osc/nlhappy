@@ -1,5 +1,5 @@
 from ...utils.make_model import PLMBaseModel, align_token_span
-from ...layers.classifier.biaffine import EfficientBiaffine
+from ...layers.classifier.biaffine import BiaffineSpanClassifier, EfficientBiaffineSpanClassifier
 from ...layers.dropout import MultiDropout
 from ...layers.loss import MultiLabelCategoricalCrossEntropy
 from ...metrics.span import SpanF1
@@ -23,16 +23,22 @@ class BiaffineForEntityExtraction(PLMBaseModel):
                  threshold: float = 0.0,
                  scheduler: str = 'linear_warmup_step',
                  weight_decay: float = 0.01,
+                 use_efficient: bool = True,
                  **kwargs) -> None:
         super().__init__()
         
         self.plm = self.get_plm_architecture()
         
-        self.classifier = EfficientBiaffine(input_size=self.plm.config.hidden_size,
-                                            hidden_size=hidden_size,
-                                            output_size=len(self.hparams.label2id),
-                                            add_rope=add_rope,
-                                            tril_mask=True)
+        if self.hparams.use_efficient:
+            self.classifier = EfficientBiaffineSpanClassifier(input_size=self.plm.config.hidden_size,
+                                                              hidden_size=hidden_size,
+                                                              output_size=len(self.hparams.label2id),
+                                                              add_rope=add_rope)
+        else:
+            self.classifier = BiaffineSpanClassifier(input_size=self.plm.config.hidden_size,
+                                                     hidden_size=hidden_size,
+                                                     output_size=len(self.hparams.label2id),
+                                                     add_rope=add_rope)
         self.dropout = MultiDropout()
         
         self.criterion = MultiLabelCategoricalCrossEntropy()

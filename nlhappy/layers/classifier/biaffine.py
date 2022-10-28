@@ -95,10 +95,10 @@ class BiaffineSpanClassifier(nn.Module):
             mask_tril = torch.tril(torch.ones_like(span_logits), diagonal=-1)
             span_logits = span_logits - mask_tril * 1e12
             
-        return span_logits.permute(0,2,3,1)
+        return span_logits
     
     
-class EfficientBiaffine(nn.Module):
+class EfficientBiaffineSpanClassifier(nn.Module):
     """更加高效的利用biaffine机制做span分类,想法来源于EfficientGlobalPointer
     
     - 输入: batch_size, seq_length, hidden_size
