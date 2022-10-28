@@ -260,14 +260,14 @@ class PLMBaseDataModule(pl.LightningModule):
     def val_dataloader(self):
         return DataLoader(dataset=self.dataset['validation'], 
                           batch_size=self.hparams.batch_size, 
-                          num_workers=self.hparams.num_workers, 
-                          pin_memory=self.hparams.pin_memory,
+                          num_workers=2, 
+                          pin_memory=False,
                           shuffle=self.hparams.shuffle_val)
 
 
     def test_dataloader(self):
         return DataLoader(dataset=self.dataset['test'], 
                           batch_size=self.hparams.batch_size, 
-                          num_workers=self.hparams.num_workers, 
-                          pin_memory=self.hparams.pin_memory,
+                          num_workers=2, 
+                          pin_memory=False,
                           shuffle=self.hparams.shuffle_test)

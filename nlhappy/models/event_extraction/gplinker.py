@@ -52,7 +52,7 @@ class GPLinkerForEventExtraction(PLMBaseModel):
                  hidden_size: int = 64,
                  weight_decay: float = 0.01,
                  threshold: float = 0.0,
-                 scheduler: str = 'linear_warmup_step',
+                 scheduler: str = 'linear_warmup',
                  **kwargs: Any) -> None:
         super().__init__()
         self.plm = self.get_plm_architecture()

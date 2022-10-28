@@ -114,10 +114,8 @@ def analysis_span_badcase(examples: List[Example], key: str='all', return_prf: b
         return badcases, scores
     else:
         return badcases
-        
             
     
-
 def analysis_relation_badcase(examples: List[Example] , return_prf:bool=True):
     """错误分析,并且返回细粒度的指标
 
@@ -167,6 +165,7 @@ def analysis_relation_badcase(examples: List[Example] , return_prf:bool=True):
         return badcases, scores
     else:
         return badcases
+    
     
 def analysis_text_badcase(examples: List[Example], return_prf: bool=True):
     all_preds = 0
