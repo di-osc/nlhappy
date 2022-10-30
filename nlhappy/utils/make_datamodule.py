@@ -227,7 +227,7 @@ class PLMBaseDataModule(pl.LightningModule):
         if type(self.hparams.auto_length) == int:
             assert self.hparams.auto_length >0, 'max_length length  must > 0'
             max_length = self.hparams.auto_length
-        log.info(f'current max token length: {max_length}')
+        log.info(f'current max sequence length(token level): {max_length} ')
         return max_length
     
     
