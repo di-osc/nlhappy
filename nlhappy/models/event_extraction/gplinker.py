@@ -1,8 +1,9 @@
 from ...utils.make_model import PLMBaseModel
-from ...layers.classifier import EfficientGlobalPointer
-from ...layers.loss import MultiLabelCategoricalCrossEntropy
+from ...layers.classifier import EfficientGlobalPointer, GlobalPointer, EfficientBiaffineSpanClassifier
+from ...layers.loss import MultiLabelCategoricalCrossEntropy, SparseMultiLabelCrossEntropy
 from ...layers.dropout import MultiDropout
 from ...metrics.event import EventF1, Event, Role
+from ...metrics.span import SpanF1
 import torch
 from itertools import groupby
 from typing import Any, Union
@@ -55,13 +56,12 @@ class GPLinkerForEventExtraction(PLMBaseModel):
                  scheduler: str = 'linear_warmup',
                  **kwargs: Any) -> None:
         super().__init__()
+        
         self.plm = self.get_plm_architecture()
 
-        self.role_classifier = EfficientGlobalPointer(input_size=self.plm.config.hidden_size,
-                                                      hidden_size=hidden_size,
-                                                      output_size=len(self.hparams.label2id),
-                                                      add_rope=True,
-                                                      tril_mask=True)
+        self.role_classifier = EfficientBiaffineSpanClassifier(input_size=self.plm.config.hidden_size,
+                                                               hidden_size=hidden_size,
+                                                               output_size=len(self.hparams.label2id))
         
         self.head_classifier = EfficientGlobalPointer(input_size=self.plm.config.hidden_size,
                                                       hidden_size=hidden_size,
@@ -79,7 +79,10 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         self.head_criterion = MultiLabelCategoricalCrossEntropy()
         self.tail_criterion = MultiLabelCategoricalCrossEntropy()
     
-        self.val_metric = EventF1()                  
+        self.val_metric = EventF1()             
+        self.role_metric = SpanF1()
+        self.head_metric = SpanF1()
+        self.tail_metric = SpanF1()
 
         
     def forward(self, input_ids, attention_mask):
@@ -104,6 +107,9 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         role_loss = self.role_criterion(role_logits.reshape(role_logits.shape[0]*role_logits.shape[1], -1), role_true.reshape(role_true.shape[0]*role_true.shape[1], -1))
         head_loss = self.head_criterion(head_logits.reshape(head_logits.shape[0]*head_logits.shape[1], -1), head_true.reshape(head_true.shape[0]*head_true.shape[1], -1))
         tail_loss = self.tail_criterion(tail_logits.reshape(tail_logits.shape[0]*tail_logits.shape[1], -1), tail_true.reshape(tail_true.shape[0]*tail_true.shape[1], -1))
+        # role_loss = self.role_criterion(role_logits, role_true)
+        # head_loss = self.head_criterion(head_logits, head_true)
+        # tail_loss = self.tail_criterion(tail_logits, tail_true)
         
         loss = (role_loss + head_loss + tail_loss) / 3
         
@@ -112,7 +118,19 @@ class GPLinkerForEventExtraction(PLMBaseModel):
 
     def training_step(self, batch, batch_idx):
         loss, role_logits, head_logits, tail_logits = self.step(batch)
-        self.log('train/loss', loss)
+        role_pred = role_logits.ge(self.hparams.threshold)
+        head_pred = head_logits.ge(self.hparams.threshold)
+        tail_pred = tail_logits.ge(self.hparams.threshold)
+        role_true = batch['role_ids']
+        head_true = batch['head_ids']
+        tail_true = batch['tail_ids']
+        self.role_metric(role_pred, role_true)
+        self.head_metric(head_pred, head_true)
+        self.tail_metric(tail_pred, tail_true)
+        self.log('train/role_f1', self.role_metric, on_step=True, prog_bar=True)
+        self.log('train/head_f1', self.head_metric, on_step=True, prog_bar=True)
+        self.log('train/tail_f1', self.tail_metric, on_step=True, prog_bar=True)
+        self.log('train/loss_f1', loss)
         return {'loss': loss}
 
 
@@ -163,12 +181,24 @@ class GPLinkerForEventExtraction(PLMBaseModel):
     def configure_optimizers(self)  :
         no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
         grouped_params = [
-            {'params': [p for n, p in self.named_parameters() if not any(nd in n for nd in no_decay)],
-            'weight_decay': self.hparams.weight_decay},
-            {'params': [p for n, p in self.named_parameters() if any(nd in n for nd in no_decay)],
-            'weight_decay': 0.0}
+            {'params': [p for n, p in self.plm.named_parameters() if not any(nd in n for nd in no_decay)],
+            'weight_decay': self.hparams.weight_decay, 'lr': self.hparams.lr},
+            {'params': [p for n, p in self.plm.named_parameters() if any(nd in n for nd in no_decay)],
+            'weight_decay': 0.0, 'lr': self.hparams.lr},
+            {'params': [p for n, p in self.role_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
+            'weight_decay': self.hparams.weight_decay, 'lr': self.hparams.lr * 2},
+            {'params': [p for n, p in self.role_classifier.named_parameters() if any(nd in n for nd in no_decay)],
+            'weight_decay': 0.0, 'lr': self.hparams.lr * 2},
+            {'params': [p for n, p in self.head_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
+            'weight_decay': self.hparams.weight_decay, 'lr': self.hparams.lr},
+            {'params': [p for n, p in self.head_classifier.named_parameters() if any(nd in n for nd in no_decay)],
+            'weight_decay': 0.0, 'lr': self.hparams.lr},
+            {'params': [p for n, p in self.tail_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
+            'weight_decay': self.hparams.weight_decay, 'lr': self.hparams.lr},
+            {'params': [p for n, p in self.tail_classifier.named_parameters() if any(nd in n for nd in no_decay)],
+            'weight_decay': 0.0, 'lr': self.hparams.lr}
         ]
-        optimizer = torch.optim.AdamW(grouped_params, lr=self.hparams.lr)
+        optimizer = torch.optim.AdamW(grouped_params)
         scheduler_config = self.get_scheduler_config(optimizer=optimizer, name=self.hparams.scheduler)
         return [optimizer], [scheduler_config]
 
