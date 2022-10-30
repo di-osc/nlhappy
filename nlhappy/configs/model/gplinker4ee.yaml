@@ -4,5 +4,5 @@ lr: 3e-5
 hidden_size: 64
 weight_decay: 0.01
 threshold: 0.0
-scheduler: cosine_warmup
+scheduler: linear_warmup
 name: gplinker4ee
