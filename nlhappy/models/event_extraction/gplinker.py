@@ -1,12 +1,12 @@
-from ...utils.make_model import PLMBaseModel
-from ...layers.classifier import EfficientGlobalPointer, GlobalPointer, EfficientBiaffineSpanClassifier
+from ...utils.make_model import PLMBaseModel, align_token_span
+from ...layers.classifier import EfficientGlobalPointer
 from ...layers.loss import MultiLabelCategoricalCrossEntropy, SparseMultiLabelCrossEntropy
 from ...layers.dropout import MultiDropout
 from ...metrics.event import EventF1, Event, Role
 from ...metrics.span import SpanF1
 import torch
 from itertools import groupby
-from typing import Any, Union
+from typing import Any, Union, Optional, List, Tuple
 import numpy as np
 
 
@@ -59,9 +59,9 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         
         self.plm = self.get_plm_architecture()
 
-        self.role_classifier = GlobalPointer(input_size=self.plm.config.hidden_size,
-                                             hidden_size=hidden_size,
-                                             output_size=len(self.hparams.label2id))
+        self.role_classifier = EfficientGlobalPointer(input_size=self.plm.config.hidden_size,
+                                                      hidden_size=hidden_size,
+                                                      output_size=len(self.hparams.label2id))
         
         self.head_classifier = EfficientGlobalPointer(input_size=self.plm.config.hidden_size,
                                                       hidden_size=hidden_size,
@@ -79,7 +79,7 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         self.head_criterion = MultiLabelCategoricalCrossEntropy()
         self.tail_criterion = MultiLabelCategoricalCrossEntropy()
     
-        self.val_metric = EventF1()             
+        self.event_metric = EventF1()             
         self.role_metric = SpanF1()
         self.head_metric = SpanF1()
         self.tail_metric = SpanF1()
@@ -135,12 +135,12 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         loss, role_logits, head_logits, tail_logits = self.step(batch)
         batch_true_events = self.extract_events(role_true, head_true, tail_true)
         batch_events = self.extract_events(role_logits, head_logits, tail_logits)
-        self.val_metric(batch_events, batch_true_events)
-        self.log('val/f1', self.val_metric, on_step=False, on_epoch=True, prog_bar=True)
+        self.event_metric(batch_events, batch_true_events)
+        self.log('val/f1', self.event_metric, on_step=False, on_epoch=True, prog_bar=True)
         return {'val_loss': loss}
 
 
-    def extract_events(self, role_logits: torch.Tensor, head_logits: torch.Tensor, tail_logits: torch.Tensor, threshold: Union[None, float]=None):
+    def extract_events(self, role_logits: torch.Tensor, head_logits: torch.Tensor, tail_logits: torch.Tensor, threshold: Union[None, float]= None, mapping: Optional[List[Tuple]]= None):
         if threshold is None:
             threshold = self.hparams.threshold
         role_logits = role_logits.cpu().detach().numpy()
@@ -167,7 +167,9 @@ class GPLinkerForEventExtraction(PLMBaseModel):
                     role_ls = []
                     for argu in event:
                         role_label, start, end =argu[1], argu[2], argu[3]+1
-                        role_ls.append(Role(start=start, end=end, label=role_label))
+                        if mapping is not None:
+                            (start, end) = align_token_span((start, end), mapping)
+                        role_ls.append(Role(start=start, end=end, label=role_label))                            
                     event = Event(label=e_label, roles=role_ls)
                     events.add(event)
             batch_events.append(events)
@@ -182,9 +184,9 @@ class GPLinkerForEventExtraction(PLMBaseModel):
             {'params': [p for n, p in self.plm.named_parameters() if any(nd in n for nd in no_decay)],
             'weight_decay': 0.0, 'lr': self.hparams.lr},
             {'params': [p for n, p in self.role_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
-            'weight_decay': self.hparams.weight_decay, 'lr': self.hparams.lr * 2},
+            'weight_decay': self.hparams.weight_decay, 'lr': self.hparams.lr},
             {'params': [p for n, p in self.role_classifier.named_parameters() if any(nd in n for nd in no_decay)],
-            'weight_decay': 0.0, 'lr': self.hparams.lr * 2},
+            'weight_decay': 0.0, 'lr': self.hparams.lr},
             {'params': [p for n, p in self.head_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
             'weight_decay': self.hparams.weight_decay, 'lr': self.hparams.lr},
             {'params': [p for n, p in self.head_classifier.named_parameters() if any(nd in n for nd in no_decay)],
@@ -195,11 +197,14 @@ class GPLinkerForEventExtraction(PLMBaseModel):
             'weight_decay': 0.0, 'lr': self.hparams.lr}
         ]
         optimizer = torch.optim.AdamW(grouped_params)
-        scheduler_config = self.get_scheduler_config(optimizer=optimizer, name=self.hparams.scheduler)
-        return [optimizer], [scheduler_config]
+        return [optimizer]
+        # scheduler_config = self.get_scheduler_config(optimizer=optimizer, name=self.hparams.scheduler)
+        # return [optimizer], [scheduler_config]
 
 
-    def predict(self, text: str, device: str = 'cpu'):
+    def predict(self, text: str, device: str = 'cpu', threshold: Optional[float] = None):
+        if threshold is None:
+            threshold = self.hparams.threshold
         inputs = self.tokenizer(text,
                                 add_special_tokens=True,
                                 max_length=self.hparams.max_length,
@@ -209,7 +214,9 @@ class GPLinkerForEventExtraction(PLMBaseModel):
                                 return_token_type_ids=False)
         mapping = inputs.pop('offset_mapping')
         mapping = mapping[0].tolist()
+        self.freeze()
+        self.to(device)
         inputs.to(device)
         role_logits, head_logits, tail_logits = self(**inputs)
-        events = self.extract_events(role_logits, head_logits, tail_logits)
+        events = self.extract_events(role_logits, head_logits, tail_logits, threshold=threshold, mapping=mapping)
         return events
