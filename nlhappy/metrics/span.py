@@ -22,4 +22,4 @@ class SpanF1(Metric):
         self.all_true += torch.sum(true != 0)
 
     def compute(self):
-        return 2 * self.correct / (self.all_pred + self.all_true + 1e-5)
+        return 2 * self.correct / (self.all_pred + self.all_true + 1e-10)
