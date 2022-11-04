@@ -1,7 +1,7 @@
 import os
 from .utils import get_logger
-from typing import Union
-from torch.utils.data import DataLoader
+from typing import Union, List
+from torch.utils.data import DataLoader, BatchSampler, RandomSampler
 from datasets import load_from_disk, load_dataset
 import pytorch_lightning as pl
 from transformers import AutoConfig, AutoTokenizer, AutoModel
@@ -162,11 +162,11 @@ class PLMBaseDataModule(pl.LightningModule):
     def __init__(self,
                  auto_length: Union[str, int] = 'max',
                  plm_dir: str = 'plms',
-                 plm_max_input_length: int = 512,
+                 plm_max_length: int = 512,
                  dataset_dir: str = 'datasets',
-                 num_workers: int = 0,
+                 num_workers: int = 4,
                  pin_memory: bool = False,
-                 shuffle_train: bool = True,
+                 shuffle_train: bool = False,
                  shuffle_val: bool = False,
                  shuffle_test: bool = False):
         super().__init__()
@@ -214,7 +214,7 @@ class PLMBaseDataModule(pl.LightningModule):
         
     @lru_cache()
     def get_max_length(self):
-        """根据auto_length参数自动获取最大token的长度,并将其添加进hparams
+        """根据auto_length参数自动获取最大token的长度
         
         Returns:
             int: 最大token长度
@@ -227,7 +227,19 @@ class PLMBaseDataModule(pl.LightningModule):
         if type(self.hparams.auto_length) == int:
             assert self.hparams.auto_length >0, 'max_length length  must > 0'
             max_length = self.hparams.auto_length
-        log.info(f'current max sequence length(token level): {max_length} ')
+        return max_length
+    
+    def get_batch_max_length(self, batch_text: List[str]) -> int:
+        """获取一个batch的最大文本长度,不得大于模型的最大输入长度,一般用于dataset的transform中
+
+        Args:
+            batch_text (List[str]): 一个批次的文本
+
+        Returns:
+            int: 最大文本长度
+        """
+        max_length = max([len(t) for t in batch_text])
+        max_length = min([self.hparams.plm_max_length, max_length])
         return max_length
     
     
@@ -251,23 +263,26 @@ class PLMBaseDataModule(pl.LightningModule):
     
     def train_dataloader(self):
         return DataLoader(dataset= self.dataset['train'], 
-                          batch_size=self.hparams.batch_size, 
                           num_workers=self.hparams.num_workers, 
                           pin_memory=self.hparams.pin_memory,
-                          shuffle=self.hparams.shuffle_train)
+                          shuffle=self.hparams.shuffle_train,
+                          batch_size=None,
+                          sampler=BatchSampler(RandomSampler(self.dataset['train']), batch_size=self.hparams.batch_size, drop_last=False))
     
     
     def val_dataloader(self):
         return DataLoader(dataset=self.dataset['validation'], 
-                          batch_size=self.hparams.batch_size, 
+                          batch_size=None, 
                           num_workers=2, 
                           pin_memory=False,
-                          shuffle=self.hparams.shuffle_val)
+                          shuffle=self.hparams.shuffle_val,
+                          sampler=BatchSampler(RandomSampler(self.dataset['validation']), batch_size=self.hparams.batch_size, drop_last=False))
 
 
     def test_dataloader(self):
         return DataLoader(dataset=self.dataset['test'], 
-                          batch_size=self.hparams.batch_size, 
+                          batch_size=None, 
                           num_workers=2, 
                           pin_memory=False,
-                          shuffle=self.hparams.shuffle_test)
+                          shuffle=self.hparams.shuffle_test,
+                          sampler=BatchSampler(RandomSampler(self.dataset['test']), batch_size=self.hparams.batch_size, drop_last=False))
