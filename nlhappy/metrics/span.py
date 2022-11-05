@@ -18,8 +18,8 @@ class SpanF1(Metric):
 
     def update(self, pred: Tensor, true: Tensor):
         self.correct += torch.sum(pred[true==1])
-        self.all_pred += torch.sum(pred != 0)
-        self.all_true += torch.sum(true != 0)
+        self.all_pred += torch.sum(pred == 1)
+        self.all_true += torch.sum(true == 1)
 
     def compute(self):
-        return 2 * self.correct / (self.all_pred + self.all_true + 1e-10)
+        return 2 * self.correct / (self.all_pred + self.all_true)

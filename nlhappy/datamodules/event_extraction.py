@@ -166,9 +166,9 @@ class EventExtractionDataModule(PLMBaseDataModule):
             batch_role_ids.append(role_ids)
             batch_head_ids.append(head_ids)
             batch_tail_ids.append(tail_ids)
-        batch_inputs['role_ids'] = torch.stack(batch_role_ids, dim=0)
-        batch_inputs['head_ids'] = torch.stack(batch_head_ids, dim=0)
-        batch_inputs['tail_ids'] = torch.stack(batch_tail_ids, dim=0)
+        batch_inputs['role_tags'] = torch.stack(batch_role_ids, dim=0)
+        batch_inputs['head_tags'] = torch.stack(batch_head_ids, dim=0)
+        batch_inputs['tail_tags'] = torch.stack(batch_tail_ids, dim=0)
         return batch_inputs
     
     def blinker_transform(self, examples):
