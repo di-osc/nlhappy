@@ -82,4 +82,4 @@ class TextClassificationDataModule(PLMBaseDataModule):
     
     @classmethod
     def get_available_transforms(cls):
-        return ['bert']
+        return ['bert_tc']

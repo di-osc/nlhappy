@@ -49,8 +49,9 @@ class RelationExtractionDataModule(PLMBaseDataModule):
         if self.hparams.transform == 'onerel':
             self.hparams.tag2id = self.onerel_tag2id
             self.hparams.id2tag = {i:l for l,i in self.onerel_tag2id.items()}
-        self.hparams.label2id = self.label2id
-        self.hparams.id2label = {i:l for l, i in self.label2id.items()}
+        else:
+            self.hparams.label2id = self.label2id
+            self.hparams.id2label = {i:l for l, i in self.label2id.items()}
         # 设置数据转换
         self.dataset.set_transform(transform=self.transforms.get(self.hparams.transform))   
 
@@ -103,9 +104,9 @@ class RelationExtractionDataModule(PLMBaseDataModule):
             batch_so_ids.append(so_ids)
             batch_head_ids.append(head_ids)
             batch_tail_ids.append(tail_ids)
-        batch_inputs['so_ids'] = torch.stack(batch_so_ids, dim=0)
-        batch_inputs['head_ids'] = torch.stack(batch_head_ids, dim=0)
-        batch_inputs['tail_ids'] = torch.stack(batch_tail_ids, dim=0)
+        batch_inputs['so_tags'] = torch.stack(batch_so_ids, dim=0)
+        batch_inputs['head_tags'] = torch.stack(batch_head_ids, dim=0)
+        batch_inputs['tail_tags'] = torch.stack(batch_tail_ids, dim=0)
         return batch_inputs
     
     

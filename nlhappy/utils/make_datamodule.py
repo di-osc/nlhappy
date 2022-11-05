@@ -229,6 +229,7 @@ class PLMBaseDataModule(pl.LightningModule):
             max_length = self.hparams.auto_length
         return max_length
     
+    
     def get_batch_max_length(self, batch_text: List[str]) -> int:
         """获取一个batch的最大文本长度,不得大于模型的最大输入长度,一般用于dataset的transform中
 

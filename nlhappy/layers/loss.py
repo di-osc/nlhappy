@@ -19,15 +19,15 @@ class MultiLabelCategoricalCrossEntropy(torch.nn.Module):
 
     def forward(self, y_pred, y_true):
         """
-
-        Args:
-            y_pred : [batch_size, num_classes, seq_len, seq_len]
-            y_true : [batch_size, num_classes, seq_len, seq_len]
+            y_pred : [batch_size * num_classes, seq_len * seq_len]
+            y_true : [batch_size * num_classes, seq_len * seq_len]
         """
         y_pred = (1 - 2 * y_true) * y_pred  # -1 -> pos classes, 1 -> neg classes
         y_pred_neg = y_pred - y_true * 1e12  # mask the pred outputs of pos classes
         y_pred_pos =  y_pred - (1 - y_true) * 1e12  # mask the pred outputs of neg classes
+        
         zeros = torch.zeros_like(y_pred[..., :1])
+        
         y_pred_neg = torch.cat([y_pred_neg, zeros], dim=-1)
         y_pred_pos = torch.cat([y_pred_pos, zeros], dim=-1)
         neg_loss = torch.logsumexp(y_pred_neg, dim=-1)
@@ -38,20 +38,23 @@ class MultiLabelCategoricalCrossEntropy(torch.nn.Module):
 
 
 class SparseMultiLabelCrossEntropy(torch.nn.Module):
-    """稀疏版多标签分类的交叉熵
-    - y_true.shape=[..., num_positive],y_pred.shape=[..., num_classes];
+    """稀疏版多标签分类的交叉熵, y_true只传正例
+    - y_true.shape=[batch, class, max_instance, 2(下标, 例如 (0,1))],y_pred.shape=[batch, class, seq, seq];
     - 请保证y_pred的值域是全体实数，换言之一般情况下y_pred不用加激活函数，尤其是不能加sigmoid或者softmax；
     - 预测阶段则输出y_pred大于0的类；
     参考:
     - https://kexue.fm/archives/7359 。
     - https://github.com/bojone/bert4keras/blob/4dcda150b54ded71420c44d25ff282ed30f3ea42/bert4keras/backend.py#L272
     """
-    def __init__(self, eposilon: float = 1e-5, inf: float =1e4):
+    def __init__(self, mask_zero: bool = True, eposilon: float = 1e-10, inf=1e12):
         super().__init__()
         self.eposilon = eposilon
-        self.inf = inf
-
-    def forward(self, y_pred: Tensor, y_true: Tensor, mask_zero: bool =True) -> Tensor:
+        self.mask_zero = mask_zero
+        self.inf = inf # inf 太大损失会变为inf
+        
+    def forward(self, y_pred: Tensor, y_true: Tensor) -> Tensor:
+        # y_pred shape: [batch, class, seq, seq]
+        # y_true shape: [batch, class, max_instance, 2]
         shape = y_pred.shape
         # bs, nclass, max_spo_num
         y_true = y_true[..., 0] * shape[2] + y_true[..., 1]
@@ -60,19 +63,21 @@ class SparseMultiLabelCrossEntropy(torch.nn.Module):
         
         zeros = torch.zeros_like(y_pred[..., :1])
         y_pred = torch.cat([y_pred, zeros], dim=-1)
-        if mask_zero:
+        if self.mask_zero:
             infs = zeros + self.inf
             y_pred = torch.cat([infs, y_pred[..., 1:]], dim=-1)
 
         y_pos_2 = torch.gather(y_pred, index=y_true, dim=-1)
         y_pos_1 = torch.cat([y_pos_2, zeros], dim=-1)
-        if mask_zero:
+        
+        if self.mask_zero:
             y_pred = torch.cat([-infs, y_pred[..., 1:]], dim=-1)
             y_pos_2 = torch.gather(y_pred, index=y_true, dim=-1)
+            
         pos_loss = torch.logsumexp(-y_pos_1, dim=-1)
         all_loss = torch.logsumexp(y_pred, dim=-1)
         aux_loss = torch.logsumexp(y_pos_2, dim=-1) - all_loss
-        aux_loss = torch.clamp(1 - torch.exp(aux_loss), min=self.eposilon, max=1)
+        aux_loss = torch.clip(1 - torch.exp(aux_loss), min=self.eposilon, max=1)
         neg_loss = all_loss + torch.log(aux_loss)
         loss = pos_loss + neg_loss
         return loss.sum(dim=1).mean()
