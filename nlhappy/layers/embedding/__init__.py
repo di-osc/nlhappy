@@ -1,1 +1,1 @@
-from .position_embedding import SinusoidalPositionEmbedding
+from .position_embedding import SinusoidalPositionEmbedding, RoPEPositionEncoding
