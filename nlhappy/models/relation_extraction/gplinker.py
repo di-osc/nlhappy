@@ -1,11 +1,11 @@
 from ...layers import MultiDropout, EfficientGlobalPointer
-from ...layers.loss import MultiLabelCategoricalCrossEntropy, SparseMultiLabelCrossEntropy
+from ...layers.loss import MultiLabelCategoricalCrossEntropy
 from ...metrics.triple import TripleF1, Triple
+from ...metrics.span import SpanF1
 import torch
 from torch import Tensor
 from typing import List, Set
 from ...utils.make_model import align_token_span, PLMBaseModel
-
 
 
 class GPLinkerForRelationExtraction(PLMBaseModel):
@@ -37,7 +37,9 @@ class GPLinkerForRelationExtraction(PLMBaseModel):
         self.tail_criterion = MultiLabelCategoricalCrossEntropy()
         
 
-        self.train_metric = TripleF1()
+        self.so_metric = SpanF1()
+        self.head_metric = SpanF1()
+        self.tail_metric = SpanF1()
         self.val_metric = TripleF1()
         self.test_metric = TripleF1()
 
@@ -56,28 +58,41 @@ class GPLinkerForRelationExtraction(PLMBaseModel):
         #inputs为bert常规输入, span_ids: [batch_size, 2, seq_len, seq_len],
         #head_ids: [batch_size, len(label2id), seq_len, seq_len], tail_ids: [batch_size, len(label2id), seq_len, seq_len]
         input_ids, attention_mask = batch['input_ids'], batch['attention_mask']
-        so_true, head_true, tail_true = batch['so_ids'],  batch['head_ids'], batch['tail_ids']
+        so_true, head_true, tail_true = batch['so_tags'],  batch['head_tags'], batch['tail_tags']
         so_logits, head_logits, tail_logits = self(input_ids=input_ids, attention_mask=attention_mask)
 
-        so_loss = self.so_criterion(so_logits.reshape(so_logits.shape[0] * so_logits.shape[1], -1), so_true.reshape(so_true.shape[0]*so_true.shape[1], -1))
-        head_loss = self.head_criterion(head_logits.reshape(head_logits.shape[0] * head_logits.shape[1], -1), head_true.reshape(head_true.shape[0]*head_true.shape[1], -1))
-        tail_loss = self.tail_criterion(tail_logits.reshape(tail_logits.shape[0] * tail_logits.shape[1], -1), tail_true.reshape(tail_true.shape[0]*tail_true.shape[1], -1))
+        # so_true = so_true.permute(0,2,3,1) 
+        # head_true = head_true.permute(0,2,3,1)
+        # tail_true = tail_true.permute(0,2,3,1)
+        
+        so_loss = self.so_criterion(so_logits, so_true)
+        # head_loss = self.head_criterion(head_logits, head_true)
+        # tail_loss = self.tail_criterion(tail_logits, tail_true)
+        b,c,s,s = head_logits.shape
+        # so_loss = self.so_criterion(so_logits.reshape(-1, s*s), so_true.reshape(-1, s*s))
+        head_loss = self.head_criterion(head_logits.reshape(-1, s*s), head_true.reshape(-1, s*s))
+        tail_loss = self.tail_criterion(tail_logits.reshape(-1, s*s), tail_true.reshape(-1, s*s))
         
         loss = (so_loss + head_loss + tail_loss) / 3
         
-        return loss, so_logits, head_logits, tail_logits
+        return loss, so_logits, head_logits, tail_logits, so_true, head_true, tail_true
 
         
     def training_step(self, batch, batch_idx) -> dict:
         # 训练阶段不进行解码, 会比较慢
-        loss, so_logits, head_logits, tail_logits = self.shared_step(batch)
+        loss, so_logits, head_logits, tail_logits, so_true, head_true, tail_true = self.shared_step(batch)
         self.log('train/loss', loss)
+        self.so_metric(so_logits.gt(self.hparams.threshold), so_true)
+        self.log('train/so', self.so_metric, prog_bar=True, on_step=True)
+        self.head_metric(head_logits.gt(self.hparams.threshold), head_true)
+        self.log('train/head', self.head_metric, prog_bar=True, on_step=True)
+        self.tail_metric(tail_logits.gt(self.hparams.threshold), tail_true)
+        self.log('train/tail', self.tail_metric, prog_bar=True, on_step=True)
         return {'loss': loss}
 
 
     def validation_step(self, batch, batch_idx) -> dict:
-        so_true, head_true, tail_true = batch['so_ids'], batch['head_ids'], batch['tail_ids']
-        loss, so_logits, head_logits, tail_logits = self.shared_step(batch)
+        loss, so_logits, head_logits, tail_logits, so_true, head_true, tail_true = self.shared_step(batch)
         batch_triples = self.extract_triple(so_logits, head_logits, tail_logits, threshold=self.hparams.threshold)
         batch_true_triples = self.extract_triple(so_true, head_true, tail_true, threshold=self.hparams.threshold)
         self.val_metric(batch_triples, batch_true_triples)
@@ -86,8 +101,7 @@ class GPLinkerForRelationExtraction(PLMBaseModel):
 
 
     def test_step(self, batch, batch_idx) -> dict:
-        so_true, head_true, tail_true = batch['so_ids'], batch['head_ids'], batch['tail_ids']
-        loss, so_logits, head_logits, tail_logits = self.shared_step(batch)
+        loss, so_logits, head_logits, tail_logits, so_true, head_true, tail_true = self.shared_step(batch)
         batch_triples = self.extract_triple(so_logits, head_logits, tail_logits, threshold=self.hparams.threshold)
         batch_true_triples = self.extract_triple(so_true, head_true, tail_true, threshold=self.hparams.threshold)
         self.test_metric(batch_triples, batch_true_triples)
@@ -148,8 +162,8 @@ class GPLinkerForRelationExtraction(PLMBaseModel):
                             triples.add(Triple(triple=(sh.item(), st.item(), self.hparams['id2label'][p], oh.item(), ot.item())))
             batch_triples.append(triples)
         return batch_triples
-
-
+            
+        
     def predict(self, text: str, device:str='cpu', threshold = None) -> Set[Triple]:
         """模型预测
         参数:
