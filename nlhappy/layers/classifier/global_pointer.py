@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from torch.nn import Module
-from ..embedding import SinusoidalPositionEmbedding
+from ..embedding import SinusoidalPositionEmbedding, RoPEPositionEncoding
 
 
 class GlobalPointer(Module):
@@ -137,33 +137,31 @@ class EfficientGlobalPointer(Module):
                  hidden_size: int,
                  output_size: int,
                  add_rope: bool =True,
-                 tril_mask: bool =True):
+                 tril_mask: bool =True,
+                 use_bias: bool = True,
+                 max_length: int = 512):
         super(EfficientGlobalPointer, self).__init__()
         self.output_size = output_size
         self.hidden_size = hidden_size
         self.RoPE = add_rope
         self.tril_mask = tril_mask
         self.input_size = input_size
-        self.linear_1 = nn.Linear(input_size, hidden_size * 2)
-        self.linear_2 = nn.Linear(hidden_size * 2, output_size * 2)
+        self.linear_1 = nn.Linear(input_size, hidden_size * 2, bias=use_bias)
+        self.linear_2 = nn.Linear(hidden_size * 2, output_size * 2, bias=use_bias)
+        if self.RoPE:
+            self.pe = RoPEPositionEncoding(max_position=max_length, embedding_size=hidden_size)
 
     def forward(self, inputs, mask=None):
         inputs = self.linear_1(inputs)
         qw, kw = inputs[..., ::2], inputs[..., 1::2]
         # RoPE编码
         if self.RoPE:
-            pos = SinusoidalPositionEmbedding(self.hidden_size, 'zero')(inputs)
-            cos_pos = pos[...,1::2].repeat(1,1,2)
-            sin_pos = pos[...,::2].repeat(1,1,2)
-            qw2 = torch.stack([-qw[..., 1::2], qw[..., ::2]], 3)
-            qw2 = torch.reshape(qw2, qw.shape)
-            qw = qw * cos_pos + qw2 * sin_pos
-            kw2 = torch.stack([-kw[..., 1::2], kw[..., ::2]], 3)
-            kw2 = torch.reshape(kw2, kw.shape)
-            kw = kw * cos_pos + kw2 * sin_pos
+            qw = self.pe(qw)
+            kw = self.pe(kw)
         logits = torch.einsum('bmd , bnd -> bmn', qw, kw) / self.hidden_size**0.5
-        bias = torch.einsum('bnh -> bhn', self.linear_2(inputs)) / 2
-        logits = logits[:, None] + bias[:, ::2, None] + bias[:, 1::2, :, None]
+        bias = self.linear_2(inputs)
+        bias = torch.stack(torch.chunk(bias, self.output_size, dim=-1), dim=-2).transpose(1,2) #[btz, heads, seq_len, 2]
+        logits = logits.unsqueeze(1) + bias[..., :1] + bias[..., 1:].transpose(2, 3)
         
         # padding mask
         if mask is not None:
@@ -174,7 +172,7 @@ class EfficientGlobalPointer(Module):
 
         # tril mask
         if self.tril_mask:
-            mask = torch.tril(torch.ones_like(logits), -1) 
-            logits = logits - mask * 1e12
+            t_mask = torch.tril(torch.ones_like(logits), -1) 
+            logits = logits - t_mask * 1e12
 
         return logits
