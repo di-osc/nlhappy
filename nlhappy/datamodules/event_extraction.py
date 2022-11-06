@@ -35,7 +35,8 @@ class EventExtractionDataModule(PLMBaseDataModule):
             self.hparams.id2label = {i:l for l,i in self.combined2id.items()}
             self.dataset.set_transform(self.gplinker_transform)
         elif self.hparams.transform == 'role-head-tail':
-            self.hparams.id2label = {i:l for l,i in self.ent2id.items()}
+            self.hparams.id2event = {i:e for e,i in self.event2id.items()}
+            self.hparams.id2role = {i:r for r,i in self.ent2id.items()}
             self.dataset.set_transform(self.blinker_transform)
         elif self.hparams.transform == 'head-tail':
             self.hparams.id2label = {i:l for l,i in self.event2id.items()}
@@ -113,9 +114,9 @@ class EventExtractionDataModule(PLMBaseDataModule):
     def gplinker_transform(self, examples):
         batch_text = examples['text']
         batch_events = examples['events']
-        batch_role_ids = []
-        batch_head_ids = []
-        batch_tail_ids = []
+        batch_role_tags = []
+        batch_head_tags = []
+        batch_tail_tags = []
         max_length = self.get_max_length()
         batch_inputs = self.tokenizer(batch_text,
                                       max_length=max_length,
@@ -163,18 +164,21 @@ class EventExtractionDataModule(PLMBaseDataModule):
                             except:
                                 log.warning(f'role {role2["text"]} offset {(role2_head, role2_tail)} align to token offset failed in \n\t {text}')
                                 continue
-            batch_role_ids.append(role_ids)
-            batch_head_ids.append(head_ids)
-            batch_tail_ids.append(tail_ids)
-        batch_inputs['role_tags'] = torch.stack(batch_role_ids, dim=0)
-        batch_inputs['head_tags'] = torch.stack(batch_head_ids, dim=0)
-        batch_inputs['tail_tags'] = torch.stack(batch_tail_ids, dim=0)
+            batch_role_tags.append(role_ids)
+            batch_head_tags.append(head_ids)
+            batch_tail_tags.append(tail_ids)
+        batch_inputs['role_tags'] = torch.stack(batch_role_tags, dim=0)
+        batch_inputs['head_tags'] = torch.stack(batch_head_tags, dim=0)
+        batch_inputs['tail_tags'] = torch.stack(batch_tail_tags, dim=0)
         return batch_inputs
     
     def blinker_transform(self, examples):
+        """论元角色 头相连,尾相连
+
+        """
         batch_text = examples['text']
         batch_events = examples['events']
-        batch_ent_tags = []
+        batch_role_tags = []
         batch_head_tags = []
         batch_tail_tags = []
         max_length = self.get_max_length()
@@ -189,52 +193,45 @@ class EventExtractionDataModule(PLMBaseDataModule):
         for i, text in enumerate(batch_text):
             offset_mapping = batch_mappings[i]
             events = batch_events[i]
-            ent_tags = torch.zeros(len(self.ent2id), max_length, max_length, dtype=torch.long)
-            head_tags = torch.zeros(1, max_length, max_length, dtype=torch.long)
-            tail_tags = torch.zeros(1, max_length, max_length, dtype=torch.long)
+            role_tags = torch.zeros(len(self.event_labels), max_length, max_length, dtype=torch.long) # +1, 加上触发词
+            head_tags = torch.zeros(len(self.event_labels), max_length, max_length, dtype=torch.long)
+            tail_tags = torch.zeros(len(self.event_labels), max_length, max_length, dtype=torch.long)
             for event in events:
+                roles: List = event['roles']
                 e_label = event['label']
-                try:
-                    trigger = event['trigger']
-                    trigger_label = e_label + '-' + '触发词'
-                    trigger_head = trigger['offset'][0]
-                    trigger_tail = trigger['offset'][1]-1
-                    _trigger_head = char_idx_to_token(trigger_head, offset_mapping=offset_mapping)
-                    _trigger_tail = char_idx_to_token(trigger_tail, offset_mapping=offset_mapping)
-                    ent_tags[self.ent2id[trigger_label]][_trigger_head][_trigger_tail] = 1
-                except:
-                    log.warning(f'set triiger({trigger}) to tag failed in \n\t {text}')
-                    pass
-                for i, role1 in enumerate(event['roles']):
-                    label = role1['label']
+                trigger = event['trigger']
+                trigger_head = trigger['offset'][0]
+                trigger_tail = trigger['offset'][1]
+                roles.append({'label':e_label + '-' + '触发词', 'offset': (trigger_head, trigger_tail)})
+                for i, role1 in enumerate(roles):
                     role1_head = role1['offset'][0]
                     role1_tail = role1['offset'][1]-1
                     try:
                         _role1_head = char_idx_to_token(role1_head, offset_mapping=offset_mapping)
                         _role1_tail = char_idx_to_token(role1_tail, offset_mapping=offset_mapping)
-                        ent_tags[self.ent2id[label]][_role1_head][_role1_tail] = 1
+                        role_tags[self.event2id[e_label]][_role1_head][_role1_tail] = 1
                     except:
-                        log.warning(f'role {role1["text"]} offset {(role1_head, role1_tail)} align to token offset failed in \n\t {text}')
+                        log.warning(f'role: {role1["text"]} offset {(role1_head, role1_tail)} align failed in \n\t text: {text}')
                         continue
                         # 这个role 跟 其他的每个role 头头 尾尾 联系起来
-                    for j, role2 in enumerate(event['roles']):
+                    for j, role2 in enumerate(roles):
                         if j>i:
                             role2_head = role2['offset'][0]
                             role2_tail = role2['offset'][1]-1
                             try:
                                 _role2_head = char_idx_to_token(role2_head, offset_mapping=offset_mapping)
                                 _role2_tail = char_idx_to_token(role2_tail, offset_mapping=offset_mapping)
-                                head_tags[0][min(_role1_head, _role2_head)][max(_role1_head, _role2_head)] = 1
-                                tail_tags[0][min(_role1_tail, _role2_tail)][max(_role1_tail, _role2_tail)] = 1
+                                head_tags[self.event2id[e_label]][min(_role1_head, _role2_head)][max(_role1_head, _role2_head)] = 1
+                                tail_tags[self.event2id[e_label]][min(_role1_tail, _role2_tail)][max(_role1_tail, _role2_tail)] = 1
                             except:
-                                log.warning(f'role {role2["text"]} offset {(role2_head, role2_tail)} align to token offset failed in \n\t {text}')
+                                log.warning(f'role: {role2["text"]} offset {(role2_head, role2_tail)} align failed \n\t text: {text}')
                                 continue
-            batch_ent_tags.append(ent_tags)
+            batch_role_tags.append(role_tags)
             batch_head_tags.append(head_tags)
             batch_tail_tags.append(tail_tags)
-        batch_inputs['role_ids'] = torch.stack(batch_ent_tags, dim=0)
-        batch_inputs['head_ids'] = torch.stack(batch_head_tags, dim=0)
-        batch_inputs['tail_ids'] = torch.stack(batch_tail_tags, dim=0)
+        batch_inputs['role_tags'] = torch.stack(batch_role_tags, dim=0)
+        batch_inputs['head_tags'] = torch.stack(batch_head_tags, dim=0)
+        batch_inputs['tail_tags'] = torch.stack(batch_tail_tags, dim=0)
         return batch_inputs
     
     
