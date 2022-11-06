@@ -26,6 +26,7 @@ def get_hf_tokenizer(config: Union[Dict, DictConfig] , vocab: Union[Dict, DictCo
         tokenizer = AutoTokenizer.from_pretrained(tmpdirname)
     return tokenizer
 
+
 def get_hf_config_object(config: Union[DictConfig , Dict]):
     with tempfile.TemporaryDirectory() as tmpdirname:
         config_path = os.path.join(tmpdirname, 'config.json')
@@ -43,7 +44,6 @@ def get_hf_config_object(config: Union[DictConfig , Dict]):
     return config
 
     
-
 def align_token_span(token_span_offset: Tuple, token_offset_mapping: List[Tuple]) -> Tuple:
     '''将词符级别的下标对齐为字符级别的下标
     参数
@@ -104,7 +104,7 @@ class PLMBaseModel(LightningModule):
             return plm_config
     
     
-    def get_plm_architecture(self, add_pooler_layer: bool = False):
+    def get_plm_architecture(self, add_pooler_layer: bool = False) -> torch.nn.Module:
         if 'trf_config' in self.hparams.keys():
             plm_config = get_hf_config_object(self.hparams.trf_config)
         elif 'plm' in self.hparams.keys() and 'plm_dir' in self.hparams.keys():
@@ -116,7 +116,7 @@ class PLMBaseModel(LightningModule):
         return AutoModel.from_config(plm_config)    
     
     
-    def get_linear_warmup_step_scheduler_config(self, optimizer):
+    def get_linear_warmup_step_scheduler_config(self, optimizer) -> Dict:
         total_steps = self.get_total_steps()
         warmup_steps = self.get_one_epoch_steps() // 3
         scheduler = get_linear_schedule_with_warmup(optimizer=optimizer, num_training_steps=total_steps, num_warmup_steps=warmup_steps)
@@ -124,7 +124,7 @@ class PLMBaseModel(LightningModule):
         return scheduler_config
     
     
-    def get_cosine_warmup_step_scheduler_config(self, optimizer):
+    def get_cosine_warmup_step_scheduler_config(self, optimizer) -> Dict:
         total_steps = self.get_total_steps()
         warmup_steps = self.get_one_epoch_steps() // 3
         scheduler = get_cosine_schedule_with_warmup(optimizer=optimizer, num_training_steps=total_steps, num_warmup_steps=warmup_steps)

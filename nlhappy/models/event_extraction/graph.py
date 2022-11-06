@@ -100,11 +100,8 @@ class GlobalPointerForCliqueExtraction(PLMBaseModel):
         
         head_true = batch['head_ids']
         tail_true = batch['tail_ids']
-        
         head_loss = self.head_criterion(head_logits.reshape(head_logits.shape[0] * head_logits.shape[1], -1), head_true.reshape(head_true.shape[0] * head_true.shape[1], -1))
         tail_loss = self.tail_criterion(tail_logits.reshape(tail_logits.shape[0]*tail_logits.shape[1], -1), tail_true.reshape(tail_true.shape[0]*tail_true.shape[1], -1))
-        # head_loss = self.head_criterion(head_logits, head_true)
-        # tail_loss = self.tail_criterion(tail_logits, tail_true)
         
         loss = (head_loss + tail_loss) / 2
         
@@ -132,7 +129,7 @@ class GlobalPointerForCliqueExtraction(PLMBaseModel):
         self.val_metric(batch_pred_cliques, batch_true_cliques)
         self.val_head_metric(head_logits.gt(self.hparams.threshold), head_true)
         self.val_tail_metric(tail_logits.gt(self.hparams.threshold), tail_true)
-        # self.log('val/f1', self.val_metric, on_step=False, on_epoch=True, prog_bar=True)
+        self.log('val/f1', self.val_metric, on_step=False, on_epoch=True, prog_bar=True)
         self.log('val/head', self.val_head_metric, on_step=False, on_epoch=True, prog_bar=True)
         self.log('val/tail', self.val_tail_metric, on_step=False, on_epoch=True, prog_bar=True)
         return {'val_loss': loss}

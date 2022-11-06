@@ -1,6 +1,6 @@
 from ...utils.make_model import PLMBaseModel, align_token_span
-from ...layers.classifier import EfficientGlobalPointer
-from ...layers.loss import MultiLabelCategoricalCrossEntropy, SparseMultiLabelCrossEntropy
+from ...layers.classifier import EfficientGlobalPointer, EfficientBiaffineSpanClassifier
+from ...layers.loss import SparseMultiLabelCrossEntropy, MultiLabelCategoricalCrossEntropy
 from ...layers.dropout import MultiDropout
 from ...metrics.event import EventF1, Event, Role
 from ...metrics.span import SpanF1
@@ -61,7 +61,7 @@ class GPLinkerForEventExtraction(PLMBaseModel):
 
         self.role_classifier = EfficientGlobalPointer(input_size=self.plm.config.hidden_size,
                                                       hidden_size=hidden_size,
-                                                      output_size=len(self.hparams.label2id))
+                                                      output_size=len(self.hparams.id2label))
         
         self.head_classifier = EfficientGlobalPointer(input_size=self.plm.config.hidden_size,
                                                       hidden_size=hidden_size,
@@ -72,6 +72,7 @@ class GPLinkerForEventExtraction(PLMBaseModel):
                                                       hidden_size=hidden_size,
                                                       output_size=1,
                                                       add_rope=False)
+        
         
         self.dropout = MultiDropout()
         
@@ -100,52 +101,53 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         attention_mask = batch['attention_mask']
         role_logits, head_logits, tail_logits = self(input_ids, attention_mask)
         
+        role_true = batch['role_tags']
+        head_true = batch['head_tags']
+        tail_true = batch['tail_tags']
         
-        role_true = batch['role_ids']
-        head_true = batch['head_ids']
-        tail_true = batch['tail_ids']
+        b,n,s,s = role_true.shape
+        role_loss = self.role_criterion(role_logits.reshape(-1, s*s), role_true.reshape(-1, s*s))
+        head_loss = self.head_criterion(head_logits, head_true)
+        tail_loss = self.tail_criterion(tail_logits, tail_true)
+        loss = (role_loss + head_loss + tail_loss) / 3
         
-        role_loss = self.role_criterion(role_logits.reshape(role_logits.shape[0]*role_logits.shape[1], -1), role_true.reshape(role_true.shape[0]*role_true.shape[1], -1))
-        head_loss = self.head_criterion(head_logits.reshape(head_logits.shape[0]*head_logits.shape[1], -1), head_true.reshape(head_true.shape[0]*head_true.shape[1], -1))
-        tail_loss = self.tail_criterion(tail_logits.reshape(tail_logits.shape[0]*tail_logits.shape[1], -1), tail_true.reshape(tail_true.shape[0]*tail_true.shape[1], -1))
-        
-        # 前5个epoch只训练role
-        if self.trainer.current_epoch >=5:
-            loss = (role_loss + head_loss + tail_loss) / 3
-        else:
-            loss = role_loss
-        
-        return loss, role_logits, head_logits, tail_logits
+        return loss, role_logits, head_logits, tail_logits, role_true, head_true, tail_true
 
 
     def training_step(self, batch, batch_idx):
-        loss, role_logits, head_logits, tail_logits = self.step(batch)
+        loss, role_logits, head_logits, tail_logits, role_true, head_true, tail_true = self.step(batch)
         
-        role_pred = role_logits.ge(self.hparams.threshold).float()
-        head_pred = head_logits.ge(self.hparams.threshold).float()
-        tail_pred = tail_logits.ge(self.hparams.threshold).float()
+        role_pred = role_logits.gt(self.hparams.threshold).float()
+        head_pred = head_logits.gt(self.hparams.threshold).float()
+        tail_pred = tail_logits.gt(self.hparams.threshold).float()
 
-        role_true = batch['role_ids']
-        head_true = batch['head_ids']
-        tail_true = batch['tail_ids']
         
         self.role_metric(role_pred, role_true)
         self.head_metric(head_pred, head_true)
         self.tail_metric(tail_pred, tail_true)
         
-        self.log('train/role_f1', self.role_metric, on_step=True, prog_bar=True, on_epoch=True)
-        self.log('train/head_f1', self.head_metric, on_step=True, prog_bar=True, on_epoch=True)
-        self.log('train/tail_f1', self.tail_metric, on_step=True, prog_bar=True, on_epoch=True)
+        self.log('train/role_f1', self.role_metric, on_step=True, prog_bar=True)
+        self.log('train/head_f1', self.head_metric, on_step=True, prog_bar=True)
+        self.log('train/tail_f1', self.tail_metric, on_step=True, prog_bar=True)
         return {'loss': loss}
 
 
     def validation_step(self, batch, batch_idx):
-        role_true, head_true, tail_true = batch['role_ids'], batch['head_ids'], batch['tail_ids']
-        loss, role_logits, head_logits, tail_logits = self.step(batch)
+        loss, role_logits, head_logits, tail_logits, role_true, head_true, tail_true = self.step(batch)
         batch_true_events = self.extract_events(role_true, head_true, tail_true)
         batch_pred_events = self.extract_events(role_logits, head_logits, tail_logits)
         self.event_metric(batch_pred_events, batch_true_events)
         self.log('val/f1', self.event_metric, on_step=False, on_epoch=True, prog_bar=True)
+        
+        role_pred = role_logits.gt(self.hparams.threshold).float()
+        head_pred = head_logits.gt(self.hparams.threshold).float()
+        tail_pred = tail_logits.gt(self.hparams.threshold).float()
+        self.role_metric(role_pred, role_true)
+        self.head_metric(head_pred, head_true)
+        self.tail_metric(tail_pred, tail_true)
+        self.log('val/role_f1', self.role_metric, on_epoch=True, prog_bar=True)
+        self.log('val/head_f1', self.head_metric, on_epoch=True, prog_bar=True)
+        self.log('val/tail_f1', self.tail_metric, on_epoch=True, prog_bar=True)
         return {'val_loss': loss}
 
 
@@ -193,9 +195,9 @@ class GPLinkerForEventExtraction(PLMBaseModel):
             {'params': [p for n, p in self.plm.named_parameters() if any(nd in n for nd in no_decay)],
             'weight_decay': 0.0, 'lr': self.hparams.lr},
             {'params': [p for n, p in self.role_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
-            'weight_decay': self.hparams.weight_decay, 'lr': self.hparams.lr * 5},
+            'weight_decay': self.hparams.weight_decay, 'lr': self.hparams.lr * 10},
             {'params': [p for n, p in self.role_classifier.named_parameters() if any(nd in n for nd in no_decay)],
-            'weight_decay': 0.0, 'lr': self.hparams.lr * 5},
+            'weight_decay': 0.0, 'lr': self.hparams.lr * 10},
             {'params': [p for n, p in self.head_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
             'weight_decay': self.hparams.weight_decay, 'lr': self.hparams.lr},
             {'params': [p for n, p in self.head_classifier.named_parameters() if any(nd in n for nd in no_decay)],
