@@ -51,7 +51,7 @@ class BiaffineForEventExtraction(PLMBaseModel):
     def __init__(self, 
                  lr: float = 3e-5,
                  hidden_size: int = 64,
-                 weight_decay: float = 0.01,
+                 weight_decay: float = 0.00,
                  threshold: float = 0.0,
                  scheduler: str = 'linear_warmup',
                  **kwargs: Any) -> None:
@@ -104,9 +104,13 @@ class BiaffineForEventExtraction(PLMBaseModel):
         head_true = batch['head_tags']
         tail_true = batch['tail_tags']
         
-        role_loss = self.ent_criterion(role_logits.reshape(role_logits.shape[0]*role_logits.shape[1], -1), role_true.reshape(role_true.shape[0]*role_true.shape[1], -1))
-        head_loss = self.head_criterion(head_logits.reshape(head_logits.shape[0]*head_logits.shape[1], -1), head_true.reshape(head_true.shape[0]*head_true.shape[1], -1))
-        tail_loss = self.tail_criterion(tail_logits.reshape(tail_logits.shape[0]*tail_logits.shape[1], -1), tail_true.reshape(tail_true.shape[0]*tail_true.shape[1], -1))
+        # role_loss = self.ent_criterion(role_logits.reshape(role_logits.shape[0]*role_logits.shape[1], -1), role_true.reshape(role_true.shape[0]*role_true.shape[1], -1))
+        # head_loss = self.head_criterion(head_logits.reshape(head_logits.shape[0]*head_logits.shape[1], -1), head_true.reshape(head_true.shape[0]*head_true.shape[1], -1))
+        # tail_loss = self.tail_criterion(tail_logits.reshape(tail_logits.shape[0]*tail_logits.shape[1], -1), tail_true.reshape(tail_true.shape[0]*tail_true.shape[1], -1))
+        b,e,s,s = role_logits.shape
+        role_loss = self.ent_criterion(role_logits.reshape(b,e,-1), role_true.reshape(b,e,-1))
+        head_loss = self.head_criterion(head_logits.reshape(b,e,-1), head_true.reshape(b,e,-1))
+        tail_loss = self.tail_criterion(tail_logits.reshape(b,e,-1), tail_true.reshape(b,e,-1))
         
         loss = (role_loss + head_loss + tail_loss) / 3
         
@@ -201,5 +205,5 @@ class BiaffineForEventExtraction(PLMBaseModel):
         mapping = mapping[0].tolist()
         inputs.to(device)
         role_logits, head_logits, tail_logits = self(**inputs)
-        events = self.extract_events(role_logits, head_logits, tail_logits)
+        events = self.extract_events(role_logits, head_logits, tail_logits, mapping=mapping)
         return events
