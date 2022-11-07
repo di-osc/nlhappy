@@ -79,11 +79,15 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         self.role_criterion = MultiLabelCategoricalCrossEntropy()
         self.head_criterion = MultiLabelCategoricalCrossEntropy()
         self.tail_criterion = MultiLabelCategoricalCrossEntropy()
-    
-        self.event_metric = EventF1()             
-        self.role_metric = SpanF1()
-        self.head_metric = SpanF1()
-        self.tail_metric = SpanF1()
+                 
+        self.train_role_metric = SpanF1()
+        self.train_head_metric = SpanF1()
+        self.train_tail_metric = SpanF1()
+        self.val_role_metric = SpanF1()
+        self.val_head_metric = SpanF1()
+        self.val_tail_metric = SpanF1()
+        # 以事件级别的f1最为最终指标
+        self.val_event_metric = EventF1()
 
         
     def forward(self, input_ids, attention_mask):
@@ -107,8 +111,8 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         
         b,n,s,s = role_true.shape
         role_loss = self.role_criterion(role_logits.reshape(b, -1, s*s), role_true.reshape(b, -1, s*s))
-        head_loss = self.head_criterion(head_logits, head_true)
-        tail_loss = self.tail_criterion(tail_logits, tail_true)
+        head_loss = self.head_criterion(head_logits.reshape(b, -1, s*s), head_true.reshape(b, -1, s*s))
+        tail_loss = self.tail_criterion(tail_logits.reshape(b, -1, s*s), tail_true.reshape(b, -1, s*s))
         loss = (role_loss + head_loss + tail_loss) / 3
         
         return loss, role_logits, head_logits, tail_logits, role_true, head_true, tail_true
@@ -122,13 +126,13 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         tail_pred = tail_logits.gt(self.hparams.threshold).float()
 
         
-        self.role_metric(role_pred, role_true)
-        self.head_metric(head_pred, head_true)
-        self.tail_metric(tail_pred, tail_true)
+        self.train_role_metric(role_pred, role_true)
+        self.train_head_metric(head_pred, head_true)
+        self.train_tail_metric(tail_pred, tail_true)
         
-        self.log('train/role_f1', self.role_metric, on_step=True, prog_bar=True)
-        self.log('train/head_f1', self.head_metric, on_step=True, prog_bar=True)
-        self.log('train/tail_f1', self.tail_metric, on_step=True, prog_bar=True)
+        self.log('train/role_f1', self.train_role_metric, on_step=True, prog_bar=True)
+        self.log('train/head_f1', self.train_head_metric, on_step=True, prog_bar=True)
+        self.log('train/tail_f1', self.train_tail_metric, on_step=True, prog_bar=True)
         return {'loss': loss}
 
 
@@ -136,18 +140,18 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         loss, role_logits, head_logits, tail_logits, role_true, head_true, tail_true = self.step(batch)
         batch_true_events = self.extract_events(role_true, head_true, tail_true)
         batch_pred_events = self.extract_events(role_logits, head_logits, tail_logits)
-        self.event_metric(batch_pred_events, batch_true_events)
-        self.log('val/f1', self.event_metric, on_step=False, on_epoch=True, prog_bar=True)
+        self.val_event_metric(batch_pred_events, batch_true_events)
+        self.log('val/f1', self.val_event_metric, on_step=False, on_epoch=True, prog_bar=True)
         
         role_pred = role_logits.gt(self.hparams.threshold).float()
         head_pred = head_logits.gt(self.hparams.threshold).float()
         tail_pred = tail_logits.gt(self.hparams.threshold).float()
-        self.role_metric(role_pred, role_true)
-        self.head_metric(head_pred, head_true)
-        self.tail_metric(tail_pred, tail_true)
-        self.log('val/role_f1', self.role_metric, on_epoch=True, prog_bar=True)
-        self.log('val/head_f1', self.head_metric, on_epoch=True, prog_bar=True)
-        self.log('val/tail_f1', self.tail_metric, on_epoch=True, prog_bar=True)
+        self.val_role_metric(role_pred, role_true)
+        self.val_head_metric(head_pred, head_true)
+        self.val_tail_metric(tail_pred, tail_true)
+        self.log('val/role_f1', self.val_role_metric, on_epoch=True, prog_bar=True)
+        self.log('val/head_f1', self.val_head_metric, on_epoch=True, prog_bar=True)
+        self.log('val/tail_f1', self.val_tail_metric, on_epoch=True, prog_bar=True)
         return {'val_loss': loss}
 
 
