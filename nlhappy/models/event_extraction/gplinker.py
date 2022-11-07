@@ -51,7 +51,7 @@ class GPLinkerForEventExtraction(PLMBaseModel):
     def __init__(self, 
                  lr: float = 3e-5,
                  hidden_size: int = 64,
-                 weight_decay: float = 0.01,
+                 weight_decay: float = 0.00,
                  threshold: float = 0.0,
                  scheduler: str = 'linear_warmup',
                  **kwargs: Any) -> None:
@@ -106,7 +106,7 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         tail_true = batch['tail_tags']
         
         b,n,s,s = role_true.shape
-        role_loss = self.role_criterion(role_logits.reshape(-1, s*s), role_true.reshape(-1, s*s))
+        role_loss = self.role_criterion(role_logits.reshape(b, -1, s*s), role_true.reshape(b, -1, s*s))
         head_loss = self.head_criterion(head_logits, head_true)
         tail_loss = self.tail_criterion(tail_logits, tail_true)
         loss = (role_loss + head_loss + tail_loss) / 3

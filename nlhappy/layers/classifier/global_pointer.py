@@ -143,19 +143,19 @@ class EfficientGlobalPointer(Module):
         super(EfficientGlobalPointer, self).__init__()
         self.output_size = output_size
         self.hidden_size = hidden_size
-        self.RoPE = add_rope
+        self.add_rope = add_rope
         self.tril_mask = tril_mask
         self.input_size = input_size
         self.linear_1 = nn.Linear(input_size, hidden_size * 2, bias=use_bias)
         self.linear_2 = nn.Linear(hidden_size * 2, output_size * 2, bias=use_bias)
-        if self.RoPE:
+        if self.add_rope:
             self.pe = RoPEPositionEncoding(max_position=max_length, embedding_size=hidden_size)
 
     def forward(self, inputs, mask=None):
         inputs = self.linear_1(inputs)
         qw, kw = inputs[..., ::2], inputs[..., 1::2]
         # RoPE编码
-        if self.RoPE:
+        if self.add_rope:
             qw = self.pe(qw)
             kw = self.pe(kw)
         logits = torch.einsum('bmd , bnd -> bmn', qw, kw) / self.hidden_size**0.5
