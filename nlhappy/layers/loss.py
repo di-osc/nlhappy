@@ -48,7 +48,7 @@ class SparseMultiLabelCrossEntropy(torch.nn.Module):
     - https://kexue.fm/archives/7359 。
     - https://github.com/bojone/bert4keras/blob/4dcda150b54ded71420c44d25ff282ed30f3ea42/bert4keras/backend.py#L272
     """
-    def __init__(self, mask_zero: bool = True, eposilon: float = 1e-10, inf=1e12):
+    def __init__(self, mask_zero: bool = True, eposilon: float = 1e-10, inf=1e4):
         super().__init__()
         self.eposilon = eposilon
         self.mask_zero = mask_zero
