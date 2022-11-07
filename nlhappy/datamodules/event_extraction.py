@@ -1,4 +1,4 @@
-from ..utils.make_datamodule import PLMBaseDataModule, get_logger, char_idx_to_token
+from ..utils.make_datamodule import PLMBaseDataModule, get_logger, char_idx_to_token, sequence_padding
 from functools import lru_cache
 import torch
 import pandas as pd
@@ -23,10 +23,11 @@ class EventExtractionDataModule(PLMBaseDataModule):
                 transform: str = 'combined-head-tail',
                 **kwargs):
         super().__init__()
-        self.transforms = {'event-role-head-tail': self.gplinker_transform,
-                           'role-head-tail': self.blinker_transform,
-                           'head-tail': self.graph_transform}
-        assert self.hparams.transform in self.transforms
+        self.transforms = ['event-role-head-tail',
+                           'role-head-tail',
+                           'head-tail',
+                           'sparse-gplinker']
+        assert self.hparams.transform in self.transforms, f'available transforms: {self.transforms}'
 
 
     def setup(self, stage: str = 'fit') -> None:
@@ -40,7 +41,11 @@ class EventExtractionDataModule(PLMBaseDataModule):
             self.dataset.set_transform(self.blinker_transform)
         elif self.hparams.transform == 'head-tail':
             self.hparams.id2label = {i:l for l,i in self.event2id.items()}
-            self.dataset.set_transform(self.transforms.get(self.hparams.transform))
+            self.dataset.set_transform(self.graph_transform)
+        elif self.hparams.transform == 'sparse-gplinker':
+            self.hparams.id2label = {i:l for l,i in self.combined2id.items()}
+            self.dataset['train'].set_transform(self.sparse_transform)
+            self.dataset['validation'].set_transform(self.gplinker_transform)
             
             
     @property
@@ -298,4 +303,72 @@ class EventExtractionDataModule(PLMBaseDataModule):
         batch_inputs['role_ids'] = torch.stack(batch_role_ids, dim=0)
         batch_inputs['head_ids'] = torch.stack(batch_head_ids, dim=0)
         batch_inputs['tail_ids'] = torch.stack(batch_tail_ids, dim=0)
+        return batch_inputs
+    
+    
+    def sparse_transform(self, examples):
+        batch_text = examples['text']
+        batch_events = examples['events']
+        batch_role_tags = []
+        batch_head_tags = []
+        batch_tail_tags = []
+        max_length = self.get_max_length()
+        batch_inputs = self.tokenizer(batch_text,
+                                      max_length=max_length,
+                                      padding='max_length',
+                                      truncation=True,
+                                      return_offsets_mapping=True,
+                                      return_tensors='pt',
+                                      return_token_type_ids=False)
+        batch_mappings = batch_inputs.pop('offset_mapping').tolist()
+        for i, text in enumerate(batch_text):
+            offset_mapping = batch_mappings[i]
+            events = batch_events[i]
+            role_tags = [set() for _ in range(len(self.combined2id))]
+            head_tags = [set()]
+            tail_tags = [set()]
+            for event in events:
+                e_label = event['label']
+                roles = event['roles']
+                # 将触发词当做事件角色之一
+                trigger = event['trigger']
+                trigger_head = trigger['offset'][0]
+                trigger_tail = trigger['offset'][1]
+                roles.append({'label':'触发词', 'offset': (trigger_head, trigger_tail)})
+                for i, role1 in enumerate(roles):
+                    label = (e_label, role1['label'])
+                    role1_head = role1['offset'][0]
+                    role1_tail = role1['offset'][1]-1
+                    try:
+                        _role1_head = char_idx_to_token(role1_head, offset_mapping=offset_mapping)
+                        _role1_tail = char_idx_to_token(role1_tail, offset_mapping=offset_mapping)
+                        role_tags[self.combined2id[label]].add((_role1_head, _role1_tail))
+                    except:
+                        log.warning(f'role {role1["text"]} offset {(role1_head, role1_tail)} align to token offset failed in \n\t {text}')
+                        continue
+                        # 这个role 跟 其他的每个role 头头 尾尾 联系起来
+                    for j, role2 in enumerate(roles):
+                        if j>i:
+                            role2_head = role2['offset'][0]
+                            role2_tail = role2['offset'][1]-1
+                            try:
+                                _role2_head = char_idx_to_token(role2_head, offset_mapping=offset_mapping)
+                                _role2_tail = char_idx_to_token(role2_tail, offset_mapping=offset_mapping)
+                                head_tags[0].add((min(_role1_head, _role2_head), max(_role1_head, _role2_head)))
+                                tail_tags[0].add((min(_role1_tail, _role2_tail), max(_role1_tail, _role2_tail)))
+                            except:
+                                log.warning(f'role {role2["text"]} offset {(role2_head, role2_tail)} align to token offset failed in \n\t {text}')
+                                continue
+            for tag in (role_tags + head_tags + tail_tags):
+                if not tag:
+                    tag.add((0,0))
+            role_tags = sequence_padding([list(l) for l in role_tags])
+            head_tags = sequence_padding([list(l) for l in head_tags])
+            tail_tags = sequence_padding([list(l) for l in tail_tags])
+            batch_role_tags.append(role_tags)
+            batch_head_tags.append(head_tags)
+            batch_tail_tags.append(tail_tags)
+        batch_inputs['role_tags'] = torch.tensor(sequence_padding(batch_role_tags, seq_dims=2), dtype=torch.long)
+        batch_inputs['head_tags'] = torch.tensor(sequence_padding(batch_head_tags, seq_dims=2), dtype=torch.long)
+        batch_inputs['tail_tags'] = torch.tensor(sequence_padding(batch_tail_tags, seq_dims=2), dtype=torch.long)
         return batch_inputs

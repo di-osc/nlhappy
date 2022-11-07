@@ -1,6 +1,6 @@
 from ...utils.make_model import PLMBaseModel, align_token_span
-from ...layers.classifier import EfficientGlobalPointer, EfficientBiaffineSpanClassifier
-from ...layers.loss import SparseMultiLabelCrossEntropy, MultiLabelCategoricalCrossEntropy
+from ...layers.classifier import EfficientGlobalPointer
+from ...layers.loss import MultiLabelCategoricalCrossEntropy, SparseMultiLabelCrossEntropy
 from ...layers.dropout import MultiDropout
 from ...metrics.event import EventF1, Event, Role
 from ...metrics.span import SpanF1
@@ -76,9 +76,12 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         
         self.dropout = MultiDropout()
         
-        self.role_criterion = MultiLabelCategoricalCrossEntropy()
-        self.head_criterion = MultiLabelCategoricalCrossEntropy()
-        self.tail_criterion = MultiLabelCategoricalCrossEntropy()
+        # self.role_criterion = MultiLabelCategoricalCrossEntropy()
+        # self.head_criterion = MultiLabelCategoricalCrossEntropy()
+        # self.tail_criterion = MultiLabelCategoricalCrossEntropy()
+        self.role_criterion = SparseMultiLabelCrossEntropy()
+        self.head_criterion = SparseMultiLabelCrossEntropy()
+        self.tail_criterion = SparseMultiLabelCrossEntropy()
                  
         self.train_role_metric = SpanF1()
         self.train_head_metric = SpanF1()
@@ -99,7 +102,7 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         return role_logits, head_logits, tail_logits
 
 
-    def step(self, batch):
+    def step(self, batch, is_train: bool=True):
         
         input_ids = batch['input_ids']
         attention_mask = batch['attention_mask']
@@ -109,35 +112,44 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         head_true = batch['head_tags']
         tail_true = batch['tail_tags']
         
-        b,n,s,s = role_true.shape
-        role_loss = self.role_criterion(role_logits.reshape(b, -1, s*s), role_true.reshape(b, -1, s*s))
-        head_loss = self.head_criterion(head_logits.reshape(b, -1, s*s), head_true.reshape(b, -1, s*s))
-        tail_loss = self.tail_criterion(tail_logits.reshape(b, -1, s*s), tail_true.reshape(b, -1, s*s))
-        loss = (role_loss + head_loss + tail_loss) / 3
+        # b,n,s,s = role_true.shape
+        # role_loss = self.role_criterion(role_logits.reshape(b, -1, s*s), role_true.reshape(b, -1, s*s))
+        # head_loss = self.head_criterion(head_logits.reshape(-1, s*s), head_true.reshape(-1, s*s))
+        # tail_loss = self.tail_criterion(tail_logits.reshape(-1, s*s), tail_true.reshape(-1, s*s))
+        
+        role_loss = self.role_criterion(role_logits, role_true)
+        head_loss = self.head_criterion(head_logits, head_true)
+        tail_loss = self.tail_criterion(tail_logits, tail_true)
+        if is_train:
+            self.log('train/role_loss', role_loss, prog_bar=True, on_step=True)
+            self.log('train/head_loss', head_loss, prog_bar=True, on_step=True)
+            self.log('train/tail_loss', tail_loss, prog_bar=True, on_step=True)
+        loss = sum([role_loss, head_loss, tail_loss]) / 3
         
         return loss, role_logits, head_logits, tail_logits, role_true, head_true, tail_true
 
 
     def training_step(self, batch, batch_idx):
-        loss, role_logits, head_logits, tail_logits, role_true, head_true, tail_true = self.step(batch)
         
-        role_pred = role_logits.gt(self.hparams.threshold).float()
-        head_pred = head_logits.gt(self.hparams.threshold).float()
-        tail_pred = tail_logits.gt(self.hparams.threshold).float()
+        loss, role_logits, head_logits, tail_logits, role_true, head_true, tail_true = self.step(batch)
+        self.print(role_logits.shape)
+        # role_pred = role_logits.gt(self.hparams.threshold).float()
+        # head_pred = head_logits.gt(self.hparams.threshold).float()
+        # tail_pred = tail_logits.gt(self.hparams.threshold).float()
 
         
-        self.train_role_metric(role_pred, role_true)
-        self.train_head_metric(head_pred, head_true)
-        self.train_tail_metric(tail_pred, tail_true)
+        # self.train_role_metric(role_pred, role_true)
+        # self.train_head_metric(head_pred, head_true)
+        # self.train_tail_metric(tail_pred, tail_true)
         
-        self.log('train/role_f1', self.train_role_metric, on_step=True, prog_bar=True)
-        self.log('train/head_f1', self.train_head_metric, on_step=True, prog_bar=True)
-        self.log('train/tail_f1', self.train_tail_metric, on_step=True, prog_bar=True)
+        # self.log('train/role_f1', self.train_role_metric, on_step=True, prog_bar=True)
+        # self.log('train/head_f1', self.train_head_metric, on_step=True, prog_bar=True)
+        # self.log('train/tail_f1', self.train_tail_metric, on_step=True, prog_bar=True)
         return {'loss': loss}
 
 
     def validation_step(self, batch, batch_idx):
-        loss, role_logits, head_logits, tail_logits, role_true, head_true, tail_true = self.step(batch)
+        loss, role_logits, head_logits, tail_logits, role_true, head_true, tail_true = self.step(batch, is_train=False)
         batch_true_events = self.extract_events(role_true, head_true, tail_true)
         batch_pred_events = self.extract_events(role_logits, head_logits, tail_logits)
         self.val_event_metric(batch_pred_events, batch_true_events)
@@ -193,22 +205,28 @@ class GPLinkerForEventExtraction(PLMBaseModel):
     
     def configure_optimizers(self)  :
         no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
+        # grouped_params = [
+        #     {'params': [p for n, p in self.plm.named_parameters() if not any(nd in n for nd in no_decay)],
+        #     'weight_decay': self.hparams.weight_decay, 'lr': self.hparams.lr},
+        #     {'params': [p for n, p in self.plm.named_parameters() if any(nd in n for nd in no_decay)],
+        #     'weight_decay': 0.0, 'lr': self.hparams.lr},
+        #     {'params': [p for n, p in self.role_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
+        #     'weight_decay': self.hparams.weight_decay, 'lr': self.hparams.lr},
+        #     {'params': [p for n, p in self.role_classifier.named_parameters() if any(nd in n for nd in no_decay)],
+        #     'weight_decay': 0.0, 'lr': self.hparams.lr},
+        #     {'params': [p for n, p in self.head_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
+        #     'weight_decay': self.hparams.weight_decay, 'lr': self.hparams.lr},
+        #     {'params': [p for n, p in self.head_classifier.named_parameters() if any(nd in n for nd in no_decay)],
+        #     'weight_decay': 0.0, 'lr': self.hparams.lr},
+        #     {'params': [p for n, p in self.tail_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
+        #     'weight_decay': self.hparams.weight_decay, 'lr': self.hparams.lr},
+        #     {'params': [p for n, p in self.tail_classifier.named_parameters() if any(nd in n for nd in no_decay)],
+        #     'weight_decay': 0.0, 'lr': self.hparams.lr}
+        # ]
         grouped_params = [
-            {'params': [p for n, p in self.plm.named_parameters() if not any(nd in n for nd in no_decay)],
+            {'params': [p for n, p in self.named_parameters() if not any(nd in n for nd in no_decay)],
             'weight_decay': self.hparams.weight_decay, 'lr': self.hparams.lr},
-            {'params': [p for n, p in self.plm.named_parameters() if any(nd in n for nd in no_decay)],
-            'weight_decay': 0.0, 'lr': self.hparams.lr},
-            {'params': [p for n, p in self.role_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
-            'weight_decay': self.hparams.weight_decay, 'lr': self.hparams.lr * 10},
-            {'params': [p for n, p in self.role_classifier.named_parameters() if any(nd in n for nd in no_decay)],
-            'weight_decay': 0.0, 'lr': self.hparams.lr * 10},
-            {'params': [p for n, p in self.head_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
-            'weight_decay': self.hparams.weight_decay, 'lr': self.hparams.lr},
-            {'params': [p for n, p in self.head_classifier.named_parameters() if any(nd in n for nd in no_decay)],
-            'weight_decay': 0.0, 'lr': self.hparams.lr},
-            {'params': [p for n, p in self.tail_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
-            'weight_decay': self.hparams.weight_decay, 'lr': self.hparams.lr},
-            {'params': [p for n, p in self.tail_classifier.named_parameters() if any(nd in n for nd in no_decay)],
+            {'params': [p for n, p in self.named_parameters() if any(nd in n for nd in no_decay)],
             'weight_decay': 0.0, 'lr': self.hparams.lr}
         ]
         
