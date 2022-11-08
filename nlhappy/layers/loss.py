@@ -69,13 +69,14 @@ class SparseMultiLabelCrossEntropy(torch.nn.Module):
             y_pred = torch.cat([infs, y_pred[..., 1:]], dim=-1)
         y_pos_2 = torch.gather(y_pred, index=y_true, dim=-1)
         y_pos_1 = torch.cat([y_pos_2, zeros], dim=-1)
+        print('1')
         
         if self.mask_zero:
             y_pred = torch.cat([-infs, y_pred[..., 1:]], dim=-1)
             y_pos_2 = torch.gather(y_pred, index=y_true, dim=-1)
+            print('2')
         pos_loss = torch.logsumexp(-y_pos_1, dim=-1)
         # 计算负类对应损失
-        print(y_pred)
         all_loss = torch.logsumexp(y_pred, dim=-1) # 公式里面的a
         aux_loss = torch.logsumexp(y_pos_2, dim=-1) - all_loss # b - a
         aux_loss = torch.clamp(1 - torch.exp(aux_loss), min=self.eposilon, max=1) # 1-exp(b-a)

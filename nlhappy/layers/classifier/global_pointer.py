@@ -158,10 +158,12 @@ class EfficientGlobalPointer(Module):
         if self.add_rope:
             qw = self.pe(qw)
             kw = self.pe(kw)
-        logits = torch.einsum('bmd , bnd -> bmn', qw, kw) / self.hidden_size**0.5
-        bias = self.linear_2(inputs)
-        bias = torch.stack(torch.chunk(bias, self.output_size, dim=-1), dim=-2).transpose(1,2) #[btz, heads, seq_len, 2]
-        logits = logits.unsqueeze(1) + bias[..., :1] + bias[..., 1:].transpose(2, 3)
+        logits = torch.einsum('bmd , bnd -> bmn', qw, kw) / self.hidden_size ** 0.5
+        # bias = self.linear_2(inputs)
+        # bias = torch.stack(torch.chunk(bias, self.output_size, dim=-1), dim=-2).transpose(1,2) #[btz, heads, seq_len, 2]
+        # logits = logits.unsqueeze(1) + bias[..., :1] + bias[..., 1:].transpose(2, 3)
+        bias = self.linear_2(inputs).transpose(1, 2) / 2  #'bnh->bhn'
+        logits = logits[:, None] + bias[:, ::2, None] + bias[:, 1::2, :, None]
         
         # padding mask
         if mask is not None:

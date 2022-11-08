@@ -51,7 +51,7 @@ class GPLinkerForEventExtraction(PLMBaseModel):
     def __init__(self, 
                  lr: float = 3e-5,
                  hidden_size: int = 64,
-                 weight_decay: float = 0.00,
+                 weight_decay: float = 0.0,
                  threshold: float = 0.0,
                  scheduler: str = 'linear_warmup',
                  **kwargs: Any) -> None:
@@ -137,7 +137,7 @@ class GPLinkerForEventExtraction(PLMBaseModel):
 
     def training_step(self, batch, batch_idx):
         loss, role_logits, head_logits, tail_logits, role_true, head_true, tail_true = self.step(batch)
-        return loss
+        return {'loss': loss}
 
 
     def validation_step(self, batch, batch_idx):
