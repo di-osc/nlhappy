@@ -325,8 +325,8 @@ class EventExtractionDataModule(PLMBaseDataModule):
             offset_mapping = batch_mappings[i]
             events = batch_events[i]
             role_tags = [set() for _ in range(len(self.combined2id))]
-            head_tags = [set()]
-            tail_tags = [set()]
+            head_tags = set()
+            tail_tags = set()
             for event in events:
                 e_label = event['label']
                 roles = event['roles']
@@ -354,17 +354,17 @@ class EventExtractionDataModule(PLMBaseDataModule):
                             try:
                                 _role2_head = char_idx_to_token(role2_head, offset_mapping=offset_mapping)
                                 _role2_tail = char_idx_to_token(role2_tail, offset_mapping=offset_mapping)
-                                head_tags[0].add((min(_role1_head, _role2_head), max(_role1_head, _role2_head)))
-                                tail_tags[0].add((min(_role1_tail, _role2_tail), max(_role1_tail, _role2_tail)))
+                                head_tags.add((min(_role1_head, _role2_head), max(_role1_head, _role2_head)))
+                                tail_tags.add((min(_role1_tail, _role2_tail), max(_role1_tail, _role2_tail)))
                             except:
                                 log.warning(f'role {role2["text"]} offset {(role2_head, role2_tail)} align to token offset failed in \n\t {text}')
                                 continue
-            for tag in (role_tags + head_tags + tail_tags):
+            for tag in role_tags + [head_tags, tail_tags]:
                 if not tag:
                     tag.add((0,0))
             role_tags = sequence_padding([list(l) for l in role_tags])
-            head_tags = sequence_padding([list(l) for l in head_tags])
-            tail_tags = sequence_padding([list(l) for l in tail_tags])
+            head_tags = sequence_padding([list(head_tags)])
+            tail_tags = sequence_padding([list(tail_tags)])
             batch_role_tags.append(role_tags)
             batch_head_tags.append(head_tags)
             batch_tail_tags.append(tail_tags)

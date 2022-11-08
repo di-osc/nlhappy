@@ -40,7 +40,7 @@ class MultiLabelCategoricalCrossEntropy(torch.nn.Module):
         return loss
 
 class SparseMultiLabelCrossEntropy(torch.nn.Module):
-    """稀疏版多标签分类的交叉熵, y_true只传正例
+    """token-pair稀疏版多标签分类的交叉熵, y_true只传正例
     - y_true.shape=[batch, class, max_instance, 2(下标, 例如 (0,1))],y_pred.shape=[batch, class, seq, seq];
     - 请保证y_pred的值域是全体实数，换言之一般情况下y_pred不用加激活函数，尤其是不能加sigmoid或者softmax；
     - 预测阶段则输出y_pred大于0的类；
@@ -48,39 +48,39 @@ class SparseMultiLabelCrossEntropy(torch.nn.Module):
     - https://kexue.fm/archives/7359 。
     - https://github.com/bojone/bert4keras/blob/4dcda150b54ded71420c44d25ff282ed30f3ea42/bert4keras/backend.py#L272
     """
-    def __init__(self, mask_zero: bool = True, eposilon: float = 1e-10, inf=1e4):
+    def __init__(self, mask_zero: bool = True, eposilon: float = 1e-7):
         super().__init__()
         self.eposilon = eposilon
         self.mask_zero = mask_zero
-        self.inf = inf # inf 太大损失会变为inf
         
-    def forward(self, y_pred: Tensor, y_true: Tensor) -> Tensor:
+    def forward(self, y_pred: Tensor, y_true: Tensor):
         # y_pred shape: [batch, class, seq, seq]
         # y_true shape: [batch, class, max_instance, 2]
-        shape = y_pred.shape
-        # bs, nclass, max_spo_num
-        y_true = y_true[..., 0] * shape[2] + y_true[..., 1]
-        # bs, nclass, seqlen * seqlen
-        y_pred = y_pred.reshape(shape[0], -1, np.prod(shape[2:]))
+        # shape = y_pred.shape
+        # # 乘以seq_len是因为(i, j)在展开到seq_len*seq_len维度对应的下标是i*seq_len+j
+        # y_true = y_true[..., 0] * shape[2] + y_true[..., 1]  # [btz, heads, 实体起终点的展开后的位置]
+        # # bs, nclass, seqlen * seqlen
+        # y_pred = y_pred.reshape(shape[0], -1, np.prod(shape[2:]))
         
         zeros = torch.zeros_like(y_pred[..., :1])
         y_pred = torch.cat([y_pred, zeros], dim=-1)
         if self.mask_zero:
-            infs = zeros + self.inf
+            infs = zeros + float('inf')
             y_pred = torch.cat([infs, y_pred[..., 1:]], dim=-1)
-
         y_pos_2 = torch.gather(y_pred, index=y_true, dim=-1)
         y_pos_1 = torch.cat([y_pos_2, zeros], dim=-1)
         
         if self.mask_zero:
             y_pred = torch.cat([-infs, y_pred[..., 1:]], dim=-1)
             y_pos_2 = torch.gather(y_pred, index=y_true, dim=-1)
-            
         pos_loss = torch.logsumexp(-y_pos_1, dim=-1)
-        all_loss = torch.logsumexp(y_pred, dim=-1)
-        aux_loss = torch.logsumexp(y_pos_2, dim=-1) - all_loss
-        aux_loss = torch.clip(1 - torch.exp(aux_loss), min=self.eposilon, max=1)
-        neg_loss = all_loss + torch.log(aux_loss)
+        # 计算负类对应损失
+        print(y_pred)
+        all_loss = torch.logsumexp(y_pred, dim=-1) # 公式里面的a
+        aux_loss = torch.logsumexp(y_pos_2, dim=-1) - all_loss # b - a
+        aux_loss = torch.clamp(1 - torch.exp(aux_loss), min=self.eposilon, max=1) # 1-exp(b-a)
+        neg_loss = all_loss + torch.log(aux_loss) # a + log[1-exp(b-a)]
+        
         loss = pos_loss + neg_loss
         return loss.sum(dim=1).mean()
     
@@ -88,7 +88,8 @@ class SparseMultiLabelCrossEntropy(torch.nn.Module):
 class CoSentLoss(torch.nn.Module):
     '''CoSentLoss的实现
     参考:
-    - https://kexue.fm/archives/8847'''
+    - https://kexue.fm/archives/8847
+    '''
     def __init__(self) -> None:
         super().__init__()
     
