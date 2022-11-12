@@ -1,6 +1,6 @@
 from ...utils.make_model import PLMBaseModel, align_token_span
-from ...layers.classifier import EfficientGlobalPointer, EfficientBiaffineSpanClassifier
-from ...layers.loss import MultiLabelCategoricalCrossEntropy, SparseMultiLabelCrossEntropy
+from ...layers.classifier import EfficientGlobalPointer
+from ...layers.loss import SparseMultiLabelCrossEntropy
 from ...layers.dropout import MultiDropout
 from ...metrics.event import EventF1, Event, Role
 from ...metrics.span import SpanF1
