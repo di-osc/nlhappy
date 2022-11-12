@@ -6,6 +6,6 @@ dataset:
 batch_size: 
 plm: hfl/chinese-roberta-wwm-ext
 auto_length: max
-transform: sparse-gplinker
+transform: sparse-combined
 pin_memory: True
 num_workers: 4
