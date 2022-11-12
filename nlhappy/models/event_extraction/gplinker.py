@@ -1,5 +1,5 @@
 from ...utils.make_model import PLMBaseModel, align_token_span
-from ...layers.classifier import EfficientGlobalPointer
+from ...layers.classifier import EfficientGlobalPointer, EfficientBiaffineSpanClassifier
 from ...layers.loss import MultiLabelCategoricalCrossEntropy, SparseMultiLabelCrossEntropy
 from ...layers.dropout import MultiDropout
 from ...metrics.event import EventF1, Event, Role
@@ -51,7 +51,7 @@ class GPLinkerForEventExtraction(PLMBaseModel):
     def __init__(self, 
                  lr: float = 3e-5,
                  hidden_size: int = 64,
-                 weight_decay: float = 0.0,
+                 weight_decay: float = 0.01,
                  threshold: float = 0.0,
                  scheduler: str = 'linear_warmup',
                  **kwargs: Any) -> None:
@@ -104,33 +104,37 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         input_ids = batch['input_ids']
         attention_mask = batch['attention_mask']
         role_logits, head_logits, tail_logits = self(input_ids, attention_mask)
-        
-        b,c,s,s = role_logits.shape
-        role_logits = role_logits.reshape(b,c,s*s)
         role_true = batch['role_tags']
-        role_true = role_true[..., 0] * s + role_true[..., 1]
-        role_loss = self.role_criterion(role_logits, role_true)
-        
-        b,c,s,s = head_logits.shape
-        head_logits = head_logits.reshape(b,c,s*s)
         head_true = batch['head_tags']
-        head_true = head_true[..., 0] * s + head_true[..., 1]
-        head_loss = self.head_criterion(head_logits, head_true)
-        
-        b,c,s,s = tail_logits.shape
-        tail_logits = tail_logits.reshape(b,c,s*s)
         tail_true = batch['tail_tags']
-        tail_true = tail_true[..., 0] * s + tail_true[..., 1]
-        tail_loss = self.tail_criterion(tail_logits, tail_true)
     
-        # role_loss = self.role_criterion(role_logits, role_true)
-        # head_loss = self.head_criterion(head_logits, head_true)
-        # tail_loss = self.tail_criterion(tail_logits, tail_true)
         if is_train:
+            b,c,s,s = role_logits.shape
+            role_logits = role_logits.reshape(b,c,s*s)
+            role_true = role_true[..., 0] * s + role_true[..., 1]
+            role_loss = self.role_criterion(role_logits, role_true)
+        
+            b,c,s,s = head_logits.shape
+            head_logits = head_logits.reshape(b,c,s*s)
+            head_true = head_true[..., 0] * s + head_true[..., 1]
+            head_loss = self.head_criterion(head_logits, head_true)
+            
+            b,c,s,s = tail_logits.shape
+            tail_logits = tail_logits.reshape(b,c,s*s)
+            tail_true = tail_true[..., 0] * s + tail_true[..., 1]
+            tail_loss = self.tail_criterion(tail_logits, tail_true)
             self.log('train/role_loss', role_loss, prog_bar=True, on_step=True)
             self.log('train/head_loss', head_loss, prog_bar=True, on_step=True)
             self.log('train/tail_loss', tail_loss, prog_bar=True, on_step=True)
-        loss = sum([role_loss, head_loss, tail_loss]) / 3
+            
+            loss = sum([role_loss, head_loss, tail_loss]) / 3
+        else:
+            b, c, s, s = role_logits.shape
+            role_loss = self.role_criterion(role_logits.reshape(b, -1, s*s), role_true.reshape(b, -1, s*s))
+            head_loss = self.head_criterion(head_logits.reshape(b, -1, s*s), head_true.reshape(b, -1, s*s))
+            tail_loss = self.tail_criterion(tail_logits.reshape(b, -1, s*s), tail_true.reshape(b, -1, s*s))
+            loss = sum([role_loss, head_loss, tail_loss]) / 3
+            
         
         return loss, role_logits, head_logits, tail_logits, role_true, head_true, tail_true
 
@@ -214,7 +218,7 @@ class GPLinkerForEventExtraction(PLMBaseModel):
             threshold = self.hparams.threshold
         inputs = self.tokenizer(text,
                                 add_special_tokens=True,
-                                max_length=self.hparams.max_length,
+                                max_length=self.hparams.plm_max_length,
                                 truncation=True,
                                 return_offsets_mapping=True,
                                 return_tensors='pt',
@@ -226,4 +230,4 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         inputs.to(device)
         role_logits, head_logits, tail_logits = self(**inputs)
         events = self.extract_events(role_logits, head_logits, tail_logits, threshold=threshold, mapping=mapping)
-        return events
+        return [e for e in events[0]]

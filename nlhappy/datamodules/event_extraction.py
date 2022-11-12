@@ -19,33 +19,22 @@ class EventExtractionDataModule(PLMBaseDataModule):
                 dataset: str, 
                 plm: str, 
                 batch_size: int,
-                auto_length: int = 'max',
-                transform: str = 'combined-head-tail',
+                transform: str = 'sparse-combined',
                 **kwargs):
         super().__init__()
-        self.transforms = ['event-role-head-tail',
-                           'role-head-tail',
-                           'head-tail',
-                           'sparse-gplinker']
+        self.transforms = ['combined',
+                           'sparse-combined']
         assert self.hparams.transform in self.transforms, f'available transforms: {self.transforms}'
 
 
     def setup(self, stage: str = 'fit') -> None:
-        self.hparams.max_length = self.get_max_length()
-        if self.hparams.transform == 'event-role-head-tail':
+        if self.hparams.transform == 'combined':
             self.hparams.id2label = {i:l for l,i in self.combined2id.items()}
-            self.dataset.set_transform(self.gplinker_transform)
-        elif self.hparams.transform == 'role-head-tail':
-            self.hparams.id2event = {i:e for e,i in self.event2id.items()}
-            self.hparams.id2role = {i:r for r,i in self.ent2id.items()}
-            self.dataset.set_transform(self.blinker_transform)
-        elif self.hparams.transform == 'head-tail':
-            self.hparams.id2label = {i:l for l,i in self.event2id.items()}
-            self.dataset.set_transform(self.graph_transform)
-        elif self.hparams.transform == 'sparse-gplinker':
+            self.dataset.set_transform(self.combined_transform)
+        elif self.hparams.transform == 'sparse-combined':
             self.hparams.id2label = {i:l for l,i in self.combined2id.items()}
-            self.dataset['train'].set_transform(self.sparse_transform)
-            self.dataset['validation'].set_transform(self.gplinker_transform)
+            self.dataset['train'].set_transform(self.sparse_combined_transform)
+            self.dataset['validation'].set_transform(self.combined_transform)
             
             
     @property
@@ -116,13 +105,13 @@ class EventExtractionDataModule(PLMBaseDataModule):
         return {i:l for i,l in enumerate(self.combined_labels)}
 
 
-    def gplinker_transform(self, examples):
+    def combined_transform(self, examples):
         batch_text = examples['text']
         batch_events = examples['events']
         batch_role_tags = []
         batch_head_tags = []
         batch_tail_tags = []
-        max_length = self.get_max_length()
+        max_length = self.get_batch_max_length(batch_text=batch_text)
         batch_inputs = self.tokenizer(batch_text,
                                       max_length=max_length,
                                       padding='max_length',
@@ -144,7 +133,7 @@ class EventExtractionDataModule(PLMBaseDataModule):
                 trigger = event['trigger']
                 trigger_head = trigger['offset'][0]
                 trigger_tail = trigger['offset'][1]
-                roles.append({'label':'触发词', 'offset': (trigger_head, trigger_tail)})
+                roles.append({'label':'触发词', 'offset': (trigger_head, trigger_tail), 'text': trigger})
                 for i, role1 in enumerate(roles):
                     label = (e_label, role1['label'])
                     role1_head = role1['offset'][0]
@@ -152,9 +141,11 @@ class EventExtractionDataModule(PLMBaseDataModule):
                     try:
                         _role1_head = char_idx_to_token(role1_head, offset_mapping=offset_mapping)
                         _role1_tail = char_idx_to_token(role1_tail, offset_mapping=offset_mapping)
+                        assert _role1_head > 0
+                        assert _role1_tail > 0
                         role_ids[self.combined2id[label]][_role1_head][_role1_tail] = 1
                     except:
-                        log.warning(f'role {role1["text"]} offset {(role1_head, role1_tail)} align to token offset failed in \n\t {text}')
+                        log.warning(f'batch max length: {max_length}, role {role1["text"]} offset {(role1_head, role1_tail)} align to token offset failed in \n\t {text}')
                         continue
                         # 这个role 跟 其他的每个role 头头 尾尾 联系起来
                     for j, role2 in enumerate(roles):
@@ -164,10 +155,12 @@ class EventExtractionDataModule(PLMBaseDataModule):
                             try:
                                 _role2_head = char_idx_to_token(role2_head, offset_mapping=offset_mapping)
                                 _role2_tail = char_idx_to_token(role2_tail, offset_mapping=offset_mapping)
+                                assert _role2_head > 0
+                                assert _role2_tail > 0
                                 head_ids[0][min(_role1_head, _role2_head)][max(_role1_head, _role2_head)] = 1
                                 tail_ids[0][min(_role1_tail, _role2_tail)][max(_role1_tail, _role2_tail)] = 1
                             except:
-                                log.warning(f'role {role2["text"]} offset {(role2_head, role2_tail)} align to token offset failed in \n\t {text}')
+                                log.warning(f'batch max length: {max_length}, role {role2["text"]} offset {(role2_head, role2_tail)} align to token offset failed in \n\t {text}')
                                 continue
             batch_role_tags.append(role_ids)
             batch_head_tags.append(head_ids)
@@ -175,6 +168,79 @@ class EventExtractionDataModule(PLMBaseDataModule):
         batch_inputs['role_tags'] = torch.stack(batch_role_tags, dim=0)
         batch_inputs['head_tags'] = torch.stack(batch_head_tags, dim=0)
         batch_inputs['tail_tags'] = torch.stack(batch_tail_tags, dim=0)
+        return batch_inputs
+    
+    def sparse_combined_transform(self, examples):
+        batch_text = examples['text']
+        batch_events = examples['events']
+        batch_role_tags = []
+        batch_head_tags = []
+        batch_tail_tags = []
+        max_length = self.get_batch_max_length(batch_text=batch_text)
+        batch_inputs = self.tokenizer(batch_text,
+                                      max_length=max_length,
+                                      padding='max_length',
+                                      truncation=True,
+                                      return_offsets_mapping=True,
+                                      return_tensors='pt',
+                                      return_token_type_ids=False)
+        batch_mappings = batch_inputs.pop('offset_mapping').tolist()
+        for i, text in enumerate(batch_text):
+            offset_mapping = batch_mappings[i]
+            events = batch_events[i]
+            role_tags = [set() for _ in range(len(self.combined2id))]
+            head_tags = [set()]
+            tail_tags = [set()]
+            for event in events:
+                e_label = event['label']
+                roles = event['roles']
+                # 将触发词当做事件角色之一
+                trigger = event['trigger']
+                trigger_head = trigger['offset'][0]
+                trigger_tail = trigger['offset'][1]
+                assert trigger_tail > trigger_head
+                roles.append({'label':'触发词', 'offset': (trigger_head, trigger_tail), 'text': trigger['text']})
+                for i, role1 in enumerate(roles):
+                    label = (e_label, role1['label'])
+                    role1_head = role1['offset'][0]
+                    role1_tail = role1['offset'][1]-1
+                    assert role1_tail >= role1_head
+                    try:
+                        _role1_head = char_idx_to_token(role1_head, offset_mapping=offset_mapping)
+                        _role1_tail = char_idx_to_token(role1_tail, offset_mapping=offset_mapping)
+                        assert _role1_head > 0
+                        assert _role1_tail > 0
+                        role_tags[self.combined2id[label]].add((_role1_head, _role1_tail))
+                    except:
+                        log.warning(f'batch max length: {max_length}, role1 {role1["text"]} offset {(role1_head, role1_tail)} align to token offset failed in \n\t {text}')
+                        continue
+                        # 这个role 跟 其他的每个role 头头 尾尾 联系起来
+                    for j, role2 in enumerate(roles):
+                        if j>i:
+                            role2_head = role2['offset'][0]
+                            role2_tail = role2['offset'][1]-1
+                            try:
+                                _role2_head = char_idx_to_token(role2_head, offset_mapping=offset_mapping)
+                                _role2_tail = char_idx_to_token(role2_tail, offset_mapping=offset_mapping)
+                                assert _role2_head > 0
+                                assert _role2_tail > 0
+                                head_tags[0].add((min(_role1_head, _role2_head), max(_role1_head, _role2_head)))
+                                tail_tags[0].add((min(_role1_tail, _role2_tail), max(_role1_tail, _role2_tail)))
+                            except:
+                                log.warning(f'batch max length: {max_length}, role2 {role2["text"]} offset {(role2_head, role2_tail)} align to token offset failed in \n\t {text}')
+                                continue
+            for tag in role_tags + head_tags + tail_tags:
+                if not tag:
+                    tag.add((0,0))
+            role_tags = sequence_padding([list(l) for l in role_tags])
+            head_tags = sequence_padding([list(l) for l in head_tags])
+            tail_tags = sequence_padding([list(l) for l in tail_tags])
+            batch_role_tags.append(role_tags)
+            batch_head_tags.append(head_tags)
+            batch_tail_tags.append(tail_tags) 
+        batch_inputs['role_tags'] = torch.tensor(sequence_padding(batch_role_tags, seq_dims=2), dtype=torch.long)
+        batch_inputs['head_tags'] = torch.tensor(sequence_padding(batch_head_tags, seq_dims=2), dtype=torch.long)
+        batch_inputs['tail_tags'] = torch.tensor(sequence_padding(batch_tail_tags, seq_dims=2), dtype=torch.long)
         return batch_inputs
     
     def blinker_transform(self, examples):
@@ -304,73 +370,3 @@ class EventExtractionDataModule(PLMBaseDataModule):
         batch_inputs['tail_ids'] = torch.stack(batch_tail_ids, dim=0)
         return batch_inputs
     
-    
-    def sparse_transform(self, examples):
-        batch_text = examples['text']
-        batch_events = examples['events']
-        batch_role_tags = []
-        batch_head_tags = []
-        batch_tail_tags = []
-        max_length = self.get_max_length()
-        batch_inputs = self.tokenizer(batch_text,
-                                      max_length=max_length,
-                                      padding='max_length',
-                                      truncation=True,
-                                      return_offsets_mapping=True,
-                                      return_tensors='pt',
-                                      return_token_type_ids=False)
-        batch_mappings = batch_inputs.pop('offset_mapping').tolist()
-        for i, text in enumerate(batch_text):
-            offset_mapping = batch_mappings[i]
-            events = batch_events[i]
-            role_tags = [set() for _ in range(len(self.combined2id))]
-            head_tags = [set()]
-            tail_tags = [set()]
-            for event in events:
-                e_label = event['label']
-                roles = event['roles']
-                # 将触发词当做事件角色之一
-                trigger = event['trigger']
-                trigger_head = trigger['offset'][0]
-                trigger_tail = trigger['offset'][1]
-                assert trigger_tail > trigger_head
-                roles.append({'label':'触发词', 'offset': (trigger_head, trigger_tail)})
-                for i, role1 in enumerate(roles):
-                    label = (e_label, role1['label'])
-                    role1_head = role1['offset'][0]
-                    role1_tail = role1['offset'][1]-1
-                    assert role1_tail >= role1_head
-                    try:
-                        _role1_head = char_idx_to_token(role1_head, offset_mapping=offset_mapping)
-                        _role1_tail = char_idx_to_token(role1_tail, offset_mapping=offset_mapping)
-                        role_tags[self.combined2id[label]].add((_role1_head, _role1_tail))
-                    except:
-                        log.warning(f'role {role1["text"]} offset {(role1_head, role1_tail)} align to token offset failed in \n\t {text}')
-                        continue
-                        # 这个role 跟 其他的每个role 头头 尾尾 联系起来
-                    for j, role2 in enumerate(roles):
-                        if j>i:
-                            role2_head = role2['offset'][0]
-                            role2_tail = role2['offset'][1]-1
-                            assert role2_tail >= role2_head
-                            try:
-                                _role2_head = char_idx_to_token(role2_head, offset_mapping=offset_mapping)
-                                _role2_tail = char_idx_to_token(role2_tail, offset_mapping=offset_mapping)
-                                head_tags[0].add((min(_role1_head, _role2_head), max(_role1_head, _role2_head)))
-                                tail_tags[0].add((min(_role1_tail, _role2_tail), max(_role1_tail, _role2_tail)))
-                            except:
-                                log.warning(f'role {role2["text"]} offset {(role2_head, role2_tail)} align to token offset failed in \n\t {text}')
-                                continue
-            for tag in role_tags + head_tags + tail_tags:
-                if not tag:
-                    tag.add((0,0))
-            role_tags = sequence_padding([list(l) for l in role_tags])
-            head_tags = sequence_padding([list(l) for l in head_tags])
-            tail_tags = sequence_padding([list(l) for l in tail_tags])
-            batch_role_tags.append(role_tags)
-            batch_head_tags.append(head_tags)
-            batch_tail_tags.append(tail_tags) 
-        batch_inputs['role_tags'] = torch.tensor(sequence_padding(batch_role_tags, seq_dims=2), dtype=torch.long)
-        batch_inputs['head_tags'] = torch.tensor(sequence_padding(batch_head_tags, seq_dims=2), dtype=torch.long)
-        batch_inputs['tail_tags'] = torch.tensor(sequence_padding(batch_tail_tags, seq_dims=2), dtype=torch.long)
-        return batch_inputs

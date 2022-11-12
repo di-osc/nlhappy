@@ -260,7 +260,7 @@ class PLMBaseDataModule(pl.LightningModule):
     
     
     def get_batch_max_length(self, batch_text: List[str]) -> int:
-        """获取一个batch的最大文本长度,不得大于模型的最大输入长度,一般用于dataset的transform中
+        """获取一个batch的最大token长度,不会大于预训练模型的最大输入长度,一般用于dataset的transform中
 
         Args:
             batch_text (List[str]): 一个批次的文本
@@ -268,7 +268,7 @@ class PLMBaseDataModule(pl.LightningModule):
         Returns:
             int: 最大文本长度
         """
-        max_length = max([len(t) for t in batch_text])
+        max_length = max([len(self.tokenizer.encode(t)) for t in batch_text]) # 获取最大token序列的长度
         max_length = min([self.hparams.plm_max_length, max_length])
         return max_length
     
