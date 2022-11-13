@@ -1,7 +1,7 @@
 from functools import lru_cache
-from ..utils.make_datamodule import char_idx_to_token, get_logger, PLMBaseDataModule
+from ..utils.make_datamodule import char_idx_to_token, get_logger, PLMBaseDataModule, sequence_padding
 import torch
-from typing import Dict, Union
+from typing import Dict, Union, List
 import numpy as np
 import pandas as pd
 import random
@@ -14,7 +14,9 @@ class RelationExtractionDataModule(PLMBaseDataModule):
     """三元组抽取数据模块,
         数据集样式:
             {'text':'小明是小花的朋友'。
-            'triples': [{'object': {'offset': [0, 2], 'text': '小明'},'predicate': '朋友','subject': {'offset': [3, 5], 'text': '小花'}}]}}
+            'triples': [{'object': {'offset': [0, 2], 'text': '小明', 'label': '人物'},'predicate': '朋友','subject': {'offset': [3, 5], 'text': '小花', 'label': '人物'}}]}}
+        数据集说明:
+            当只抽取三元组的时候subject,object中的标签可以为''
         """
     def __init__(self, 
                  dataset: str, 
@@ -39,7 +41,8 @@ class RelationExtractionDataModule(PLMBaseDataModule):
                 
         self.transforms = {'gplinker': self.gplinker_transform,
                            'onerel': self.onerel_transform,
-                           'casrel': self.casrel_transform}
+                           'casrel': self.casrel_transform,
+                           'sparse_combined': self.sparse_combined_transform}
         assert self.hparams.transform in self.transforms.keys(), f'availabel models for relation extraction: {self.transforms.keys()}'
 
 
@@ -49,19 +52,59 @@ class RelationExtractionDataModule(PLMBaseDataModule):
         if self.hparams.transform == 'onerel':
             self.hparams.tag2id = self.onerel_tag2id
             self.hparams.id2tag = {i:l for l,i in self.onerel_tag2id.items()}
-        else:
-            self.hparams.label2id = self.label2id
-            self.hparams.id2label = {i:l for l, i in self.label2id.items()}
-        # 设置数据转换
-        self.dataset.set_transform(transform=self.transforms.get(self.hparams.transform))   
-
+            self.dataset.set_transform(transform=self.transforms.get(self.hparams.transform))
+        elif self.hparams.transform == 'sparse_combined':
+            self.hparams.id2combined = {i:l for l, i in self.combined2id.items()}
+            self.hparams.id2rel = {i:l for l,i in self.rel2id.items()}
+            self.dataset['train'].set_transform(transform=self.sparse_combined_transform)
+            self.dataset['validation'].set_transform(transform=self.combined_transform)
+        elif self.hparams.transform == 'gplinker':
+            self.hparams.id2label = {i:l for l,i in self.rel2id.items()}
+            self.hparams.label2id = self.rel2id
+            self.dataset.set_transform(transform=self.transforms.get(self.hparams.transform))
+        
+    @property
+    @lru_cache()
+    def combined_labels(self) -> List:
+        """将主体客体与其实体标签结合起来, (主体, 地点)
+        """
+        def get_labels(e):
+            return ['主体'+'-'+e['subject']['label'], '客体'+'-'+ e['object']['label']]
+        labels = set(np.concatenate(pd.Series(np.concatenate(self.train_df.triples)).apply(get_labels)))
+        ls = [tuple(l.split('-')) for l in labels]
+        return ls
     
     @property
     @lru_cache()
-    def label2id(self):
-        labels = pd.Series(np.concatenate(self.train_df.triples.values)).apply(lambda x: x['predicate']).drop_duplicates().values
-        label2id = {label: i for i, label in enumerate(labels)}
+    def combined2id(self) -> Dict:
+        return {l:i for i,l in enumerate(self.combined_labels)}
+    
+    @property
+    @lru_cache()
+    def ent_labels(self) -> List:
+        def get_labels(e):
+            return [e['subject']['label'], e['object']['label']]
+        return list(set(np.concatenate(pd.Series(np.concatenate(self.train_df.triples)).apply(get_labels))))
+    
+    def ent2id(self) -> Dict:
+        return {l:i for i,l in enumerate(self.ent_labels)}
+    
+    
+    @property
+    @lru_cache()
+    def rel_labels(self) -> List:
+        labels = set(pd.Series(np.concatenate(self.train_df.triples.values)).apply(lambda x: x['predicate']))
+        return list(labels)
+
+    
+    @property
+    def rel2id(self) -> Dict:
+        label2id = {label: i for i, label in enumerate(self.rel_labels)}
         return label2id
+    
+    @property
+    def onerel_tag2id(self):
+        return {'O':0, 'HB-TB':1, 'HB-TE':2, 'HE-TE':3}
     
         
     def gplinker_transform(self, example) -> Dict:
@@ -108,11 +151,6 @@ class RelationExtractionDataModule(PLMBaseDataModule):
         batch_inputs['head_tags'] = torch.stack(batch_head_ids, dim=0)
         batch_inputs['tail_tags'] = torch.stack(batch_tail_ids, dim=0)
         return batch_inputs
-    
-    
-    @property
-    def onerel_tag2id(self):
-        return {'O':0, 'HB-TB':1, 'HB-TE':2, 'HE-TE':3}
     
     
     def onerel_transform(self, example):
@@ -232,9 +270,109 @@ class RelationExtractionDataModule(PLMBaseDataModule):
         return batch
         
 
-    @classmethod
-    def get_one_example(cls):
-        return {'text':'小明是小花的朋友',
-                'triples': [{'object': {'offset': [0, 2], 'text': '小明'},
-                             'predicate': '朋友',
-                             'subject': {'offset': [3, 5], 'text': '小花'}}]}
+    def sparse_combined_transform(self, examples):
+        batch_text = examples['text']
+        max_length = self.get_batch_max_length(batch_text=batch_text)
+        batch_inputs = self.tokenizer(batch_text,
+                                      padding=True,
+                                      truncation=True,
+                                      max_length=max_length,
+                                      return_tensors='pt',
+                                      return_token_type_ids=False)
+        batch_combined_tags = []
+        batch_head_tags = []
+        batch_tail_tags = []
+        batch_triples = examples['triples']
+        for i, text in enumerate(batch_text):
+            triples = batch_triples[i]
+            combined_tags = [set() for _ in range(len(self.combined_labels))]
+            head_tags = [set() for _ in range(len(self.rel_labels))]
+            tail_tags = [set() for _ in range(len(self.rel_labels))]
+            for triple in triples:
+                sub_head = triple['subject']['offset'][0]
+                _sub_head = batch_inputs.char_to_token(i, sub_head)
+                sub_tail = triple['subject']['offset'][1]-1
+                _sub_tail = batch_inputs.char_to_token(i, sub_tail)
+                sub_label = triple['subject']['label']
+                
+                obj_head = triple['object']['offset'][0]
+                obj_tail = triple['object']['offset'][1]-1
+                obj_label = triple['object']['label']
+                _obj_head = batch_inputs.char_to_token(i, obj_head)
+                _obj_tail = batch_inputs.char_to_token(i, obj_tail)
+                
+                if _sub_head is None or _sub_tail is None :
+                    log.warning(f'subject {(sub_head, sub_tail)} align fail')
+                    continue
+                if _obj_head is None or _obj_tail is None:
+                    log.warning(f'object {(obj_head, obj_tail)} align fail')
+                    continue
+                
+                combined_tags[self.combined2id[('主体', sub_label)]].add((_sub_head, _sub_tail))
+                combined_tags[self.combined2id[('客体', obj_label)]].add((_obj_head, _obj_tail))
+                head_tags[self.rel2id[triple['predicate']]].add((_sub_head, _obj_head))
+                tail_tags[self.rel2id[triple['predicate']]].add((_sub_tail, _obj_tail))
+            for tag in combined_tags + head_tags + tail_tags:
+                if not tag:
+                    tag.add((0,0))
+            combined_tags = sequence_padding([list(l) for l in combined_tags])
+            head_tags = sequence_padding([list(l) for l in head_tags])
+            tail_tags = sequence_padding([list(l) for l in tail_tags])
+            batch_combined_tags.append(combined_tags)
+            batch_head_tags.append(head_tags)
+            batch_tail_tags.append(tail_tags)
+        batch_inputs['combined_tags'] = torch.tensor(sequence_padding(batch_combined_tags, seq_dims=2), dtype=torch.long)
+        batch_inputs['head_tags'] = torch.tensor(sequence_padding(batch_head_tags, seq_dims=2), dtype=torch.long)
+        batch_inputs['tail_tags'] = torch.tensor(sequence_padding(batch_tail_tags, seq_dims=2), dtype=torch.long)
+        return batch_inputs
+    
+    
+    def combined_transform(self, examples):
+        batch_text = examples['text']
+        max_length = self.get_batch_max_length(batch_text=batch_text)
+        batch_inputs = self.tokenizer(batch_text,
+                                      padding=True,
+                                      truncation=True,
+                                      max_length=max_length,
+                                      return_tensors='pt',
+                                      return_token_type_ids=False)
+        batch_combined_tags = []
+        batch_head_tags = []
+        batch_tail_tags = []
+        batch_triples = examples['triples']
+        for i, text in enumerate(batch_text):
+            triples = batch_triples[i]
+            combined_tags = torch.zeros(len(self.combined_labels), max_length, max_length, dtype=torch.long)
+            head_tags = torch.zeros(len(self.rel_labels), max_length, max_length, dtype=torch.long)
+            tail_tags = torch.zeros(len(self.rel_labels), max_length, max_length, dtype=torch.long)
+            for triple in triples:
+                sub_head = triple['subject']['offset'][0]
+                _sub_head = batch_inputs.char_to_token(i, sub_head)
+                sub_tail = triple['subject']['offset'][1]-1
+                _sub_tail = batch_inputs.char_to_token(i, sub_tail)
+                sub_label = triple['subject']['label']
+                
+                obj_head = triple['object']['offset'][0]
+                obj_tail = triple['object']['offset'][1]-1
+                obj_label = triple['object']['label']
+                _obj_head = batch_inputs.char_to_token(i, obj_head)
+                _obj_tail = batch_inputs.char_to_token(i, obj_tail)
+                
+                if _sub_head is None or _sub_tail is None :
+                    log.warning(f'subject {(sub_head, sub_tail)} align fail')
+                    continue
+                if _obj_head is None or _obj_tail is None:
+                    log.warning(f'object {(obj_head, obj_tail)} align fail')
+                    continue
+                
+                combined_tags[self.combined2id[('主体', sub_label)], _sub_head, _sub_tail] = 1
+                combined_tags[self.combined2id[('客体', obj_label)], _obj_head, _obj_tail] = 1
+                head_tags[self.rel2id[triple['predicate']], _sub_head, _obj_head] = 1
+                tail_tags[self.rel2id[triple['predicate']], _sub_tail, _obj_tail] = 1
+            batch_combined_tags.append(combined_tags)
+            batch_head_tags.append(head_tags)
+            batch_tail_tags.append(tail_tags)
+        batch_inputs['combined_tags'] = torch.stack(batch_combined_tags, dim=0)
+        batch_inputs['head_tags'] = torch.stack(batch_head_tags, dim=0)
+        batch_inputs['tail_tags'] = torch.stack(batch_tail_tags, dim=0)
+        return batch_inputs
