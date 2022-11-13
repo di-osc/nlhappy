@@ -42,7 +42,7 @@ class RelationExtractionDataModule(PLMBaseDataModule):
         self.transforms = {'gplinker': self.gplinker_transform,
                            'onerel': self.onerel_transform,
                            'casrel': self.casrel_transform,
-                           'sparse_combined': self.sparse_combined_transform}
+                           'sparse-combined': self.sparse_combined_transform}
         assert self.hparams.transform in self.transforms.keys(), f'availabel models for relation extraction: {self.transforms.keys()}'
 
 
@@ -53,7 +53,7 @@ class RelationExtractionDataModule(PLMBaseDataModule):
             self.hparams.tag2id = self.onerel_tag2id
             self.hparams.id2tag = {i:l for l,i in self.onerel_tag2id.items()}
             self.dataset.set_transform(transform=self.transforms.get(self.hparams.transform))
-        elif self.hparams.transform == 'sparse_combined':
+        elif self.hparams.transform == 'sparse-combined':
             self.hparams.id2combined = {i:l for l, i in self.combined2id.items()}
             self.hparams.id2rel = {i:l for l,i in self.rel2id.items()}
             self.dataset['train'].set_transform(transform=self.sparse_combined_transform)
@@ -289,23 +289,26 @@ class RelationExtractionDataModule(PLMBaseDataModule):
             head_tags = [set() for _ in range(len(self.rel_labels))]
             tail_tags = [set() for _ in range(len(self.rel_labels))]
             for triple in triples:
-                sub_head = triple['subject']['offset'][0]
-                _sub_head = batch_inputs.char_to_token(i, sub_head)
-                sub_tail = triple['subject']['offset'][1]-1
-                _sub_tail = batch_inputs.char_to_token(i, sub_tail)
-                sub_label = triple['subject']['label']
-                
-                obj_head = triple['object']['offset'][0]
-                obj_tail = triple['object']['offset'][1]-1
-                obj_label = triple['object']['label']
-                _obj_head = batch_inputs.char_to_token(i, obj_head)
-                _obj_tail = batch_inputs.char_to_token(i, obj_tail)
-                
-                if _sub_head is None or _sub_tail is None :
-                    log.warning(f'subject {(sub_head, sub_tail)} align fail')
+                try:
+                    sub_head = triple['subject']['offset'][0]
+                    _sub_head = batch_inputs.char_to_token(i, sub_head)
+                    sub_tail = triple['subject']['offset'][1]-1
+                    _sub_tail = batch_inputs.char_to_token(i, sub_tail)
+                    sub_label = triple['subject']['label']
+                    assert _sub_head is not None and _sub_tail is not None
+                except:
+                    log.warning(f'subject {(sub_head, sub_tail)} align fail in \n {text}')
                     continue
-                if _obj_head is None or _obj_tail is None:
-                    log.warning(f'object {(obj_head, obj_tail)} align fail')
+                
+                try:
+                    obj_head = triple['object']['offset'][0]
+                    obj_tail = triple['object']['offset'][1]-1
+                    obj_label = triple['object']['label']
+                    _obj_head = batch_inputs.char_to_token(i, obj_head)
+                    _obj_tail = batch_inputs.char_to_token(i, obj_tail)
+                    assert _obj_head is not None and _obj_tail is not None
+                except:
+                    log.warning(f'object {(obj_head, obj_tail)} align fail in \n {text}')
                     continue
                 
                 combined_tags[self.combined2id[('主体', sub_label)]].add((_sub_head, _sub_tail))
@@ -359,10 +362,10 @@ class RelationExtractionDataModule(PLMBaseDataModule):
                 _obj_tail = batch_inputs.char_to_token(i, obj_tail)
                 
                 if _sub_head is None or _sub_tail is None :
-                    log.warning(f'subject {(sub_head, sub_tail)} align fail')
+                    log.warning(f'subject {(sub_head, sub_tail)} align fail in \n {text}')
                     continue
                 if _obj_head is None or _obj_tail is None:
-                    log.warning(f'object {(obj_head, obj_tail)} align fail')
+                    log.warning(f'object {(obj_head, obj_tail)} align fail in \n {text}')
                     continue
                 
                 combined_tags[self.combined2id[('主体', sub_label)], _sub_head, _sub_tail] = 1
