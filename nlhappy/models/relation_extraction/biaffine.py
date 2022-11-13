@@ -191,12 +191,18 @@ class BLinkerForEntityRelationExtraction(PLMBaseModel):
                 max_length=max_length,
                 return_tensors='pt',
                 return_token_type_ids=False,
-                truncation=True)
+                truncation=True,
+                return_offsets_mapping=True)
+        mapping = inputs.pop('offset_mapping')
+        mapping = mapping[0].tolist()
         self.freeze()
         inputs.to(torch.device(device))
         ent_logits, head_logits, tail_logits = self(**inputs)
         if threshold == None:
-            batch_rels = self.extract_rels(ent_logits, head_logits, tail_logits, threshold=self.hparams.threshold)
+            batch_rels: List[Set[Relation]] = self.extract_rels(ent_logits, head_logits, tail_logits, threshold=self.hparams.threshold, mapping=mapping)
         else:
-            batch_rels = self.extract_rels(ent_logits, head_logits, tail_logits, threshold=threshold)
-        return list(batch_rels[0])
+            batch_rels: List[Set[Relation]] = self.extract_rels(ent_logits, head_logits, tail_logits, threshold=threshold, mapping=mapping)
+        for rel in batch_rels[0]:
+            rel.sub.text = text[rel.sub.offset[0]:rel.sub.offset[1]]
+            rel.obj.text = text[rel.obj.offset[0]:rel.obj.offset[1]]
+        return batch_rels[0]

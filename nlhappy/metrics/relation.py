@@ -9,6 +9,7 @@ class SO(BaseModel):
     """主体或者客体"""
     offset : Tuple
     label: Optional[str] = None
+    text: Optional[str] = None
     
     def __hash__(self):
         return hash(self.label)
@@ -27,6 +28,18 @@ class Relation(BaseModel):
     
     def __eq__(self, other: "Relation") -> bool:
         return self.sub == other.sub and self.predicate == other.predicate and self.obj == other.obj
+    
+    def __str__(self) -> str:
+        if self.sub.text is None or self.obj.text is None:
+            return f"{self.sub.offset}-{self.predicate}-{self.obj.offset}"
+        else: 
+            return f"{self.sub.text}-{self.predicate}-{self.obj.text}"
+        
+    def __repr__(self) -> str:
+        if self.sub.text is None or self.obj.text is None:
+            return f"{self.sub.offset}-{self.predicate}-{self.obj.offset}"
+        else: 
+            return f"{self.sub.text}-{self.predicate}-{self.obj.text}"
     
 class RelationF1(Metric):
     """实体和关系联合抽取的F1指标
