@@ -1,6 +1,6 @@
 from ...layers import MultiDropout, EfficientBiaffineSpanClassifier
 from ...layers.loss import SparseMultiLabelCrossEntropy
-from ...metrics.triple import TripleF1, Triple
+from ...metrics.relation import RelationF1, SO, Relation
 from ...metrics.span import SpanF1
 import torch
 from torch import Tensor
@@ -38,7 +38,7 @@ class BLinkerForEntityRelationExtraction(PLMBaseModel):
         self.ent_metric = SpanF1()
         self.head_metric = SpanF1()
         self.tail_metric = SpanF1()
-        self.val_metric = TripleF1()
+        self.val_metric = RelationF1()
 
     
 
@@ -92,18 +92,22 @@ class BLinkerForEntityRelationExtraction(PLMBaseModel):
     def validation_step(self, batch, batch_idx) -> dict:
         ent_logits, head_logits, tail_logits, ent_true, head_true, tail_true = self.shared_step(batch, is_train=False)
         
-        self.ent_metric(ent_logits, ent_true)
+        ent_pred = ent_logits.gt(self.hparams.threshold)
+        head_pred = head_logits.gt(self.hparams.threshold)
+        tail_pred = tail_logits.gt(self.hparams.threshold)
+        
+        self.ent_metric(ent_pred, ent_true)
         self.log('val/ent', self.ent_metric, on_epoch=True, prog_bar=True)
 
-        self.head_metric(head_logits, head_true)
+        self.head_metric(head_pred, head_true)
         self.log('val/head', self.head_metric, on_epoch=True, prog_bar=True)
 
-        self.tail_metric(tail_logits, tail_true)
+        self.tail_metric(tail_pred, tail_true)
         self.log('val/tail', self.tail_metric, on_epoch=True, prog_bar=True)
         
-        batch_triples = self.extract_triple(ent_logits, head_logits, tail_logits, threshold=self.hparams.threshold)
-        batch_true_triples = self.extract_triple(ent_true, head_true, tail_true, threshold=self.hparams.threshold)
-        self.val_metric(batch_triples, batch_true_triples)
+        batch_rels = self.extract_rels(ent_logits, head_logits, tail_logits, threshold=self.hparams.threshold)
+        batch_true_rels = self.extract_rels(ent_true, head_true, tail_true, threshold=self.hparams.threshold)
+        self.val_metric(batch_rels, batch_true_rels)
         self.log('val/f1', self.val_metric, on_epoch=True, prog_bar=True)
 
 
@@ -121,11 +125,12 @@ class BLinkerForEntityRelationExtraction(PLMBaseModel):
 
 
 
-    def extract_triple(self, 
-                       ent_logits: Tensor,
-                       head_logits: Tensor, 
-                       tail_logtis: Tensor, 
-                       threshold: Optional[float] = None) -> List[Set[Triple]]:
+    def extract_rels(self, 
+                     ent_logits: Tensor,
+                     head_logits: Tensor, 
+                     tail_logtis: Tensor, 
+                     threshold: Optional[float] = None,
+                     mapping: Optional[dict] = None) -> List[Set[Relation]]:
         """
         将三个globalpointer预测的结果进行合并，得到三元组的预测结果
         参数:
@@ -141,7 +146,7 @@ class BLinkerForEntityRelationExtraction(PLMBaseModel):
         head_logits = head_logits.chunk(head_logits.shape[0])
         tail_logtis = tail_logtis.chunk(tail_logtis.shape[0])
         assert len(head_logits) == len(tail_logtis) == len(ent_logits)
-        batch_triples = []
+        batch_rels = []
         for i in range(len(ent_logits)):
             subjects, objects = set(), set()
             for l, h, t in zip(*torch.where(ent_logits[i].squeeze(0) > threshold)):
@@ -151,7 +156,7 @@ class BLinkerForEntityRelationExtraction(PLMBaseModel):
                 else:
                     objects.add((h, t, combined_label[1]))
             
-            triples = set()
+            rels = set()
             for sh, st, sl, in subjects:
                 for oh, ot, ol in objects:
                     p1s = torch.where(head_logits[i].squeeze(0)[:, sh, oh] > threshold)[0].tolist()
@@ -159,12 +164,18 @@ class BLinkerForEntityRelationExtraction(PLMBaseModel):
                     ps = set(p1s) & set(p2s)
                     if len(ps) > 0:
                         for p in ps:
-                            triples.add(Triple(triple=(sh.item(), st.item(), self.hparams.id2rel[p], oh.item(), ot.item())))
-            batch_triples.append(triples)
-        return batch_triples
+                            if mapping is not None:
+                                sub_offset = align_token_span((sh.item(), st.item()+1), mapping)
+                                obj_offset = align_token_span((oh.item(), ot.item()+1), mapping)
+                            else:
+                                sub_offset = (sh.item(), st.item()+1)
+                                obj_offset = (oh.item(), ot.item()+1)
+                            rels.add(Relation(sub=SO(offset=sub_offset, label=sl), obj=SO(offset=obj_offset, label=ol), predicate=self.hparams.id2rel[p]))
+            batch_rels.append(rels)
+        return batch_rels
             
         
-    def predict(self, text: str, device:str='cpu', threshold = None) -> Set[Triple]:
+    def predict(self, text: str, device:str='cpu', threshold = None) -> Set[Relation]:
         """模型预测
         参数:
         - text: 要预测的单条文本
@@ -173,7 +184,7 @@ class BLinkerForEntityRelationExtraction(PLMBaseModel):
         返回
         - 预测的三元组
         """
-        max_length = min(len(text), self.hparams.max_length)
+        max_length = min(len(text), self.hparams.plm_max_length)
         inputs = self.tokenizer(
                 text, 
                 padding='max_length',  
@@ -181,23 +192,11 @@ class BLinkerForEntityRelationExtraction(PLMBaseModel):
                 return_tensors='pt',
                 return_token_type_ids=False,
                 truncation=True)
+        self.freeze()
         inputs.to(torch.device(device))
         ent_logits, head_logits, tail_logits = self(**inputs)
         if threshold == None:
-            batch_triples = self.extract_triple(ent_logits, head_logits, tail_logits, threshold=self.hparams.threshold)
+            batch_rels = self.extract_rels(ent_logits, head_logits, tail_logits, threshold=self.hparams.threshold)
         else:
-            batch_triples = self.extract_triple(ent_logits, head_logits, tail_logits, threshold=threshold)
-        rels = []
-        if len(batch_triples) >0:
-            triples = [(triple[0], triple[1], triple[2], triple[3], triple[4])  for s in batch_triples for triple in s]
-            offset_mapping = self.tokenizer(
-                text,
-                max_length=max_length,
-                padding='max_length',
-                truncation=True,
-                return_offsets_mapping=True)['offset_mapping']
-            for triple in triples:
-                sub = align_token_span((triple[0], triple[1]+1), offset_mapping)
-                obj = align_token_span((triple[3], triple[4]+1), offset_mapping)
-                rels.append((sub[0],sub[1],triple[2],obj[0],obj[1]))
-        return rels
+            batch_rels = self.extract_rels(ent_logits, head_logits, tail_logits, threshold=threshold)
+        return list(batch_rels[0])
