@@ -195,7 +195,6 @@ class BLinkerForEntityRelationExtraction(PLMBaseModel):
                 return_offsets_mapping=True)
         mapping = inputs.pop('offset_mapping')
         mapping = mapping[0].tolist()
-        self.freeze()
         inputs.to(torch.device(device))
         ent_logits, head_logits, tail_logits = self(**inputs)
         if threshold == None:
