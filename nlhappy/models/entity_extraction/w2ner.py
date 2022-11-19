@@ -128,7 +128,7 @@ class W2NERForEntityExtraction(PLMBaseModel):
     """
     def __init__(self,
                  lr: float =3e-5,
-                 scheduler: str = 'harmonic_epoch',
+                 scheduler: str = 'linear_warmup',
                  weight_decay: float = 0.01,
                  conv_hidden_size: int = 96,
                  dilation: List[int] = [1,2,3],
