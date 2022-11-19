@@ -42,13 +42,4 @@ def augment_text_from_google_translator(text: str, num_augs: int=2):
             res_ls.append(res)
         if len(res_ls) == num_augs:
             break
-    return res_ls
-        
-
-if __name__ == "__main__":
-    text = '我今天感冒了,有点头疼.'
-    res = augment_text_from_youdao_translator(text)
-    print("有道:",res)
-    res = augment_text_from_google_translator(text, 10)
-    print("google:",res)
-        
+    return res_ls    

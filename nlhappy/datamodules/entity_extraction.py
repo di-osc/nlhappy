@@ -4,6 +4,7 @@ from ..utils.utils import get_logger
 import pandas as pd
 import numpy as np
 import torch
+from typing import List
 
 
 log = get_logger()
@@ -14,42 +15,74 @@ class EntityExtractionDataModule(PLMBaseDataModule):
     globalpointer: 可以抽取嵌套实体,不能抽取非连续实体
     w2ner: 可以抽取非连续和嵌套实体
     
-    数据集格式: {"text":"这是一个长颈鹿","entities":[{"indexes":[4,5,6],"label":"动物", "text":"长颈鹿"}]}
+    数据集格式: {"text":"这是一个长颈鹿","ents":[{"indices":[4,5,6],"label":"动物", "text":"长颈鹿"}]}
     """
         
     def __init__(self,
                  dataset: str,
                  batch_size: int,
-                 transform: str = 'globalpointer',
-                 plm: str = 'hfl/chinese-macbert-base',
+                 transform: str = 't2',
+                 plm: str = 'hfl/chinese-roberta-wwm-ext',
                  **kwargs):
         super().__init__()
-        self.transforms['w2ner'] = self.w2ner_transform
-        self.transforms['globalpointer'] = self.gp_transform
-        self.transforms['biaffine'] = self.gp_transform
+        self.transforms['w2'] = self.w2ner_transform
+        self.transforms['t2'] = self.tp_transform
+        self.transforms['bio'] = self.bio_transform
+        
         assert self.hparams.transform in self.transforms.keys(), f'availabel transforms {list(self.transforms.keys())}'
 
-
-    @classmethod
-    def get_one_example(cls):
-        return '{"text":"这是一个长颈鹿","entities":[{"indexes":[4,5,6],"label":"动物", "text":"长颈鹿"}]}'
+    
+    def setup(self, stage: str = 'fit'):
+        self.hparams.max_length = self.get_max_length()
+        if self.hparams.transform == 'w2':
+            labels = list(self.ent2id.keys())
+            label2id = {'<pad>':0, '<suc>':1}
+            for i, label in enumerate(labels):
+                label2id[label] = i+2
+            id2label = {i:l for l,i in label2id.items()}
+            self.hparams.label2id = label2id
+            self.hparams.id2label = id2label
+        elif self.hparams.transform == 'bio':
+            self.hparams.label2id = self.bio2id
+            
+        else :
+            self.hparams.label2id = self.ent2id
+            self.hparams.id2label = self.id2ent
+        self.dataset.set_transform(self.transforms.get(self.hparams.transform)) 
     
     
     @classmethod
     def get_available_transforms(cls):
-        return ['w2ner', 'globalpointer']
-
-
+        return ['w2', 't2', 'bio']
+    
+    
     @property
     @lru_cache()
-    def label2id(self):
-        labels = sorted(pd.Series(np.concatenate(self.train_df.entities)).apply(lambda x: x['label']).drop_duplicates().values)
-        return {l:i for i,l in enumerate(labels)}
+    def ent_labels(self) -> List:
+        labels = sorted(pd.Series(np.concatenate(self.train_df['ents'])).apply(lambda x: x['label']).drop_duplicates().values)
+        return labels
+    
+    
+    @property
+    @lru_cache()
+    def bio_labels(self) -> List:
+        b_labels = ['B' + '-' + l for l in self.ent_labels]
+        i_labels = ['I' + '-' + l for l in self.ent_labels]
+        return ['O' + b_labels + i_labels]
+    
+    @property
+    def bio2id(self):
+        return {l:i for i,l in enumerate(self.bio_labels)}
 
 
     @property
-    def id2label(self):
-        return {i:l for l,i in self.label2id.items()}
+    def ent2id(self):
+        return {l:i for i,l in enumerate(self.ent_labels)}
+
+
+    @property
+    def id2ent(self):
+        return {i:l for l,i in self.ent2id.items()}
 
 
     @lru_cache()
@@ -76,7 +109,7 @@ class EntityExtractionDataModule(PLMBaseDataModule):
     def w2ner_transform(self, examples):
         max_length = self.hparams.max_length
         batch_text = examples['text']
-        batch_ents = examples['entities']
+        batch_ents = examples['ents']
         batch_inputs = self.tokenizer(batch_text,
                                       max_length=max_length,
                                       padding='max_length',
@@ -97,7 +130,7 @@ class EntityExtractionDataModule(PLMBaseDataModule):
             length = batch_lengths[i]
             label_ids = np.zeros((max_length, max_length), dtype=np.int)
             for ent in ents:
-                idx_ls = ent['indexes']
+                idx_ls = ent['indices']
                 for i in range(len(idx_ls)):
                     if i +1 >= len(idx_ls):
                         break
@@ -128,9 +161,9 @@ class EntityExtractionDataModule(PLMBaseDataModule):
         return batch_inputs
 
 
-    def gp_transform(self, examples):
+    def tp_transform(self, examples):
         batch_text = examples['text']
-        batch_ents = examples['entities']
+        batch_ents = examples['ents']
         max_length = self.get_max_length()
         batch_inputs = self.tokenizer(batch_text,
                                       max_length=max_length,
@@ -146,12 +179,12 @@ class EntityExtractionDataModule(PLMBaseDataModule):
             mapping = batch_mappings[i]
             label_ids = torch.zeros(len(self.hparams.label2id), max_length, max_length)
             for ent in ents :
-                if len(ent['indexes']) == 0:
+                if len(ent['indices']) == 0:
                     log.warn(f'found empty entity indexes in {text}')
                     continue
-                start = ent['indexes'][0]
+                start = ent['indices'][0]
                 start = char_idx_to_token(start, mapping)
-                end = ent['indexes'][-1] 
+                end = ent['indices'][-1] 
                 end = char_idx_to_token(end, mapping)
                 label_id = self.hparams.label2id[ent['label']]
                 label_ids[label_id,  start, end] = 1
@@ -159,19 +192,7 @@ class EntityExtractionDataModule(PLMBaseDataModule):
         batch_label_ids = torch.stack(batch_label_ids, dim=0)
         batch_inputs['label_ids'] = batch_label_ids
         return batch_inputs
-
-
-    def setup(self, stage: str = 'fit'):
-        self.hparams.max_length = self.get_max_length()
-        if self.hparams.transform == 'w2ner':
-            labels = list(self.label2id.keys())
-            label2id = {'<pad>':0, '<suc>':1}
-            for i, label in enumerate(labels):
-                label2id[label] = i+2
-            id2label = {i:l for l,i in label2id.items()}
-            self.hparams.label2id = label2id
-            self.hparams.id2label = id2label
-        else:
-            self.hparams.label2id = self.label2id
-            self.hparams.id2label = self.id2label
-        self.dataset.set_transform(self.transforms.get(self.hparams.transform))    
+    
+    
+    def bio_transform(self, examples):
+        pass   

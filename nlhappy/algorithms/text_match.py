@@ -7,7 +7,6 @@ from six import iteritems
 logger = logging.getLogger(__name__)
 
 
-
 class BM25(object):
     """
     BM25模型

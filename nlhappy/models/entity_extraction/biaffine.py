@@ -1,4 +1,5 @@
 from ...utils.make_model import PLMBaseModel, align_token_span
+from ...utils.make_doc import Doc, Entity
 from ...layers.classifier.biaffine import BiaffineSpanClassifier, EfficientBiaffineSpanClassifier
 from ...layers.dropout import MultiDropout
 from ...layers.loss import MultiLabelCategoricalCrossEntropy
@@ -21,7 +22,7 @@ class BiaffineForEntityExtraction(PLMBaseModel):
                  hidden_size: int = 64,
                  add_rope: bool = True,
                  threshold: float = 0.0,
-                 scheduler: str = 'linear_warmup_step',
+                 scheduler: str = 'linear_warmup',
                  weight_decay: float = 0.01,
                  use_efficient: bool = True,
                  **kwargs) -> None:
@@ -100,27 +101,22 @@ class BiaffineForEntityExtraction(PLMBaseModel):
         return [optimizer], [scheduler_config]
     
     
-    def predict(self, text: str, device: str='cpu', threshold = None):
+    def predict(self, text: str, device: str='cpu', threshold = None) -> Doc:
         if threshold is None:
             threshold = self.hparams.threshold
         inputs = self.tokenizer(text,
-                                add_special_tokens=True,
                                 max_length=self.hparams.max_length,
                                 truncation=True,
-                                return_offsets_mapping=True,
                                 return_tensors='pt')
-        mapping = inputs.pop('offset_mapping')
-        mapping = mapping[0].tolist()
         inputs.to(device)
         preds = self(**inputs)
         spans_ls = torch.nonzero(preds>threshold).tolist()
-        spans = []
+        ents = []
         for span in spans_ls :
-            start = span[2]
-            end = span[3]
-            char_span = align_token_span((start, end+1), mapping)
-            start = char_span[0]
-            end = char_span[1]
-            span_text = text[start:end]
-            spans.append([start, end, self.hparams.id2label[span[1]], span_text])
-        return spans
+            start_token = span[2]
+            end_token = span[3]
+            start_char = inputs.token_to_chars(start_token)[0]
+            end_char = inputs.token_to_chars(end_token)[-1]
+            label = self.hparams.id2label[span[1]]
+            ents.append(Entity(label=label, indices=[i for i in range(start_char, end_char)]))
+        return Doc(text=text, ents=ents)
