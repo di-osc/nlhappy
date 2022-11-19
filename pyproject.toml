@@ -17,18 +17,14 @@ transformers = ">=4.17.0"
 hydra-core = "1.1"
 hydra-colorlog = ">=1.1.0"
 rich = "^12.4.3"
-wandb = ">=0.12.18"
+srsly = ">=2.4.5"
+
 
 googletrans = "4.0.0rc1"
-spacy = ">=3.3.0"
-
+wandb = ">=0.12.18"
 
 [tool.poetry.extras]
-all = ["spacy", "googletrans"]
-
-
-[tool.poetry.plugins."spacy_factories"]
-"span_classifier" = "nlhappy.components:get_spancat"
+all = [ "googletrans"]
 
 
 [tool.poetry.scripts]
