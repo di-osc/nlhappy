@@ -104,7 +104,7 @@ class CoPredictor(nn.Module):
         return o1 + o2
     
 
-class W2NERForEntityExtraction(PLMBaseModel):
+class W2ForEntityExtraction(PLMBaseModel):
     """w2ner 统一解决嵌套非连续实体, 模型复现
     
     修改:
@@ -137,9 +137,9 @@ class W2NERForEntityExtraction(PLMBaseModel):
                  biaffine_size: int = 512,
                  dropout: float = 0.2,
                  ffnn_hidden_size: int = 288,
-                 **kwargs):
-                
+                 **kwargs):      
         super().__init__()
+        
         self.plm = self.get_plm_architecture()
 
         self.distance_embeddings = nn.Embedding(20, self.hparams.dist_emb_size)
@@ -261,14 +261,7 @@ class W2NERForEntityExtraction(PLMBaseModel):
 
     
     def training_step(self, batch, batch_idx):
-        # targs = batch['label_ids']
-        # attention_mask = batch['attention_mask']
-        # targs = self.extract_ents(targs, attention_mask)
         logits, loss = self.step(batch)
-        # preds = logits.argmax(dim=-1)
-        # preds = self.extract_ents(preds, attention_mask)
-        # self.train_metric(preds, targs)
-        # self.log('train/f1', self.train_metric, on_step=True, prog_bar=True)
         return {'loss':loss}
 
 
@@ -284,21 +277,29 @@ class W2NERForEntityExtraction(PLMBaseModel):
 
 
     def configure_optimizers(self):
-        plm_params = set(self.plm.parameters())
-        other_params = list(set(self.parameters()) - plm_params)
-        no_decay = ['bias', 'LayerNorm.weight']
-        params = [
+        no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
+        grouped_parameters = [
             {'params': [p for n, p in self.plm.named_parameters() if not any(nd in n for nd in no_decay)],
-             'lr': self.hparams.lr,
-             'weight_decay': self.hparams.weight_decay},
+             'lr': self.hparams.lr,'weight_decay': self.hparams.weight_decay},
             {'params': [p for n, p in self.plm.named_parameters() if any(nd in n for nd in no_decay)],
-             'lr': self.hparams.lr * 10,
-             'weight_decay': 0.0},
-            {'params': other_params,
-             'lr': self.hparams.lr * 10,
-             'weight_decay': self.hparams.weight_decay},
+             'lr': self.hparams.lr,'weight_decay': 0.0},
+            
+            {'params': [p for n, p in self.convLayer.named_parameters() if not any(nd in n for nd in no_decay)],
+             'lr': self.hparams.lr,'weight_decay': self.hparams.weight_decay},
+            {'params': [p for n, p in self.convLayer.named_parameters() if any(nd in n for nd in no_decay)],
+             'lr': self.hparams.lr,'weight_decay': 0.0},
+            
+            {'params': [p for n, p in self.cln.named_parameters() if not any(nd in n for nd in no_decay)],
+             'lr': self.hparams.lr * 10,'weight_decay': self.hparams.weight_decay},
+            {'params': [p for n, p in self.cln.named_parameters() if any(nd in n for nd in no_decay)],
+             'lr': self.hparams.lr * 10,'weight_decay': 0.0},
+            
+            {'params': [p for n, p in self.predictor.named_parameters() if not any(nd in n for nd in no_decay)],
+             'lr': self.hparams.lr * 20,'weight_decay': self.hparams.weight_decay},
+            {'params': [p for n, p in self.predictor.named_parameters() if any(nd in n for nd in no_decay)],
+             'lr': self.hparams.lr * 20,'weight_decay': 0.0},
         ]
-        optimizer = torch.optim.AdamW(params, lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
+        optimizer = torch.optim.AdamW(grouped_parameters)
         scheduler_config = self.get_scheduler_config(optimizer, name=self.hparams.scheduler)
         return [optimizer], [scheduler_config]
 

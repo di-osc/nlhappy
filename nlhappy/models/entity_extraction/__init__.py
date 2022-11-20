@@ -1,4 +1,4 @@
-from .w2ner import W2NERForEntityExtraction
+from .w2ner import W2ForEntityExtraction
 from .globalpointer import GlobalPointerForEntityExtraction
 from .biaffine import BiaffineForEntityExtraction
 from .crf import CRFForEntityExtraction
