@@ -25,12 +25,7 @@ class EntityExtractionDataModule(PLMBaseDataModule):
                  plm: str = 'hfl/chinese-roberta-wwm-ext',
                  **kwargs):
         super().__init__()
-        self.transforms['w2'] = self.w2ner_transform
-        self.transforms['t2'] = self.tp_transform
-        self.transforms['bio'] = self.bio_transform
         
-        assert self.hparams.transform in self.transforms.keys(), f'availabel transforms {list(self.transforms.keys())}'
-
     
     def setup(self, stage: str = 'fit'):
         self.hparams.max_length = self.get_max_length()
@@ -42,13 +37,16 @@ class EntityExtractionDataModule(PLMBaseDataModule):
             id2label = {i:l for l,i in label2id.items()}
             self.hparams.label2id = label2id
             self.hparams.id2label = id2label
+            self.dataset.set_transform(self.w2ner_transform)
         elif self.hparams.transform == 'bio':
             self.hparams.label2id = self.bio2id
-            self.hparams.id2label = {i:l for l,i in self.bio2id.items()}
-        else :
+            self.hparams.id2label = {i:l for l,i in self.hparams.label2id.items()}
+            self.dataset.set_transform(self.bio_transform)
+        elif self.hparams.transform == 't2' :
             self.hparams.label2id = self.ent2id
             self.hparams.id2label = self.id2ent
-        self.dataset.set_transform(self.transforms.get(self.hparams.transform)) 
+            self.dataset.set_transform(self.tp_transform)
+         
     
     
     @classmethod
@@ -107,7 +105,7 @@ class EntityExtractionDataModule(PLMBaseDataModule):
 
 
     def w2ner_transform(self, examples):
-        max_length = self.hparams.max_length
+        max_length = self.get_max_length()
         batch_text = examples['text']
         batch_ents = examples['ents']
         batch_inputs = self.tokenizer(batch_text,
@@ -135,7 +133,7 @@ class EntityExtractionDataModule(PLMBaseDataModule):
                     if i +1 >= len(idx_ls):
                         break
                     label_ids[char_idx_to_token(idx_ls[i], mapping), char_idx_to_token(idx_ls[i+1], mapping)] = 1
-                label_ids[char_idx_to_token(idx_ls[-1], mapping), char_idx_to_token(idx_ls[0], mapping)] = self.label2id[ent['label']]
+                label_ids[char_idx_to_token(idx_ls[-1], mapping), char_idx_to_token(idx_ls[0], mapping)] = self.ent2id[ent['label']]
             batch_label_ids.append(label_ids)
 
             _dist_inputs = np.zeros((length, length), dtype=np.int)
