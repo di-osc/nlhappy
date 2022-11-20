@@ -14,16 +14,14 @@ def match(s: str, text: str):
     Returns
         starts(List): 匹配到的所有开始下标,如果没有则为空列表
     """
-    p = 0
+    if s == '':
+        return []
     starts = []
-    while p < len(text):
-        start = text[p:].find(s)
-        if start != -1:
-            starts.append(start + p)
-            p += (start + len(s))
-        else:
-            p += 1
+    for i in range(0, len(text)):
+        if text[i:i+len(s)] == s:
+            starts.append(i)
     return starts
+            
         
 
 def truncate_sequences(maxlen, indices, *sequences):

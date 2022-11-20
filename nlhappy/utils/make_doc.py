@@ -85,12 +85,12 @@ class Relation(BaseModel):
     
 class Event(BaseModel):
     """由若干实体和触发词组成的事件
-    - roles (List[Entity]): 组成事件的角色
+    - args (List[Entity]): 组成事件的论元
     - label (Label): 事件类型标签
     - trigger(Optional[Span]): 触发词span,默认为None
     """
     
-    roles: conlist(item_type=Entity, min_items=1, unique_items=True)
+    args: conlist(item_type=Entity, min_items=1, unique_items=True)
     label: Label
     trigger: Optional[Span] = None
 
@@ -124,6 +124,39 @@ class Doc(BaseModel):
                     chars = [text[idx] for idx in indices]
                     assert ent_chars == chars, f'实体{ent_chars}与标注实体{chars}不一致'     
         return v
+    
+    @validator('rels')
+    def validate_rels(cls, v: List[Relation], values):
+        if v:
+            text = values['text']
+            for rel in v:
+                s = rel.s
+                o = rel.o
+                if s.text:
+                    indices = s.indices
+                    s_chars = [s for s in s.text]
+                    chars = [text[idx] for idx in indices]
+                    assert s_chars == chars, f'主体{s_chars}与标注实体{chars}不一致'
+                if o.text:
+                    indices = o.indices
+                    o_chars = [s for s in o.text]
+                    chars = [text[idx] for idx in indices]
+                    assert o_chars == chars, f'客体{o_chars}与标注实体{chars}不一致'
+        return v
+    
+    @validator('events')
+    def validate_events(cls, v: List[Event], values):
+        if v:
+            text = values['text']
+            for e in v:
+                for arg in e.args:
+                    if arg.text:
+                        indices = arg.indices
+                        arg_chars = [s for s in arg.text]
+                        chars = [text[idx] for idx in indices]
+                        assert arg_chars == chars, f'事件论元{arg_chars}与标注实体{chars}不一致' 
+        return v
+            
     
     class Config:
         # doc对象创建之后不允许修改
@@ -187,8 +220,8 @@ class DocBin():
     def to_dataframe(self, include: Optional[List] = None, dropna: bool = False) -> pd.DataFrame:
         """转换为dataframe格式
         """
-        datas = [doc.dict() for doc in self._docs]
-        df = pd.DataFrame.from_records(datas)
+        data = [doc.dict() for doc in self._docs]
+        df = pd.DataFrame.from_records(data)
         if include:
             df = df.loc[:, include]
             if dropna:
@@ -221,6 +254,7 @@ class DocBin():
         """转换为实体关系抽取数据集
         """
         df = self.to_dataframe(include=['text', 'rels'])
+        print(df)
         df = df[df['rels'].notna()]
         assert len(df)>0, '数据集为空'
         return Dataset.from_pandas(df, preserve_index=False)

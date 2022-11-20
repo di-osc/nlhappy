@@ -7,8 +7,6 @@ import torch.nn.functional as F
 import os
 
 
-
-
 class BERTBiEncoder(LightningModule):
     '''双塔模型'''
     def __init__(
@@ -71,15 +69,4 @@ class BERTBiEncoder(LightningModule):
     def configure_optimizers(self):
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
         self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lambda epoch: 1.0 / (epoch + 1.0))
-        return [self.optimizer], [self.scheduler]
-
-    def _init_tokenizer(self):
-        with open('./vocab.txt', 'w') as f:
-            for k in self.hparams.token2id.keys():
-                f.writelines(k + '\n')
-        self.hparams.bert_config.to_json_file('./config.json')
-        tokenizer = BertTokenizer.from_pretrained('./')
-        os.remove('./vocab.txt')
-        os.remove('./config.json')
-        return tokenizer
-    
+        return [self.optimizer], [self.scheduler] 

@@ -14,7 +14,7 @@ class RelationExtractionDataModule(PLMBaseDataModule):
     """三元组抽取数据模块,
         数据集样式:
             {'text':'小明是小花的朋友'。
-            'triples': [{'object': {'offset': [0, 2], 'text': '小明', 'label': '人物'},'predicate': '朋友','subject': {'offset': [3, 5], 'text': '小花', 'label': '人物'}}]}}
+            'rels': [{'o': {'indices': [0, 1, 2], 'text': '小明', 'label': '人物'},'p': '朋友','s': {'indices': [3, 4, 5], 'text': '小花', 'label': '人物'}}]}}
         数据集说明:
             当只抽取三元组的时候subject,object中的标签可以为''
         """
@@ -69,8 +69,8 @@ class RelationExtractionDataModule(PLMBaseDataModule):
         """将主体客体与其实体标签结合起来, (主体, 地点)
         """
         def get_labels(e):
-            return ['主体'+'-'+e['subject']['label'], '客体'+'-'+ e['object']['label']]
-        labels = set(np.concatenate(pd.Series(np.concatenate(self.train_df.triples)).apply(get_labels)))
+            return ['主体'+'-'+e['s']['label'], '客体'+'-'+ e['o']['label']]
+        labels = set(np.concatenate(pd.Series(np.concatenate(self.train_df.rels)).apply(get_labels)))
         ls = [tuple(l.split('-')) for l in labels]
         return ls
     
@@ -83,8 +83,8 @@ class RelationExtractionDataModule(PLMBaseDataModule):
     @lru_cache()
     def ent_labels(self) -> List:
         def get_labels(e):
-            return [e['subject']['label'], e['object']['label']]
-        return list(set(np.concatenate(pd.Series(np.concatenate(self.train_df.triples)).apply(get_labels))))
+            return [e['s']['label'], e['o']['label']]
+        return list(set(np.concatenate(pd.Series(np.concatenate(self.train_df.rels)).apply(get_labels))))
     
     def ent2id(self) -> Dict:
         return {l:i for i,l in enumerate(self.ent_labels)}
@@ -93,7 +93,7 @@ class RelationExtractionDataModule(PLMBaseDataModule):
     @property
     @lru_cache()
     def rel_labels(self) -> List:
-        labels = set(pd.Series(np.concatenate(self.train_df.triples.values)).apply(lambda x: x['predicate']))
+        labels = set(pd.Series(np.concatenate(self.train_df.rels.values)).apply(lambda x: x['p']))
         return list(labels)
 
     
@@ -109,7 +109,7 @@ class RelationExtractionDataModule(PLMBaseDataModule):
         
     def gplinker_transform(self, example) -> Dict:
         batch_text = example['text']
-        batch_triples = example['triples']
+        batch_triples = example['rels']
         batch_so_ids = []
         batch_head_ids = []
         batch_tail_ids = []
@@ -129,18 +129,18 @@ class RelationExtractionDataModule(PLMBaseDataModule):
             tail_ids = torch.zeros(len(self.hparams['label2id']), self.hparams.max_length, self.hparams.max_length, dtype=torch.long)
             for triple in triples:
                 try:
-                    sub_start = triple['subject']['offset'][0]
-                    sub_end = triple['subject']['offset'][1]-1
+                    sub_start = triple['s']['indices'][0]
+                    sub_end = triple['s']['indices'][-1]
                     sub_start = char_idx_to_token(sub_start, offset_mapping=offset_mapping)
                     sub_end = char_idx_to_token(sub_end, offset_mapping=offset_mapping)
-                    obj_start = triple['object']['offset'][0]
-                    obj_end = triple['object']['offset'][1]-1
+                    obj_start = triple['o']['indices'][0]
+                    obj_end = triple['o']['indices'][1]
                     obj_start = char_idx_to_token(obj_start, offset_mapping=offset_mapping)
                     obj_end = char_idx_to_token(obj_end, offset_mapping=offset_mapping)
                     so_ids[0][sub_start][sub_end] = 1
                     so_ids[1][obj_start][obj_end] = 1
-                    head_ids[self.hparams['label2id'][triple['predicate']]][sub_start][obj_start] = 1
-                    tail_ids[self.hparams['label2id'][triple['predicate']]][sub_end][obj_end] = 1
+                    head_ids[self.hparams['label2id'][triple['p']]][sub_start][obj_start] = 1
+                    tail_ids[self.hparams['label2id'][triple['p']]][sub_end][obj_end] = 1
                 except:
                     log.warning(f'sub char offset {(sub_start, sub_end)} or obj char offset {(obj_start, obj_end)} align to token offset failed in \n{text}')
                     pass
@@ -155,7 +155,7 @@ class RelationExtractionDataModule(PLMBaseDataModule):
     
     def onerel_transform(self, example):
         texts = example['text']
-        batch_triples = example['triples']
+        batch_triples = example['rels']
         batch_inputs = {'input_ids': [], 'attention_mask': [], 'token_type_ids': []}
         batch_tag_ids = []
         batch_loss_mask = []
@@ -177,14 +177,14 @@ class RelationExtractionDataModule(PLMBaseDataModule):
             loss_mask = loss_mask * att_mask.unsqueeze(0) * att_mask.unsqueeze(0).T
             for triple in triples:
                 try:
-                    rel = triple['predicate']
+                    rel = triple['p']
                     rel_id = self.label2id[rel]
-                    sub_start = triple['subject']['offset'][0]
-                    sub_end = triple['subject']['offset'][1]-1
+                    sub_start = triple['s']['indices'][0]
+                    sub_end = triple['s']['indices'][-1]
                     sub_start = char_idx_to_token(sub_start, offset_mapping=offset_mapping)
                     sub_end = char_idx_to_token(sub_end, offset_mapping=offset_mapping)
-                    obj_start = triple['object']['offset'][0]
-                    obj_end = triple['object']['offset'][1]-1
+                    obj_start = triple['o']['indices'][0]
+                    obj_end = triple['o']['indices'][-1]
                     obj_start = char_idx_to_token(obj_start, offset_mapping=offset_mapping)
                     obj_end = char_idx_to_token(obj_end, offset_mapping=offset_mapping)
                     if sub_start != sub_end and obj_start != obj_end:
@@ -213,7 +213,7 @@ class RelationExtractionDataModule(PLMBaseDataModule):
     
     def casrel_transform(self, example):
         texts = example['text']
-        batch_triples = example['triples']
+        batch_triples = example['rels']
         batch_inputs = {'input_ids': [], 
                         'attention_mask': [], 
                         'token_type_ids': []}
@@ -232,15 +232,15 @@ class RelationExtractionDataModule(PLMBaseDataModule):
             triples = batch_triples[i]
             s2ro_map = {}
             for triple in triples:
-                sub_start = triple['subject']['offset'][0]
-                sub_end = triple['subject']['offset'][1]-1
+                sub_start = triple['s']['indices'][0]
+                sub_end = triple['s']['indices'][-1]
                 sub_start = char_idx_to_token(sub_start, offset_mapping=offset_mapping)
                 sub_end = char_idx_to_token(sub_end, offset_mapping=offset_mapping)
-                obj_start = triple['object']['offset'][0]
-                obj_end = triple['object']['offset'][1]-1
+                obj_start = triple['o']['indices'][0]
+                obj_end = triple['o']['indices'][-1]
                 obj_start = char_idx_to_token(obj_start, offset_mapping=offset_mapping)
                 obj_end = char_idx_to_token(obj_end, offset_mapping=offset_mapping)
-                rel_id = self.hparams.label2id[triple['predicate']]
+                rel_id = self.hparams.label2id[triple['p']]
                 if (sub_start, sub_end) not in s2ro_map:
                     s2ro_map[(sub_start, sub_end)] = [] 
                 s2ro_map[(sub_start, sub_end)].append((obj_start, obj_end, rel_id))
@@ -282,7 +282,7 @@ class RelationExtractionDataModule(PLMBaseDataModule):
         batch_combined_tags = []
         batch_head_tags = []
         batch_tail_tags = []
-        batch_triples = examples['triples']
+        batch_triples = examples['rels']
         for i, text in enumerate(batch_text):
             triples = batch_triples[i]
             combined_tags = [set() for _ in range(len(self.combined_labels))]
@@ -290,20 +290,20 @@ class RelationExtractionDataModule(PLMBaseDataModule):
             tail_tags = [set() for _ in range(len(self.rel_labels))]
             for triple in triples:
                 try:
-                    sub_head = triple['subject']['offset'][0]
+                    sub_head = triple['s']['indices'][0]
                     _sub_head = batch_inputs.char_to_token(i, sub_head)
-                    sub_tail = triple['subject']['offset'][1]-1
+                    sub_tail = triple['s']['indices'][-1]
                     _sub_tail = batch_inputs.char_to_token(i, sub_tail)
-                    sub_label = triple['subject']['label']
+                    sub_label = triple['s']['label']
                     assert _sub_head is not None and _sub_tail is not None
                 except:
                     log.warning(f'subject {(sub_head, sub_tail)} align fail in \n {text}')
                     continue
                 
                 try:
-                    obj_head = triple['object']['offset'][0]
-                    obj_tail = triple['object']['offset'][1]-1
-                    obj_label = triple['object']['label']
+                    obj_head = triple['o']['indices'][0]
+                    obj_tail = triple['o']['indices'][-1]
+                    obj_label = triple['o']['label']
                     _obj_head = batch_inputs.char_to_token(i, obj_head)
                     _obj_tail = batch_inputs.char_to_token(i, obj_tail)
                     assert _obj_head is not None and _obj_tail is not None
@@ -313,8 +313,8 @@ class RelationExtractionDataModule(PLMBaseDataModule):
                 
                 combined_tags[self.combined2id[('主体', sub_label)]].add((_sub_head, _sub_tail))
                 combined_tags[self.combined2id[('客体', obj_label)]].add((_obj_head, _obj_tail))
-                head_tags[self.rel2id[triple['predicate']]].add((_sub_head, _obj_head))
-                tail_tags[self.rel2id[triple['predicate']]].add((_sub_tail, _obj_tail))
+                head_tags[self.rel2id[triple['p']]].add((_sub_head, _obj_head))
+                tail_tags[self.rel2id[triple['p']]].add((_sub_tail, _obj_tail))
             for tag in combined_tags + head_tags + tail_tags:
                 if not tag:
                     tag.add((0,0))
@@ -342,22 +342,22 @@ class RelationExtractionDataModule(PLMBaseDataModule):
         batch_combined_tags = []
         batch_head_tags = []
         batch_tail_tags = []
-        batch_triples = examples['triples']
+        batch_triples = examples['rels']
         for i, text in enumerate(batch_text):
             triples = batch_triples[i]
             combined_tags = torch.zeros(len(self.combined_labels), max_length, max_length, dtype=torch.long)
             head_tags = torch.zeros(len(self.rel_labels), max_length, max_length, dtype=torch.long)
             tail_tags = torch.zeros(len(self.rel_labels), max_length, max_length, dtype=torch.long)
             for triple in triples:
-                sub_head = triple['subject']['offset'][0]
+                sub_head = triple['s']['indices'][0]
                 _sub_head = batch_inputs.char_to_token(i, sub_head)
-                sub_tail = triple['subject']['offset'][1]-1
+                sub_tail = triple['s']['indices'][-1]
                 _sub_tail = batch_inputs.char_to_token(i, sub_tail)
-                sub_label = triple['subject']['label']
+                sub_label = triple['s']['label']
                 
-                obj_head = triple['object']['offset'][0]
-                obj_tail = triple['object']['offset'][1]-1
-                obj_label = triple['object']['label']
+                obj_head = triple['o']['indices'][0]
+                obj_tail = triple['o']['indices'][-1]
+                obj_label = triple['o']['label']
                 _obj_head = batch_inputs.char_to_token(i, obj_head)
                 _obj_tail = batch_inputs.char_to_token(i, obj_tail)
                 
@@ -370,8 +370,8 @@ class RelationExtractionDataModule(PLMBaseDataModule):
                 
                 combined_tags[self.combined2id[('主体', sub_label)], _sub_head, _sub_tail] = 1
                 combined_tags[self.combined2id[('客体', obj_label)], _obj_head, _obj_tail] = 1
-                head_tags[self.rel2id[triple['predicate']], _sub_head, _obj_head] = 1
-                tail_tags[self.rel2id[triple['predicate']], _sub_tail, _obj_tail] = 1
+                head_tags[self.rel2id[triple['p']], _sub_head, _obj_head] = 1
+                tail_tags[self.rel2id[triple['p']], _sub_tail, _obj_tail] = 1
             batch_combined_tags.append(combined_tags)
             batch_head_tags.append(head_tags)
             batch_tail_tags.append(tail_tags)

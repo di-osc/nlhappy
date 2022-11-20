@@ -146,4 +146,3 @@ class BERTCrossEncoder(LightningModule):
                 id2label = {v: k for k, v in self.hparams.label2id.items()}
                 cats[id2label[i]] = v
         return sorted(cats.items(), key=lambda x: x[1], reverse=True)
-
