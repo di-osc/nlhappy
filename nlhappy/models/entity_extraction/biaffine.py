@@ -40,7 +40,6 @@ class BiaffineForEntityExtraction(PLMBaseModel):
                                                      hidden_size=hidden_size,
                                                      output_size=len(self.hparams.label2id),
                                                      add_rope=add_rope)
-        # self.dropout = MultiDropout()
         
         self.criterion = MultiLabelCategoricalCrossEntropy()
 
@@ -51,7 +50,6 @@ class BiaffineForEntityExtraction(PLMBaseModel):
 
     def forward(self, input_ids, token_type_ids, attention_mask):
         x = self.plm(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask).last_hidden_state
-        # x = self.dropout(x)
         x = self.classifier(x, mask=attention_mask)
         return x
     
