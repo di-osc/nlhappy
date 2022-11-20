@@ -13,13 +13,12 @@
 
 ## 📌&nbsp;&nbsp; 简介
 
-nlhappy是一款集成了数据处理,模型训练,文本处理流程构建等各种功能的自然语言处理库,并且实现了很多当前的SOTA模型,相信通过nlhappy可以让你更愉悦的做各种nlp任务
+nlhappy致力于快速完成NLP任务,你唯一需要做的就是将数据处理为任务对应的数据类.
 > 它主要的依赖有
-- [spacy](https://spacy.io/usage): 用于自然语言处理流程和组件构建
-- [pytorch-lightning](https://pytorch-lightning.readthedocs.io/en/latest/): 用于模型的训练
-- [datasets](https://huggingface.co/docs/datasets/index): 构建和分析训练数据
-- [wandb](https://wandb.ai/): 训练日志以及训练结果统计
-- [transformers](https://huggingface.co/docs/transformers/index): 预训练语言模型
+- [transformers](https://huggingface.co/docs/transformers/index): 下载预训练权重
+- [pytorch-lightning](https://pytorch-lightning.readthedocs.io/en/latest/): 模型训练
+- [datasets](https://huggingface.co/docs/datasets/index): 构建数据集
+- [pydantic](https://wandb.ai/): 构建数据模型
 
 
 ## 🚀&nbsp;&nbsp; 安装
@@ -58,12 +57,9 @@ wandb login
 > 数据处理
 ```python
 from nlhappy.utils.make_doc import Doc, DocBin
-from nlhappy.utils.make_dataset import train_val_split
-from nlhappy.utils.convert_doc import convert_docs_to_tc_dataset
-import nlhappy
+from nlhappy.utils.make_dataset import DatasetDict
 # 构建corpus
 # 将数据处理为统一的Doc对象,它存储着所有标签数据
-nlp = nlhappy.nlp()
 docs = []
 # data为你自己的数据
 # doc._.label 为文本的标签,之所以加'_'是因为这是spacy Doc保存用户自己数据的用法
@@ -327,14 +323,3 @@ TODO
 <summary><b>翻译</b></summary>
 TODO
 </details>
-
-
-## 论文复现
-
-
-
-
-
-
-
-
