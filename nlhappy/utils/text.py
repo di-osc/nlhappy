@@ -5,6 +5,26 @@ import unicodedata
 from torch.nn.utils.rnn import pad_sequence
 import collections
 
+def match(s: str, text: str):
+    """在一个文本中匹配特定字符串
+
+    Args:
+        s (str): 待匹配字符串
+        text (str): 待匹配文本
+    Returns
+        starts(List): 匹配到的所有开始下标,如果没有则为空列表
+    """
+    p = 0
+    starts = []
+    while p < len(text):
+        start = text[p:].find(s)
+        if start != -1:
+            starts.append(start + p)
+            p += (start + len(s))
+        else:
+            p += 1
+    return starts
+        
 
 def truncate_sequences(maxlen, indices, *sequences):
     """截断总长度至不超过maxlen
