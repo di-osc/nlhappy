@@ -44,7 +44,7 @@ class EntityExtractionDataModule(PLMBaseDataModule):
             self.hparams.id2label = id2label
         elif self.hparams.transform == 'bio':
             self.hparams.label2id = self.bio2id
-            
+            self.hparams.id2label = {i:l for l,i in self.bio2id.items()}
         else :
             self.hparams.label2id = self.ent2id
             self.hparams.id2label = self.id2ent
@@ -68,7 +68,7 @@ class EntityExtractionDataModule(PLMBaseDataModule):
     def bio_labels(self) -> List:
         b_labels = ['B' + '-' + l for l in self.ent_labels]
         i_labels = ['I' + '-' + l for l in self.ent_labels]
-        return ['O' + b_labels + i_labels]
+        return ['O'] + b_labels + i_labels
     
     @property
     def bio2id(self):
@@ -152,7 +152,6 @@ class EntityExtractionDataModule(PLMBaseDataModule):
             _dist_inputs[_dist_inputs == 0] = 19
             batch_dist.append(_dist_inputs)
 
-        
         batch_label_ids = np.stack(batch_label_ids)
         batch_inputs['label_ids'] = torch.from_numpy(batch_label_ids)
         _batch_dist_ids = self.fill(batch_dist, batch_dist_ids)
@@ -195,4 +194,27 @@ class EntityExtractionDataModule(PLMBaseDataModule):
     
     
     def bio_transform(self, examples):
-        pass   
+        batch_text = examples['text']  
+        max_length = self.get_batch_max_length(batch_text=batch_text)
+        inputs = self.tokenizer(batch_text,
+                                padding='max_length',
+                                max_length=max_length,
+                                truncation=True,
+                                return_token_type_ids=False,
+                                return_tensors='pt')
+        batch_mask = inputs['attention_mask']
+        batch_tags = torch.zeros_like(batch_mask, dtype=torch.long)
+        batch_tags = batch_tags + (batch_mask - 1) * 100 # 将pad的部分改为-100
+        for i, text in enumerate(batch_text):
+            ents = examples['ents'][i]
+            for ent in ents:
+                indices = ent['indices']
+                start_char = indices[0]
+                start_token = inputs.char_to_token(i, start_char)
+                batch_tags[i][start_token] = self.bio2id['B' + '-' + ent['label']]
+                if len(indices) > 1:
+                    end_char = indices[-1]
+                    end_token = inputs.char_to_token(i, end_char)
+                    batch_tags[i][start_token: end_token+1] = self.bio2id['I' + '-' + ent['label']]
+        inputs['tag_ids'] = batch_tags
+        return inputs

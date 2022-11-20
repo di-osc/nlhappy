@@ -4,7 +4,7 @@ from typing import Union, List
 from torch.utils.data import DataLoader, BatchSampler, RandomSampler
 from datasets import load_from_disk, load_dataset
 import pytorch_lightning as pl
-from transformers import AutoConfig, AutoTokenizer, AutoModel
+from transformers import AutoConfig, AutoTokenizer, AutoModel, PreTrainedTokenizerFast
 from functools import lru_cache
 from pathlib import Path
 import numpy as np
@@ -141,9 +141,8 @@ def prepare_dataset(dataset_name: str, dataset_dir) -> None:
     else:
         log.info('cannot found dataset in {}.'.format(path))
         try:
-            log.info(f'download dataset {dataset} from huffingface')
-            dataset = load_dataset(dataset)
-            dataset.save_to_disk(path)
+            log.info(f'download dataset {dataset_name} from huffingface')
+            dataset = load_dataset(dataset_name)
             log.info(f'download dataset succeed')
         except:
             log.error('download dataset failed')
@@ -213,8 +212,11 @@ class PLMBaseDataModule(pl.LightningModule):
     @property
     @lru_cache()
     def dataset(self):
-        dataset_path = os.path.join(self.hparams.dataset_dir, self.hparams.dataset)
-        dsd = load_from_disk(dataset_path)
+        dataset_path = Path(self.hparams.dataset_dir, self.hparams.dataset)
+        if dataset_path.exists():  
+            dsd = load_from_disk(dataset_path)
+        else:
+            dsd = load_dataset(self.hparams.dataset)
         return dsd
             
             
@@ -228,7 +230,7 @@ class PLMBaseDataModule(pl.LightningModule):
     
     @property
     @lru_cache()
-    def tokenizer(self):
+    def tokenizer(self) -> PreTrainedTokenizerFast:
         plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
         return AutoTokenizer.from_pretrained(plm_path)
     
