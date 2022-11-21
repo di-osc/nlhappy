@@ -1,1 +1,1 @@
-from .bert_text_classification import BertForTextClassification
+from .bert import BertForTextClassification
