@@ -6,7 +6,6 @@ import logging
 log = logging.getLogger()
 
 
-
 class PromptRelationExtractionDataModule(PLMBaseDataModule):
     def __init__(self,
                 dataset: str,

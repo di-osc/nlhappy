@@ -1,4 +1,4 @@
-from pydantic import BaseModel, conint, conint, constr, validator, conlist
+from pydantic import BaseModel, conint, conint, constr, validator, conlist, validate_arguments
 from typing import List, Optional, Union
 import srsly
 from pathlib import Path
@@ -56,7 +56,7 @@ class Entity(Span):
         return hash(self.label)
     
     def __eq__(self, other: "Entity") -> bool:
-        return self.indices == other.indices
+        return self.indices == other.indices and self.label == other.label
     
     
 class Relation(BaseModel):
@@ -93,6 +93,12 @@ class Event(BaseModel):
     args: conlist(item_type=Entity, min_items=1, unique_items=True)
     label: Label
     trigger: Optional[Span] = None
+    
+    def __hash__(self):
+        return hash(self.label)
+    
+    def __eq__(self, other: "Event") -> bool:
+        return self.args == other.args and self.label == other.label and self.trigger == other.trigger
 
 
 class Doc(BaseModel):
@@ -161,12 +167,48 @@ class Doc(BaseModel):
                     chars = [text[idx] for idx in indices]
                     assert trigger_chars == chars, f'事件触发词{trigger_chars}与标注触发词{chars}不一致'
         return v
+    
+    @validate_arguments
+    def add_ent(self, ent: Entity):
+        if not self.ents:
+            self.ents = [ent]
+        else:
+            if ent not in self.ents:
+                self.ents.append(ent)
             
+    @validate_arguments
+    def add_rel(self, rel: Relation):
+        if not self.rels:
+            self.rels = [rel]
+        else:
+            if rel not in self.rels:
+                self.rels.append(rel)
+
+    @validate_arguments
+    def add_event(self, event: Event):
+        if not self.events:
+            self.events = [event]
+        else:
+            if event not in self.events:
+                self.events.append(event)
+            
+    @validate_arguments
+    def add_label(self, label: Label):
+        if not self.labels:
+            self.labels = [label]
+        else:
+            if label not in self.labels:
+                self.labels.append(label)
+    
+    @validate_arguments
+    def set_label(self, label: Label):
+        self.label = label
+    
     
     class Config:
         # doc对象创建之后不允许修改
         extra = 'forbid'
-        allow_mutation = False
+        allow_mutation = True
         
     def __hash__(self):
         return hash(self.text)

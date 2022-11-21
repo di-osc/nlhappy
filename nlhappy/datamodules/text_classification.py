@@ -8,30 +8,27 @@ log = utils.get_logger(__name__)
 
 
 class TextClassificationDataModule(PLMBaseDataModule):
-    '''
-    文本分类
-    '''
+    """单文本分类数据模块
+    
+    Args:
+        dataset (str): 数据集名称
+        plm (str): 预训练模型名称
+        batch_size (int): 批次大小
+        transform (str): 数据转换形式,默认为simple
+        num_workers (int, optional): 进程数. Defaults to 0.
+        pin_memory (bool, optional): . Defaults to False.
+        plm_dir (str, optional): 自定义预训练模型文件夹. Defaults to './plms/'.
+        dataset_dir (str, optional): 自定义数据集文件夹. Defaults to './datasets/'.
+        
+    """
     def __init__(self,
                 dataset: str,
                 batch_size: int ,
                 plm: str = 'hfl/chinese-roberta-wwm-ext',
-                transform: str = 'bert_tc',
+                transform: str = 'bert',
                 **kwargs):
-        """单文本分类数据模块
-
-        Args:
-            dataset (str): 数据集名称
-            plm (str): 预训练模型名称
-            batch_size (int): 批次大小
-            transform (str): 数据转换形式,默认为simple
-            num_workers (int, optional): 进程数. Defaults to 0.
-            pin_memory (bool, optional): . Defaults to False.
-            plm_dir (str, optional): 自定义预训练模型文件夹. Defaults to './plms/'.
-            dataset_dir (str, optional): 自定义数据集文件夹. Defaults to './datasets/'.
-        """
-        
         super().__init__()        
-        self.transforms = {'bert_tc': self.bert_transform}
+        self.transforms = {'bert': self.bert_transform}
         assert self.hparams.transform in self.transforms.keys(), f'available models for text classification dm: {self.transforms.keys()}'
         
         
@@ -82,4 +79,4 @@ class TextClassificationDataModule(PLMBaseDataModule):
     
     @classmethod
     def get_available_transforms(cls):
-        return ['bert_tc']
+        return ['bert']
