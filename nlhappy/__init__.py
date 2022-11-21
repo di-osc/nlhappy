@@ -37,30 +37,3 @@ def explain(key: str):
         return explain_dict[key]
     else:
         return 'No explanation for this key.'
-    
-def chinese(tokenizer: str = 'basic'):
-    import spacy
-    from nlhappy.components.tokenizer import all_tokenizers
-    tokenizer = all_tokenizers[tokenizer]
-    nlp = spacy.blank('zh')
-    nlp.tokenizer = tokenizer(nlp.vocab)
-    return nlp
-
-def nlp():
-    import spacy
-    return spacy.blank('zh')
-
-
-def load(path: str, config: dict = {}, disable: list=[]):
-    """load spacy nlp pipeline from path
-
-    Args:
-        path (str): path to the pipeline
-        disable(list): a list of pipe names to disable
-
-    Returns:
-        nlp: spacy nlp pipeline
-    """
-    import spacy
-    nlp = spacy.load(name=path, disable=disable, config=config)
-    return nlp
