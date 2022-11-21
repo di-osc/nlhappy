@@ -99,9 +99,8 @@ class BiaffineForEntityExtraction(PLMBaseModel):
         return [optimizer], [scheduler_config]
     
     
-    def predict(self, text: str, device: str='cpu', threshold = None) -> Doc:
-        if threshold is None:
-            threshold = self.hparams.threshold
+    def predict(self, text: str, device: str='cpu') -> Doc:
+        threshold = self.hparams.threshold
         inputs = self.tokenizer(text,
                                 max_length=self.hparams.max_length,
                                 truncation=True,
