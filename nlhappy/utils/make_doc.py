@@ -154,7 +154,12 @@ class Doc(BaseModel):
                         indices = arg.indices
                         arg_chars = [s for s in arg.text]
                         chars = [text[idx] for idx in indices]
-                        assert arg_chars == chars, f'事件论元{arg_chars}与标注实体{chars}不一致' 
+                        assert arg_chars == chars, f'事件论元{arg_chars}与标注论元{chars}不一致' 
+                if e.trigger:
+                    indices = e.trigger.indices
+                    trigger_chars = [s for s in e.trigger.text]
+                    chars = [text[idx] for idx in indices]
+                    assert trigger_chars == chars, f'事件触发词{trigger_chars}与标注触发词{chars}不一致'
         return v
             
     
@@ -175,6 +180,7 @@ class Doc(BaseModel):
                    self.ents == other.ents and \
                    self.rels == other.rels and \
                    self.events == other.events
+                
                    
 class DocBin():
     """存放所有doc
