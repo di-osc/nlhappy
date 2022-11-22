@@ -112,6 +112,8 @@ class Doc(BaseModel):
     ents: conlist(item_type=Entity, unique_items=True, min_items=1) = None
     rels: List[Relation] = None
     events: List[Event] = None   
+    summary: constr(min_length=1, strip_whitespace=True, strict=True) = None
+    title: constr(min_length=1, strip_whitespace=True, strict=True) = None
     
     @validator('text')
     def validate_text(cls, v: str):
@@ -203,10 +205,16 @@ class Doc(BaseModel):
     @validate_arguments
     def set_label(self, label: Label):
         self.label = label
-    
-    
+        
+    @validate_arguments
+    def set_summary(self, summary: constr(strip_whitespace=True, strict=True, max_length=1)):
+        self.summary = summary
+        
+    @validate_arguments
+    def set_title(self, title: constr(strip_whitespace=True, strict=True, max_length=1)):
+        self.title = title
+        
     class Config:
-        # doc对象创建之后不允许修改
         extra = 'forbid'
         allow_mutation = True
         
@@ -221,7 +229,8 @@ class Doc(BaseModel):
                    self.labels == other.labels and \
                    self.ents == other.ents and \
                    self.rels == other.rels and \
-                   self.events == other.events
+                   self.events == other.events and \
+                   self.summary == other.summary
                 
                    
 class DocBin():
@@ -312,6 +321,14 @@ class DocBin():
         """
         df = self.to_dataframe(include=['text', 'events'])
         df = df[df['events'].notna()]
+        assert len(df)>0, '数据集为空'
+        return Dataset.from_pandas(df, preserve_index=False)
+    
+    def to_summary_dataset(self) -> Dataset:
+        """转换为文本摘要数据集
+        """
+        df = self.to_dataframe(include=['text', 'summary'])
+        df = df[df['summary'].notna()]
         assert len(df)>0, '数据集为空'
         return Dataset.from_pandas(df, preserve_index=False)
     
