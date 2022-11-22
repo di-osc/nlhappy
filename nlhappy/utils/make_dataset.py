@@ -1,5 +1,5 @@
 from datasets import Dataset, DatasetDict, load_from_disk
-from typing import Dict, Tuple, Union, List
+from typing import Dict, Tuple, Union, List, Optional
 from ..algorithms.text_match import BM25
 import random
 from tqdm import tqdm
@@ -62,7 +62,7 @@ def train_val_test_split(dataset: Dataset,
         
 
 def make_text_match_dataset_with_bm25(corpus: List[str],
-                                     synonym_dict: Dict[str, set],
+                                     synonym_dict: Optional[Dict[str, set]] = None,
                                      num_positive_samples: int=10,
                                      num_negative_samples: int=20,
                                      recall_topk: int = 1000,
