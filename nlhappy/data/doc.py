@@ -4,6 +4,7 @@ import srsly
 from pathlib import Path
 import pandas as pd
 from .dataset import Dataset
+from ..utils.text import split_sentence
 
 
 Label = constr(strip_whitespace=True, min_length=1)
@@ -39,7 +40,15 @@ class Span(BaseModel):
         return hash(self.text)
     
     def __eq__(self, other: "Span") -> bool:
-        return self.start == other.start and self.end == other.end
+        if self.is_continuous and other.is_continuous:
+            return self.indices[0] == other.indices[0] and self.indices[-1] == other.indices[-1]
+        else:
+            return self.indices == other.indices
+    
+    def __contains__(self, item: "Span"):
+        return self.indices[0] <= item.indices[0] and self.indices[-1] >= item.indices[-1]
+
+        
 
 
 class Entity(Span):
@@ -56,7 +65,10 @@ class Entity(Span):
         return hash(self.label)
     
     def __eq__(self, other: "Entity") -> bool:
-        return self.indices == other.indices and self.label == other.label
+        if self.is_continuous and other.is_continuous:
+            return self.indices[0] == other.indices[0] and self.indices[-1] == other.indices[-1] and self.label == other.label
+        else:
+            return self.indices == other.indices and self.label == other.label
     
     
 class Relation(BaseModel):
@@ -103,6 +115,17 @@ class Event(BaseModel):
 
 class Doc(BaseModel):
     """存放所有标注数据,由模型或者原始数据构建
+    参数:
+    - text(str): 文本
+    - label(str): 唯一标签
+    - labels(List[str]): 多标签
+    - ents(List[Entity]): 实体列表
+    - rels(List[Relation]): 关系列表
+    - events(List[Event]): 事件列表
+    - sents(List(Span)): 文本连续的句子,不需要初始化,自动生成
+    - summary(str): 摘要
+    - title(str): 标题
+    - id(str): 唯一标识符
     """
     
     text: constr(min_length=1)
@@ -114,6 +137,15 @@ class Doc(BaseModel):
     events: List[Event] = None   
     summary: constr(min_length=1, strip_whitespace=True, strict=True) = None
     title: constr(min_length=1, strip_whitespace=True, strict=True) = None
+    
+    @property
+    def sents(self):
+        sents = []
+        for s in split_sentence(self.text):
+            start = 0 if len(sents)==0 else sents[-1].indices[-1] + 1
+            end = start + len(s)
+            sents.append(Span(text=s, indices=[i for i in range(start, end)]))
+        return sents
     
     @validator('text')
     def validate_text(cls, v: str):
