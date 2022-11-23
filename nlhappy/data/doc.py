@@ -24,7 +24,7 @@ class Span(BaseModel):
     @validator('text')
     def validate_text(cls, v):
         if v:
-            assert len(v.strip()) > 0, f'span的有效文本程度必须大于0'
+            assert len(v.strip()) > 0, f'span的有效文本长度必须大于0'
         return v
     
     @validator('indices')
@@ -46,7 +46,10 @@ class Span(BaseModel):
             return self.indices == other.indices
     
     def __contains__(self, item: "Span"):
-        return self.indices[0] <= item.indices[0] and self.indices[-1] >= item.indices[-1]
+        if self.is_continuous and item.is_continuous:
+            return self.indices[0] <= item.indices[0] and self.indices[-1] >= item.indices[-1]
+        else:
+            return sorted(self.indices[0]) <= sorted(item.indices[0]) and sorted(self.indices[-1]) >= sorted(item.indices[-1])
 
         
 
