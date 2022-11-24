@@ -17,23 +17,25 @@ class Span(BaseModel):
     - is_continuous (bool): 是否连续,默认True
     - indices (List[int]): 对应文本的下标
     """
-    text: constr(min_length=1) = None
-    is_continuous: bool = True
+    text: constr(min_length=1)
     indices: List[Index]
+    
+    @property
+    def is_continuous(self) -> bool:
+        diff = []
+        for i in range(1, len(self.indices)):
+            diff.append((self.indices[i] - self.indices[i-1]) != 1)
+        return not sum(diff) > 0
+            
     
     @validator('text')
     def validate_text(cls, v):
-        if v:
-            assert len(v.strip()) > 0, f'span的有效文本长度必须大于0'
+        assert len(v.strip()) > 0, f'span的有效文本长度必须大于0'
         return v
     
     @validator('indices')
     def validate_indices(cls, v, values):
-        if values['is_continuous']:
-            for i in range(1, len(v)):
-                assert v[i] - v[i-1] == 1, f'{v}实体非连续,如必要将is_continuous设置True'
-        if values['text']:
-            assert len(v) == len(values['text']), f'{values["text"]} 与 {v} 长度不一致'
+        assert len(v) == len(values['text']), f'{values["text"]} 与 {v} 长度不一致'
         return v
     
     def __hash__(self):
@@ -49,7 +51,7 @@ class Span(BaseModel):
         if self.is_continuous and item.is_continuous:
             return self.indices[0] <= item.indices[0] and self.indices[-1] >= item.indices[-1]
         else:
-            return sorted(self.indices[0]) <= sorted(item.indices[0]) and sorted(self.indices[-1]) >= sorted(item.indices[-1])
+            return sorted(self.indices)[0] <= sorted(item.indices)[0] and sorted(self.indices)[-1] >= sorted(item.indices)[-1]
 
         
 
@@ -59,7 +61,6 @@ class Entity(Span):
     参数:
     - text (str): 实体文本
     - label (str): 实体标签
-    - is_continuous (bool): 是否连续,默认True
     - indices (List[int]): 字符级别下标
     """
     label: Label
@@ -346,7 +347,6 @@ class DocBin():
         """转换为实体关系抽取数据集
         """
         df = self.to_dataframe(include=['text', 'rels'])
-        print(df)
         df = df[df['rels'].notna()]
         assert len(df)>0, '数据集为空'
         return Dataset.from_pandas(df, preserve_index=False)
