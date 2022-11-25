@@ -5,7 +5,6 @@ plm_dir: ${plm_dir}
 
 dataset: 
 batch_size: 
-transform: t2
 plm: hfl/chinese-roberta-wwm-ext
 auto_length: max
 pin_memory: False
