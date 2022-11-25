@@ -17,7 +17,7 @@ class Span(BaseModel):
     - is_continuous (bool): 是否连续,默认True
     - indices (List[int]): 对应文本的下标
     """
-    text: constr(min_length=1)
+    text: constr(min_length=1) = None
     indices: List[Index]
     
     @property
@@ -30,12 +30,14 @@ class Span(BaseModel):
     
     @validator('text')
     def validate_text(cls, v):
-        assert len(v.strip()) > 0, f'span的有效文本长度必须大于0'
+        if v:
+            assert len(v.strip()) > 0, f'span的有效文本长度必须大于0'
         return v
     
     @validator('indices')
     def validate_indices(cls, v, values):
-        assert len(v) == len(values['text']), f'{values["text"]} 与 {v} 长度不一致'
+        if values['text']:
+            assert len(v) == len(values['text']), f'{values["text"]} 与 {v} 长度不一致'
         return v
     
     def __hash__(self):
