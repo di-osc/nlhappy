@@ -1,6 +1,6 @@
 from ...layers import MultiDropout, EfficientBiaffineSpanClassifier
 from ...layers.loss import SparseMultiLabelCrossEntropy
-from ...metrics.relation import RelationF1, SO, Relation
+from ...metrics.relation import RelationF1, Relation, Entity
 from ...metrics.span import SpanF1
 import torch
 from torch import Tensor
@@ -170,7 +170,9 @@ class BLinkerForEntityRelationExtraction(PLMBaseModel):
                             else:
                                 sub_offset = (sh.item(), st.item()+1)
                                 obj_offset = (oh.item(), ot.item()+1)
-                            rels.add(Relation(sub=SO(offset=sub_offset, label=sl), obj=SO(offset=obj_offset, label=ol), predicate=self.hparams.id2rel[p]))
+                            sub = Entity(label=sl, indices=[i for i in range(sub_offset[0], sub_offset[1])])
+                            obj = Entity(label=ol, indices=[i for i in range(obj_offset[0], obj_offset[1])])
+                            rels.add(Relation(s=sub, o=obj, p=self.hparams.id2rel[p]))
             batch_rels.append(rels)
         return batch_rels
             

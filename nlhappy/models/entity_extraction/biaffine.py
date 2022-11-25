@@ -1,10 +1,11 @@
-from ...utils.make_model import PLMBaseModel, align_token_span
-from ...utils.make_doc import Doc, Entity
-from ...layers.classifier.biaffine import BiaffineSpanClassifier, EfficientBiaffineSpanClassifier
+from ...utils.make_model import PLMBaseModel
+from ...data import Entity
+from ...layers.classifier.biaffine import EfficientBiaffineSpanClassifier
 from ...layers.dropout import MultiDropout
 from ...layers.loss import MultiLabelCategoricalCrossEntropy
 from ...metrics.span import SpanF1
 import torch
+from typing import List
 
 
 class BiaffineForEntityExtraction(PLMBaseModel):
@@ -20,46 +21,38 @@ class BiaffineForEntityExtraction(PLMBaseModel):
     def __init__(self,
                  lr: float = 3e-5,
                  hidden_size: int = 64,
-                 add_rope: bool = True,
                  threshold: float = 0.0,
                  scheduler: str = 'linear_warmup',
                  weight_decay: float = 0.01,
-                 use_efficient: bool = True,
                  **kwargs) -> None:
         super().__init__()
         
-        self.plm = self.get_plm_architecture()
-        
-        if self.hparams.use_efficient:
-            self.classifier = EfficientBiaffineSpanClassifier(input_size=self.plm.config.hidden_size,
-                                                              hidden_size=hidden_size,
-                                                              output_size=len(self.hparams.label2id),
-                                                              add_rope=add_rope)
-        else:
-            self.classifier = BiaffineSpanClassifier(input_size=self.plm.config.hidden_size,
-                                                     hidden_size=hidden_size,
-                                                     output_size=len(self.hparams.label2id),
-                                                     add_rope=add_rope)
-        
+        self.plm = self.get_plm_architecture(add_pooler_layer=False)
+        self.classifier = EfficientBiaffineSpanClassifier(input_size=self.plm.config.hidden_size,
+                                                            hidden_size=self.hparams.hidden_size,
+                                                            output_size=len(self.hparams.id2ent))
         self.criterion = MultiLabelCategoricalCrossEntropy()
 
         self.train_metric = SpanF1()
         self.val_metric = SpanF1()
         self.test_metric = SpanF1()
+        
+        
+    def setup(self, stage: str) -> None:
+        self.trainer.datamodule.dataset.set_transform(self.trainer.datamodule.tp_transform)
 
 
-    def forward(self, input_ids, token_type_ids, attention_mask):
-        x = self.plm(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask).last_hidden_state
+    def forward(self, input_ids, attention_mask):
+        x = self.plm(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state
         x = self.classifier(x, mask=attention_mask)
         return x
     
     
     def step(self, batch):
         input_ids = batch['input_ids']
-        token_type_ids = batch['token_type_ids']
         attention_mask = batch['attention_mask']
-        span_ids = batch['label_ids']
-        logits = self(input_ids, token_type_ids, attention_mask)
+        span_ids = batch['tag_ids']
+        logits = self(input_ids, attention_mask)
         loss = self.criterion(logits.reshape(logits.shape[0]*logits.shape[1], -1), span_ids.reshape(span_ids.shape[0]*span_ids.shape[1], -1))
         pred = logits.ge(self.hparams.threshold).float()
         return loss, pred, span_ids
@@ -99,11 +92,12 @@ class BiaffineForEntityExtraction(PLMBaseModel):
         return [optimizer], [scheduler_config]
     
     
-    def predict(self, text: str, device: str='cpu') -> Doc:
+    def predict(self, text: str, device: str='cpu') -> List[Entity]:
         threshold = self.hparams.threshold
         inputs = self.tokenizer(text,
-                                max_length=self.hparams.max_length,
+                                max_length=self.hparams.plm_max_length,
                                 truncation=True,
+                                return_token_type_ids=False,
                                 return_tensors='pt')
         inputs.to(device)
         preds = self(**inputs)
@@ -112,8 +106,10 @@ class BiaffineForEntityExtraction(PLMBaseModel):
         for span in spans_ls :
             start_token = span[2]
             end_token = span[3]
-            start_char = inputs.token_to_chars(start_token)[0]
-            end_char = inputs.token_to_chars(end_token)[-1]
-            label = self.hparams.id2label[span[1]]
-            ents.append(Entity(label=label, indices=[i for i in range(start_char, end_char)]))
-        return Doc(text=text, ents=ents)
+            start_offset = inputs.token_to_chars(start_token)
+            end_offset = inputs.token_to_chars(end_token)
+            start = start_offset[0]
+            end = end_offset[-1]
+            label = self.hparams.id2ent[span[1]]
+            ents.append(Entity(label=label, indices=[i for i in range(start, end)], text=text[start: end]))
+        return ents

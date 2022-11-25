@@ -1,13 +1,16 @@
 from ...layers import CRF, SimpleDense
 from ...metrics.chunk import ChunkF1, get_entities
+from ...data.doc import Entity
 from ...utils.make_model import PLMBaseModel
+from ...utils.make_doc import convert_bio_to_entities
 import torch
+from typing import List
 
 class CRFForEntityExtraction(PLMBaseModel):
     def __init__(self,
-                 lr: float,
-                 hidden_size: int,
-                 weight_decay: float,
+                 lr: float = 3e-5,
+                 hidden_size: int = 256,
+                 weight_decay: float = 0.01,
                  scheduler: str = 'linear_warmup',
                  **kwargs):
         super().__init__()
@@ -16,15 +19,19 @@ class CRFForEntityExtraction(PLMBaseModel):
 
         self.classifier = SimpleDense(input_size=self.plm.config.hidden_size, 
                                       hidden_size=hidden_size, 
-                                      output_size=len(self.hparams.label2id))
+                                      output_size=len(self.hparams.id2bio))
 
-        self.crf = CRF(len(self.hparams.label2id))
+        self.crf = CRF(len(self.hparams.id2bio))
 
         self.train_f1 = ChunkF1()
         self.val_f1 = ChunkF1()
         self.test_f1 = ChunkF1()
-
         
+        
+    def setup(self, stage: str):
+        self.trainer.datamodule.dataset.set_transform(self.trainer.datamodule.bio_transform)
+
+
     def forward(self, input_ids, attention_mask, label_ids=None):
         x = self.plm(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state
         emissions = self.classifier(x)
@@ -46,13 +53,13 @@ class CRFForEntityExtraction(PLMBaseModel):
         loss, pred_ids = self(input_ids=input_ids, attention_mask=attention_mask,  label_ids=label_ids)
         pred_labels = []
         for ids in pred_ids:
-            pred_labels.append([self.hparams.id2label[id] for id in ids])
+            pred_labels.append([self.hparams.id2bio[id] for id in ids])
 
         true_labels = []
         for i in range(len(label_ids)):
             indice = torch.where(label_ids[i] >= 0)
             ids = label_ids[i][indice].tolist()
-            true_labels.append([self.hparams.id2label[id] for id in ids])
+            true_labels.append([self.hparams.id2bio[id] for id in ids])
         return loss, pred_labels, true_labels
         
 
@@ -95,14 +102,14 @@ class CRFForEntityExtraction(PLMBaseModel):
         return [optimizer], [scheduler_config]
 
 
-    def predict(self, text: str, device):
+    def predict(self, text: str, device: str = 'cpu') -> List[Entity]:
         inputs = self.tokenizer(text,
+                                max_length=self.hparams.plm_max_length,
+                                truncation=True,
+                                return_token_type_ids=False,
                                 return_tensors='pt')
         inputs.to(device)
         outputs = self(**inputs)
-        labels = [self.hparams.id2label[id] for id in outputs[0]]
-        ents = get_entities(seq=labels[1:-1])    #去掉cls sep 位置
-        new_ents = []
-        for ent in ents:
-            new_ents.append([ent[1], ent[2], ent[0], text[ent[1]:ent[2]+1]])
-        return new_ents
+        bio_tags = [self.hparams.id2bio[id] for id in outputs[0]]
+        ents = convert_bio_to_entities(seq=bio_tags[1:-1])    #去掉cls sep 位置
+        return ents
