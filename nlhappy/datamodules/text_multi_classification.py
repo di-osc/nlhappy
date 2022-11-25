@@ -1,5 +1,4 @@
 from typing import Any
-from torch.utils.data import DataLoader
 from datasets import load_from_disk
 from ..utils.make_datamodule import PLMBaseDataModule
 

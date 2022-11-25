@@ -22,8 +22,6 @@ class RelationExtractionDataModule(PLMBaseDataModule):
                  dataset: str, 
                  batch_size: int ,
                  plm: str = 'hfl/chinese-roberta-wwm-ext',
-                 transform: str = 'gplinker',
-                 auto_length: Union[int, str] = 'max',
                  **kwargs):
         """
         Args:
@@ -38,12 +36,6 @@ class RelationExtractionDataModule(PLMBaseDataModule):
             plm_dir (str): 预训练模型默认路径
         """
         super().__init__()
-                
-        self.transforms = {'gplinker': self.gplinker_transform,
-                           'onerel': self.onerel_transform,
-                           'casrel': self.casrel_transform,
-                           'sparse-combined': self.sparse_combined_transform}
-        assert self.hparams.transform in self.transforms.keys(), f'availabel models for relation extraction: {self.transforms.keys()}'
 
 
     def setup(self, stage: str = 'fit') -> None:
@@ -80,14 +72,23 @@ class RelationExtractionDataModule(PLMBaseDataModule):
         return {l:i for i,l in enumerate(self.combined_labels)}
     
     @property
+    def id2combined(self) -> Dict:
+        return {i:l for l,i in self.combined2id.items()}
+    
+    @property
     @lru_cache()
     def ent_labels(self) -> List:
         def get_labels(e):
             return [e['s']['label'], e['o']['label']]
         return list(set(np.concatenate(pd.Series(np.concatenate(self.train_df.rels)).apply(get_labels))))
     
+    @property
     def ent2id(self) -> Dict:
         return {l:i for i,l in enumerate(self.ent_labels)}
+    
+    @property
+    def id2ent(self) -> Dict:
+        return {i:l for l,i in self.ent2id.items()}
     
     
     @property
@@ -96,15 +97,22 @@ class RelationExtractionDataModule(PLMBaseDataModule):
         labels = set(pd.Series(np.concatenate(self.train_df.rels.values)).apply(lambda x: x['p']))
         return list(labels)
 
-    
     @property
     def rel2id(self) -> Dict:
         label2id = {label: i for i, label in enumerate(self.rel_labels)}
         return label2id
     
     @property
-    def onerel_tag2id(self):
+    def id2rel(self) -> Dict:
+        return {i:l for l,i in self.rel2id.items()}
+    
+    @property
+    def onerel2id(self):
         return {'O':0, 'HB-TB':1, 'HB-TE':2, 'HE-TE':3}
+    
+    @property
+    def id2onerel(self) -> Dict:
+        return {i:l for l,i in self.onerel2id.items()}
     
         
     def gplinker_transform(self, example) -> Dict:

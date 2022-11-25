@@ -21,38 +21,14 @@ class EntityExtractionDataModule(PLMBaseDataModule):
     def __init__(self,
                  dataset: str,
                  batch_size: int,
-                 transform: str = 't2',
                  plm: str = 'hfl/chinese-roberta-wwm-ext',
                  **kwargs):
         super().__init__()
         
-    
-    def setup(self, stage: str = 'fit'):
-        self.hparams.max_length = self.get_max_length()
-        if self.hparams.transform == 'w2':
-            labels = list(self.ent2id.keys())
-            label2id = {'<pad>':0, '<suc>':1}
-            for i, label in enumerate(labels):
-                label2id[label] = i+2
-            id2label = {i:l for l,i in label2id.items()}
-            self.hparams.label2id = label2id
-            self.hparams.id2label = id2label
-            self.dataset.set_transform(self.w2ner_transform)
-        elif self.hparams.transform == 'bio':
-            self.hparams.label2id = self.bio2id
-            self.hparams.id2label = {i:l for l,i in self.hparams.label2id.items()}
-            self.dataset.set_transform(self.bio_transform)
-        elif self.hparams.transform == 't2' :
-            self.hparams.label2id = self.ent2id
-            self.hparams.id2label = self.id2ent
-            self.dataset.set_transform(self.tp_transform)
+    def setup(self, stage: str) -> None:
+        self.hparams.id2ent = self.id2ent
+        self.hparams.id2bio = self.id2bio
          
-    
-    
-    @classmethod
-    def get_available_transforms(cls):
-        return ['w2', 't2', 'bio']
-    
     
     @property
     @lru_cache()
@@ -60,6 +36,13 @@ class EntityExtractionDataModule(PLMBaseDataModule):
         labels = sorted(pd.Series(np.concatenate(self.train_df['ents'])).apply(lambda x: x['label']).drop_duplicates().values)
         return labels
     
+    @property
+    def ent2id(self):
+        return {l:i for i,l in enumerate(self.ent_labels)}
+
+    @property
+    def id2ent(self):
+        return {i:l for l,i in self.ent2id.items()}
     
     @property
     @lru_cache()
@@ -71,17 +54,10 @@ class EntityExtractionDataModule(PLMBaseDataModule):
     @property
     def bio2id(self):
         return {l:i for i,l in enumerate(self.bio_labels)}
-
-
+    
     @property
-    def ent2id(self):
-        return {l:i for i,l in enumerate(self.ent_labels)}
-
-
-    @property
-    def id2ent(self):
-        return {i:l for l,i in self.ent2id.items()}
-
+    def id2bio(self):
+        return {i:l for l,i in self.bio2id.items()}
 
     @lru_cache()
     def get_dis2idx(self):
@@ -161,33 +137,30 @@ class EntityExtractionDataModule(PLMBaseDataModule):
     def tp_transform(self, examples):
         batch_text = examples['text']
         batch_ents = examples['ents']
-        max_length = self.get_max_length()
+        max_length = self.get_batch_max_length(batch_text=batch_text)
         batch_inputs = self.tokenizer(batch_text,
                                       max_length=max_length,
                                       padding='max_length',
                                       truncation=True,
-                                      return_offsets_mapping=True,
-                                      add_special_tokens=False,
+                                      return_token_type_ids=False,
                                       return_tensors='pt')
-        batch_mappings = batch_inputs.pop('offset_mapping').tolist()
-        batch_label_ids = []
+        batch_tag_ids = []
         for i, text in enumerate(batch_text):
             ents = batch_ents[i]
-            mapping = batch_mappings[i]
-            label_ids = torch.zeros(len(self.hparams.label2id), max_length, max_length)
+            tag_ids = torch.zeros(len(self.ent_labels), max_length, max_length)
             for ent in ents :
                 if len(ent['indices']) == 0:
                     log.warn(f'found empty entity indexes in {text}')
                     continue
-                start = ent['indices'][0]
-                start = char_idx_to_token(start, mapping)
-                end = ent['indices'][-1] 
-                end = char_idx_to_token(end, mapping)
-                label_id = self.hparams.label2id[ent['label']]
-                label_ids[label_id,  start, end] = 1
-            batch_label_ids.append(label_ids)
-        batch_label_ids = torch.stack(batch_label_ids, dim=0)
-        batch_inputs['label_ids'] = batch_label_ids
+                start_char = ent['indices'][0]
+                start = batch_inputs.char_to_token(i, start_char)
+                end_char = ent['indices'][-1] 
+                end = batch_inputs.char_to_token(i, end_char)
+                label_id = self.ent2id[ent['label']]
+                tag_ids[label_id,  start, end] = 1
+            batch_tag_ids.append(tag_ids)
+        batch_tag_ids = torch.stack(batch_tag_ids, dim=0)
+        batch_inputs['tag_ids'] = batch_tag_ids
         return batch_inputs
     
     

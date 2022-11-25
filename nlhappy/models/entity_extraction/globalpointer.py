@@ -1,9 +1,9 @@
-import torch.nn as nn
 import torch
 from ...metrics.span import SpanF1
-from ...utils.make_model import PLMBaseModel, align_token_span
-from ...layers import MultiLabelCategoricalCrossEntropy, EfficientGlobalPointer, MultiDropout, GlobalPointer
+from ...utils.make_model import PLMBaseModel
+from ...layers import MultiLabelCategoricalCrossEntropy, EfficientGlobalPointer, MultiDropout
 from ...tricks.adversarial_training import adversical_tricks
+from ...data.doc import Entity
 from typing import Optional
 
 
@@ -26,7 +26,7 @@ class GlobalPointerForEntityExtraction(PLMBaseModel):
     def __init__(self,
                  lr: float =3e-5,
                  hidden_size: int = 64,
-                 scheduler: str = 'cosine_warmup',
+                 scheduler: str = 'linear_warmup',
                  weight_decay: float =0.01,
                  adv: Optional[str] = None,
                  threshold: float = 0.0,
@@ -40,7 +40,7 @@ class GlobalPointerForEntityExtraction(PLMBaseModel):
         
         self.classifier = EfficientGlobalPointer(input_size=self.plm.config.hidden_size, 
                                                 hidden_size=hidden_size,
-                                                output_size=len(self.hparams.label2id),
+                                                output_size=len(self.hparams.id2ent),
                                                 add_rope=True)
 
         self.dropout = MultiDropout()
@@ -49,10 +49,13 @@ class GlobalPointerForEntityExtraction(PLMBaseModel):
         self.train_metric = SpanF1()
         self.val_metric = SpanF1()
         self.test_metric = SpanF1()
+        
+    def setup(self, stage: Optional[str] = None) -> None:
+        self.trainer.datamodule.dataset.set_transform(self.trainer.datamodule.tp_transform)
 
 
-    def forward(self, input_ids, token_type_ids, attention_mask=None):
-        x = self.plm(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask).last_hidden_state
+    def forward(self, input_ids, attention_mask=None):
+        x = self.plm(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state
         x = self.dropout(x)
         logits = self.classifier(x, mask=attention_mask)
         return logits
@@ -64,8 +67,8 @@ class GlobalPointerForEntityExtraction(PLMBaseModel):
 
 
     def shared_step(self, batch):
-        span_ids = batch['label_ids']
-        logits = self(input_ids=batch['input_ids'], token_type_ids=batch['token_type_ids'], attention_mask=batch['attention_mask'])
+        span_ids = batch['tag_ids']
+        logits = self(input_ids=batch['input_ids'], attention_mask=batch['attention_mask'])
         pred = logits.ge(self.hparams.threshold).float()
         batch_size, ent_type_size = logits.shape[:2]
         y_true = span_ids.reshape(batch_size*ent_type_size, -1)
@@ -137,27 +140,26 @@ class GlobalPointerForEntityExtraction(PLMBaseModel):
         return [optimizer], [scheduler_config]
 
 
-    def predict(self, text: str, device: str='cpu', threshold = None):
-        if threshold is None:
-            threshold = self.hparams.threshold
+    def predict(self, text: str, device: str='cpu'):
+        threshold = self.hparams.threshold
         inputs = self.tokenizer(text,
-                                add_special_tokens=True,
-                                max_length=self.hparams.max_length,
+                                max_length=self.hparams.plm_max_length,
                                 truncation=True,
-                                return_offsets_mapping=True,
+                                return_token_type_ids=False,
                                 return_tensors='pt')
-        mapping = inputs.pop('offset_mapping')
-        mapping = mapping[0].tolist()
         inputs.to(device)
         logits = self(**inputs)
         spans_ls = torch.nonzero(logits>threshold).tolist()
-        spans = []
+        ents = []
         for span in spans_ls :
-            start = span[2]
-            end = span[3]
-            char_span = align_token_span((start, end+1), mapping)
-            start = char_span[0]
-            end = char_span[1]
+            start_token = span[2]
+            start_offset = inputs.token_to_chars(start_token)
+            start = start_offset[0]
+            end_token = span[3]
+            end_offset = inputs.token_to_chars(end_token)
+            end = end_offset[-1]
             span_text = text[start:end]
-            spans.append([start, end, self.hparams.id2label[span[1]], span_text])
-        return spans
+            label = self.hparams.id2ent[span[1]]
+            ent = Entity(text=span_text, indices=[i for i in range(start, end)], label=label)
+            ents.append(ent)
+        return ents

@@ -39,8 +39,11 @@ class BLinkerForEntityRelationExtraction(PLMBaseModel):
         self.head_metric = SpanF1()
         self.tail_metric = SpanF1()
         self.val_metric = RelationF1()
+        
+        
+    def setup(self, stage: str) -> None:
+        self.trainer.datamodule.dataset.set_transform(self.trainer.datamodule.sparse_combined_transform)
 
-    
 
     def forward(self, input_ids, attention_mask=None):
         hidden_state = self.plm(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state

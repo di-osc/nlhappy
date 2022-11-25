@@ -3,43 +3,8 @@ from typing import Tuple, Optional
 from torchmetrics import Metric
 import torch
 from typing import List, Tuple, Set
+from ..data.doc import Entity, Relation
 
-
-class SO(BaseModel):
-    """主体或者客体"""
-    offset : Tuple
-    label: Optional[str] = None
-    text: Optional[str] = None
-    
-    def __hash__(self):
-        return hash(self.label)
-    
-    def __eq__(self, other: "SO") -> bool:
-        return self.offset == other.offset and self.label == other.label
-    
-
-class Relation(BaseModel):
-    sub: SO
-    obj: SO
-    predicate: str
-    
-    def __hash__(self):
-        return hash(self.predicate)
-    
-    def __eq__(self, other: "Relation") -> bool:
-        return self.sub == other.sub and self.predicate == other.predicate and self.obj == other.obj
-    
-    def __str__(self) -> str:
-        if self.sub.text is None or self.obj.text is None:
-            return f"{self.sub.offset}-{self.predicate}-{self.obj.offset}"
-        else: 
-            return f"{self.sub.text}-{self.predicate}-{self.obj.text}"
-        
-    def __repr__(self) -> str:
-        if self.sub.text is None or self.obj.text is None:
-            return f"{self.sub.offset}-{self.predicate}-{self.obj.offset}"
-        else: 
-            return f"{self.sub.text}-{self.predicate}-{self.obj.text}"
     
 class RelationF1(Metric):
     """实体和关系联合抽取的F1指标
