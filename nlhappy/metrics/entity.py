@@ -1,10 +1,7 @@
 from torchmetrics import Metric
 import torch
-from typing import List, Set, Tuple, Optional
-from collections import namedtuple
-
-Entity = namedtuple('Entity', ['label', 'indexes'])
-
+from typing import List, Set, Optional
+from ..data.doc import Entity
 
 class EntityF1(Metric):
     
