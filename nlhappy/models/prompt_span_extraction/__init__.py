@@ -1,1 +1,0 @@
-from .bert_global_span import BERTGlobalSpan
