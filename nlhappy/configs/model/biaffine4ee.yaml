@@ -1,8 +1,8 @@
 _target_: nlhappy.models.BiaffineForEventExtraction
 
-lr: 5e-5
+lr: 3e-5
 hidden_size: 64
-weight_decay: 0.00
+weight_decay: 0.001
 threshold: 0.0
 scheduler: linear_warmup
 name: biaffine4ee

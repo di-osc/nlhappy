@@ -232,5 +232,3 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         role_logits, head_logits, tail_logits = self(**inputs)
         events = self.extract_events(role_logits, head_logits, tail_logits, threshold=threshold, mapping=mapping)
         return [e for e in events[0]]
-
-
