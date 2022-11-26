@@ -42,7 +42,8 @@ class BLinkerForEntityRelationExtraction(PLMBaseModel):
         
         
     def setup(self, stage: str) -> None:
-        self.trainer.datamodule.dataset.set_transform(self.trainer.datamodule.sparse_combined_transform)
+        self.trainer.datamodule.dataset['train'].set_transform(self.trainer.datamodule.sparse_combined_transform)
+        self.trainer.datamodule.dataset['validation'].set_transform(self.trainer.datamodule.combined_transform)
 
 
     def forward(self, input_ids, attention_mask=None):
@@ -173,14 +174,17 @@ class BLinkerForEntityRelationExtraction(PLMBaseModel):
                             else:
                                 sub_offset = (sh.item(), st.item()+1)
                                 obj_offset = (oh.item(), ot.item()+1)
-                            sub = Entity(label=sl, indices=[i for i in range(sub_offset[0], sub_offset[1])])
-                            obj = Entity(label=ol, indices=[i for i in range(obj_offset[0], obj_offset[1])])
-                            rels.add(Relation(s=sub, o=obj, p=self.hparams.id2rel[p]))
+                            try:
+                                sub = Entity(label=sl, indices=[i for i in range(sub_offset[0], sub_offset[1])])
+                                obj = Entity(label=ol, indices=[i for i in range(obj_offset[0], obj_offset[1])])
+                                rels.add(Relation(s=sub, o=obj, p=self.hparams.id2rel[p]))
+                            except:
+                                pass
             batch_rels.append(rels)
         return batch_rels
             
         
-    def predict(self, text: str, device:str='cpu', threshold = None) -> Set[Relation]:
+    def predict(self, text: str, device:str='cpu', threshold = None) -> List[Relation]:
         """模型预测
         参数:
         - text: 要预测的单条文本
@@ -207,6 +211,6 @@ class BLinkerForEntityRelationExtraction(PLMBaseModel):
         else:
             batch_rels: List[Set[Relation]] = self.extract_rels(ent_logits, head_logits, tail_logits, threshold=threshold, mapping=mapping)
         for rel in batch_rels[0]:
-            rel.sub.text = text[rel.sub.offset[0]:rel.sub.offset[1]]
-            rel.obj.text = text[rel.obj.offset[0]:rel.obj.offset[1]]
-        return batch_rels[0]
+            rel.s.text = text[rel.s.indices[0]:rel.s.indices[-1]+1]
+            rel.o.text = text[rel.o.indices[0]:rel.o.indices[-1]+1]
+        return list(batch_rels[0])

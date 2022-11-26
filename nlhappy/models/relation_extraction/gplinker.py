@@ -1,5 +1,5 @@
 from ...layers import MultiDropout, EfficientGlobalPointer
-from ...layers.loss import MultiLabelCategoricalCrossEntropy
+from ...layers.loss import MultiLabelCategoricalCrossEntropy, SparseMultiLabelCrossEntropy
 from ...metrics.triple import TripleF1, Triple
 from ...metrics.span import SpanF1
 import torch
@@ -15,11 +15,11 @@ class GPLinkerForRelationExtraction(PLMBaseModel):
     - https://github.com/bojone/bert4keras/blob/master/examples/task_relation_extraction_gplinker.py
     """
     def __init__(self,
-                 hidden_size: int,
-                 lr: float,
-                 scheduler: str, 
-                 weight_decay: float,
-                 threshold: float,
+                 lr: float = 3e-5,
+                 hidden_size: int = 64,
+                 scheduler: str = 'linear_warmup', 
+                 weight_decay: float = 0.01,
+                 threshold: float = 0.0,
                  **kwargs):
         super().__init__()
         
@@ -28,13 +28,13 @@ class GPLinkerForRelationExtraction(PLMBaseModel):
         # 主语 宾语分类器
         self.so_classifier = EfficientGlobalPointer(self.bert.config.hidden_size, hidden_size, 2)
         # 主语 宾语 头对齐
-        self.head_classifier = EfficientGlobalPointer(self.bert.config.hidden_size, hidden_size, len(self.hparams.label2id), add_rope=False, tril_mask=False)
+        self.head_classifier = EfficientGlobalPointer(self.bert.config.hidden_size, hidden_size, len(self.hparams.id2rel), add_rope=False, tril_mask=False)
         # 主语 宾语 尾对齐
-        self.tail_classifier = EfficientGlobalPointer(self.bert.config.hidden_size, hidden_size, len(self.hparams.label2id), add_rope=False, tril_mask=False)
+        self.tail_classifier = EfficientGlobalPointer(self.bert.config.hidden_size, hidden_size, len(self.hparams.id2rel), add_rope=False, tril_mask=False)
 
-        self.so_criterion = MultiLabelCategoricalCrossEntropy()
-        self.head_criterion = MultiLabelCategoricalCrossEntropy()
-        self.tail_criterion = MultiLabelCategoricalCrossEntropy()
+        self.so_criterion = SparseMultiLabelCrossEntropy()
+        self.head_criterion = SparseMultiLabelCrossEntropy()
+        self.tail_criterion = SparseMultiLabelCrossEntropy()
         
 
         self.so_metric = SpanF1()
@@ -42,7 +42,11 @@ class GPLinkerForRelationExtraction(PLMBaseModel):
         self.tail_metric = SpanF1()
         self.val_metric = TripleF1()
         self.test_metric = TripleF1()
-
+        
+    def setup(self, stage: str = 'fit') -> None:
+        if stage == 'fit':
+            self.trainer.datamodule.dataset['train'].set_transform(self.trainer.datamodule.sparse_triple_transform)
+            self.trainer.datamodule.dataset['validation'].set_transform(self.trainer.datamodule.triple_transform)
     
 
     def forward(self, input_ids, attention_mask=None):
@@ -54,50 +58,50 @@ class GPLinkerForRelationExtraction(PLMBaseModel):
         return so_logits, head_logits, tail_logits
 
 
-    def shared_step(self, batch):
+    def shared_step(self, batch, is_train: bool):
         #inputs为bert常规输入, span_ids: [batch_size, 2, seq_len, seq_len],
         #head_ids: [batch_size, len(label2id), seq_len, seq_len], tail_ids: [batch_size, len(label2id), seq_len, seq_len]
         input_ids, attention_mask = batch['input_ids'], batch['attention_mask']
-        so_true, head_true, tail_true = batch['so_tags'],  batch['head_tags'], batch['tail_tags']
-        so_logits, head_logits, tail_logits = self(input_ids=input_ids, attention_mask=attention_mask)
-
-        # so_true = so_true.permute(0,2,3,1) 
-        # head_true = head_true.permute(0,2,3,1)
-        # tail_true = tail_true.permute(0,2,3,1)
+        ent_true, head_true, tail_true = batch['so_tags'],  batch['head_tags'], batch['tail_tags']
+        ent_logits, head_logits, tail_logits = self(input_ids=input_ids, attention_mask=attention_mask)
         
-        so_loss = self.so_criterion(so_logits, so_true)
-        # head_loss = self.head_criterion(head_logits, head_true)
-        # tail_loss = self.tail_criterion(tail_logits, tail_true)
-        b,c,s,s = head_logits.shape
-        # so_loss = self.so_criterion(so_logits.reshape(-1, s*s), so_true.reshape(-1, s*s))
-        head_loss = self.head_criterion(head_logits.reshape(-1, s*s), head_true.reshape(-1, s*s))
-        tail_loss = self.tail_criterion(tail_logits.reshape(-1, s*s), tail_true.reshape(-1, s*s))
+        if is_train:
+            b,c,s,s = ent_logits.shape
+            ent_logits = ent_logits.reshape(b,c,s*s)
+            ent_true = ent_true[..., 0] * s + ent_true[..., 1]
+            ent_loss = self.so_criterion(ent_logits, ent_true)
         
-        loss = (so_loss + head_loss + tail_loss) / 3
-        
-        return loss, so_logits, head_logits, tail_logits, so_true, head_true, tail_true
+            b,c,s,s = head_logits.shape
+            head_logits = head_logits.reshape(b,c,s*s)
+            head_true = head_true[..., 0] * s + head_true[..., 1]
+            head_loss = self.head_criterion(head_logits, head_true)
+            
+            b,c,s,s = tail_logits.shape
+            tail_logits = tail_logits.reshape(b,c,s*s)
+            tail_true = tail_true[..., 0] * s + tail_true[..., 1]
+            tail_loss = self.tail_criterion(tail_logits, tail_true)
+            self.log('train/so_loss', ent_loss, prog_bar=True, on_step=True)
+            self.log('train/head_loss', head_loss, prog_bar=True, on_step=True)
+            self.log('train/tail_loss', tail_loss, prog_bar=True, on_step=True)
+            
+            loss = sum([ent_loss, head_loss, tail_loss]) / 3
+            return loss
+        else:
+            return ent_logits, head_logits, tail_logits, ent_true, head_true, tail_true
 
         
     def training_step(self, batch, batch_idx) -> dict:
         # 训练阶段不进行解码, 会比较慢
-        loss, so_logits, head_logits, tail_logits, so_true, head_true, tail_true = self.shared_step(batch)
-        self.log('train/loss', loss)
-        self.so_metric(so_logits.gt(self.hparams.threshold), so_true)
-        self.log('train/so', self.so_metric, prog_bar=True, on_step=True)
-        self.head_metric(head_logits.gt(self.hparams.threshold), head_true)
-        self.log('train/head', self.head_metric, prog_bar=True, on_step=True)
-        self.tail_metric(tail_logits.gt(self.hparams.threshold), tail_true)
-        self.log('train/tail', self.tail_metric, prog_bar=True, on_step=True)
+        loss  = self.shared_step(batch, is_train=True)
         return {'loss': loss}
 
 
     def validation_step(self, batch, batch_idx) -> dict:
-        loss, so_logits, head_logits, tail_logits, so_true, head_true, tail_true = self.shared_step(batch)
+        so_logits, head_logits, tail_logits, so_true, head_true, tail_true = self.shared_step(batch, is_train=False)
         batch_triples = self.extract_triple(so_logits, head_logits, tail_logits, threshold=self.hparams.threshold)
         batch_true_triples = self.extract_triple(so_true, head_true, tail_true, threshold=self.hparams.threshold)
         self.val_metric(batch_triples, batch_true_triples)
         self.log('val/f1', self.val_metric, on_step=False, on_epoch=True, prog_bar=True)
-        return {'val_loss': loss}
 
 
     def test_step(self, batch, batch_idx) -> dict:
@@ -159,7 +163,7 @@ class GPLinkerForRelationExtraction(PLMBaseModel):
                     ps = set(p1s) & set(p2s)
                     if len(ps) > 0:
                         for p in ps:
-                            triples.add(Triple(triple=(sh.item(), st.item(), self.hparams['id2label'][p], oh.item(), ot.item())))
+                            triples.add(Triple(triple=(sh.item(), st.item(), self.hparams.id2rel[p], oh.item(), ot.item())))
             batch_triples.append(triples)
         return batch_triples
             

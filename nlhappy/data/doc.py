@@ -1,5 +1,5 @@
 from pydantic import BaseModel, conint, conint, constr, validator, conlist, validate_arguments
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Tuple
 import srsly
 from pathlib import Path
 import pandas as pd
@@ -9,13 +9,49 @@ from ..utils.text import split_sentence
 
 Label = constr(strip_whitespace=True, min_length=1)
 Index = conint(ge=0, strict=True)
+
+
+def assert_span_text_in_doc(doc_text: str, span_text: str, span_indices: List[Index]):
+    """检查制定下标的文本序列在文档中存在
+
+    Args:
+        doc_text (str): 文档文本
+        ent_text (str): 实体文本
+        span_indices (List[Index]): 实体在文档中的字符下标
+    """
+    span = ''.join([doc_text[i] for i in span_indices])
+    # 如果实体文本存在则确保实体文本与下标对应文本一致,确保标注正确
+    assert span == span_text, f'文本: <{span_text}> 与下标文本: <{span}> 不一致'
+    
+    
+def strip_span(span_text: str, span_indices: List[Index]) -> Tuple[str, List[Index]]:
+    """去除文本左右空格字符并将下表对齐
+
+    Args:
+        span_text (str): 文本
+        span_indices (List[Index]): 下标
+
+    Returns:
+        Tuple[str, List[Index]]: 清洗后文本, 对齐后下标
+    """
+    ori_text = span_text
+    text = span_text.strip()
+    start = ori_text.index(text)
+    indices = span_indices[start: start + len(text)]
+    return text, indices
+    
     
 class Span(BaseModel):
     """原始文本的一个片段,可以连续也可以非连续
+    
     参数:
     - text (str): 文本,默认None
     - is_continuous (bool): 是否连续,默认True
     - indices (List[int]): 对应文本的下标
+    
+    说明:
+    - 初始化时如果文本不为空,则会自动去除收尾的空格,
+    - 当文本去除收尾空格后,下标会自动修正,例如当text=' 中国'变为'中国', 下标[0,1,2]会变为[1,2]
     """
     text: constr(min_length=1) = None
     indices: List[Index]
@@ -27,18 +63,24 @@ class Span(BaseModel):
             diff.append((self.indices[i] - self.indices[i-1]) != 1)
         return not sum(diff) > 0
             
-    
     @validator('text')
-    def validate_text(cls, v):
+    def validate_text(cls, v: str, values: dict):
         if v:
-            assert len(v.strip()) > 0, f'span的有效文本长度必须大于0'
-        return v
+            values['ori_text'] = v
+            return v.strip() # 左右没有空格并且有效字符不为0则返回原文
+        else:
+            return v
     
     @validator('indices')
     def validate_indices(cls, v, values):
         if values['text']:
-            assert len(v) == len(values['text']), f'{values["text"]} 与 {v} 长度不一致'
-        return v
+            assert len(values['ori_text']) == len(v), '下标长度与原始文本长度不符'
+            start = values['ori_text'].index(values['text'])
+            indices = v[start: start+len(values['text'])]
+            del values['ori_text']
+            return indices
+        else:
+            return v
     
     def __hash__(self):
         return hash(self.text)
@@ -56,16 +98,14 @@ class Span(BaseModel):
             return sorted(self.indices)[0] <= sorted(item.indices)[0] and sorted(self.indices)[-1] >= sorted(item.indices)[-1]
 
         
-
-
 class Entity(Span):
-    """有标签的Span,支持连续非连续类型
+    """文本中有标签的Span,支持连续非连续类型
     参数:
     - text (str): 实体文本
     - label (str): 实体标签
     - indices (List[int]): 字符级别下标
     """
-    label: Label
+    label: Label = None
         
     def __hash__(self):
         return hash(self.label)
@@ -157,59 +197,47 @@ class Doc(BaseModel):
     def validate_text(cls, v: str):
         assert len(v.strip()) > 0, f'文本为空格'
         return v
-    
-    @validator('ents')
-    def validate_ents(cls, v: List[Entity], values):
-        if v:
-            text = values['text']
-            for ent in v:
-                # 如果实体文本存在则确保实体文本与下标对应文本一致,确保标注正确
-                if ent.text:
-                    indices = ent.indices
-                    ent_chars = [s for s in ent.text]
-                    chars = [text[idx] for idx in indices]
-                    assert ent_chars == chars, f'实体{ent_chars}与标注实体{chars}不一致'     
+
+    @validator('ents', each_item=True)
+    def validate_ents(cls, v: Entity, values):      
+        if v.text:
+            assert_span_text_in_doc(doc_text=values['text'], span_indices=v.indices, span_text=v.text)          
         return v
     
-    @validator('rels')
-    def validate_rels(cls, v: List[Relation], values):
-        if v:
-            text = values['text']
-            for rel in v:
-                s = rel.s
-                o = rel.o
-                if s.text:
-                    indices = s.indices
-                    s_chars = [s for s in s.text]
-                    chars = [text[idx] for idx in indices]
-                    assert s_chars == chars, f'主体{s_chars}与标注实体{chars}不一致'
-                if o.text:
-                    indices = o.indices
-                    o_chars = [s for s in o.text]
-                    chars = [text[idx] for idx in indices]
-                    assert o_chars == chars, f'客体{o_chars}与标注实体{chars}不一致'
+    @validator('rels', each_item=True)
+    def validate_rels(cls, v: Relation, values):
+        text = values['text']
+        if v.s.text:
+            assert_span_text_in_doc(doc_text=text, span_text=v.s.text, span_indices=v.s.indices)
+        if v.o.text:
+            assert_span_text_in_doc(doc_text=text, span_text=v.o.text, span_indices=v.o.indices)
         return v
     
-    @validator('events')
-    def validate_events(cls, v: List[Event], values):
-        if v:
-            text = values['text']
-            for e in v:
-                for arg in e.args:
-                    if arg.text:
-                        indices = arg.indices
-                        arg_chars = [s for s in arg.text]
-                        chars = [text[idx] for idx in indices]
-                        assert arg_chars == chars, f'事件论元{arg_chars}与标注论元{chars}不一致' 
-                if e.trigger:
-                    indices = e.trigger.indices
-                    trigger_chars = [s for s in e.trigger.text]
-                    chars = [text[idx] for idx in indices]
-                    assert trigger_chars == chars, f'事件触发词{trigger_chars}与标注触发词{chars}不一致'
+    @validator('events', each_item=True)
+    def validate_events(cls, v: Event, values):
+        text = values['text']
+        for arg in v.args:
+            arg: Entity
+            if arg.text:
+                assert_span_text_in_doc(doc_text=text, span_text=arg.text, span_indices=arg.indices) 
+        if v.trigger:
+            trigger : Span = v.trigger
+            if trigger.text:
+                assert_span_text_in_doc(doc_text=text, span_indices=trigger.indices, span_text=trigger.text)
         return v
+    
+    def _get_indices_text(self, indices: List[Index]) -> str:
+        return ''.join([self.text[i] for i in indices])
     
     @validate_arguments
     def add_ent(self, ent: Entity):
+        if ent.text:
+            assert_span_text_in_doc(doc_text=self.text, span_indices=ent.indices, span_text=ent.text)
+        else:
+            ent_text = self._get_indices_text(indices=ent.indices)
+            ent_text, ent_indices = strip_span(span_text=ent_text, span_indices=ent.indices)
+            ent.text = ent_text
+            ent.indices = ent_indices
         if not self.ents:
             self.ents = [ent]
         else:
@@ -218,6 +246,20 @@ class Doc(BaseModel):
             
     @validate_arguments
     def add_rel(self, rel: Relation):
+        if rel.s.text:
+            assert_span_text_in_doc(doc_text=self.text, span_indices=rel.s.indices, span_text=rel.s.text)
+        else:
+            s_text = self._get_indices_text(indices=rel.s.indices)
+            s_text, s_indices = strip_span(span_text=s_text, span_indices=rel.s.indices)
+            rel.s.text = s_text
+            rel.s.indices = s_indices
+        if rel.o.text:
+            assert_span_text_in_doc(doc_text=self.text, span_indices=rel.o.indices, span_text=rel.o.text)
+        else:
+            o_text = self._get_indices_text(indices=rel.o.indices)
+            o_text, o_indices = strip_span(span_text=o_text, span_indices=rel.o.indices)
+            rel.o.text = o_text
+            rel.o.indices = o_indices
         if not self.rels:
             self.rels = [rel]
         else:
@@ -226,6 +268,15 @@ class Doc(BaseModel):
 
     @validate_arguments
     def add_event(self, event: Event):
+        for arg in event.args:
+            arg: Entity
+            if arg.text:
+                assert_span_text_in_doc(doc_text=self.text, span_indices=arg.indices, span_text=arg.text)
+            else:
+                arg_text = self._get_indices_text(indices=arg.indices)
+                arg_text, arg_indices = strip_span(span_text=arg_text, span_indices=arg.indices)
+                arg.text = arg_text
+                arg.indices = arg_indices
         if not self.events:
             self.events = [event]
         else:

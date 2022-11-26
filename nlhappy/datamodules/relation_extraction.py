@@ -27,7 +27,6 @@ class RelationExtractionDataModule(PLMBaseDataModule):
         Args:
             dataset (str): 数据集名称
             plm (str): 预训练模型名称
-            transform(str): 转换特征格式,可以通过get_available_transforms查看
             auto_length (str, int): 自动设置最大长度的策略, 可以为'max', 'mean'或者>0的数,超过512的设置为512
             batch_size (int): 训练,验证,测试数据集的批次大小,
             num_workers (int): 多进程数
@@ -40,20 +39,10 @@ class RelationExtractionDataModule(PLMBaseDataModule):
 
     def setup(self, stage: str = 'fit') -> None:
         """对数据设置转换"""
-        self.hparams.max_length = self.get_max_length()
-        if self.hparams.transform == 'onerel':
-            self.hparams.tag2id = self.onerel_tag2id
-            self.hparams.id2tag = {i:l for l,i in self.onerel_tag2id.items()}
-            self.dataset.set_transform(transform=self.transforms.get(self.hparams.transform))
-        elif self.hparams.transform == 'sparse-combined':
-            self.hparams.id2combined = {i:l for l, i in self.combined2id.items()}
-            self.hparams.id2rel = {i:l for l,i in self.rel2id.items()}
-            self.dataset['train'].set_transform(transform=self.sparse_combined_transform)
-            self.dataset['validation'].set_transform(transform=self.combined_transform)
-        elif self.hparams.transform == 'gplinker':
-            self.hparams.id2label = {i:l for l,i in self.rel2id.items()}
-            self.hparams.label2id = self.rel2id
-            self.dataset.set_transform(transform=self.transforms.get(self.hparams.transform))
+        self.hparams.id2rel = self.id2rel
+        self.hparams.id2combined = self.id2combined
+        self.hparams.id2onerel = self.id2onerel
+        self.hparams.id2ent = self.id2ent
         
     @property
     @lru_cache()
@@ -114,41 +103,98 @@ class RelationExtractionDataModule(PLMBaseDataModule):
     def id2onerel(self) -> Dict:
         return {i:l for l,i in self.onerel2id.items()}
     
+    def sparse_triple_transform(self, examples):
+        batch_text = examples['text']
+        max_length = self.get_batch_max_length(batch_text=batch_text)
+        batch_inputs = self.tokenizer(batch_text,
+                                      padding=True,
+                                      truncation=True,
+                                      max_length=max_length,
+                                      return_tensors='pt',
+                                      return_token_type_ids=False)
+        batch_so_tags = []
+        batch_head_tags = []
+        batch_tail_tags = []
+        batch_triples = examples['rels']
+        for i, text in enumerate(batch_text):
+            triples = batch_triples[i]
+            so_tags = [set() for _ in range(2)]
+            head_tags = [set() for _ in range(len(self.rel_labels))]
+            tail_tags = [set() for _ in range(len(self.rel_labels))]
+            for triple in triples:
+                try:
+                    sub_head = triple['s']['indices'][0]
+                    _sub_head = batch_inputs.char_to_token(i, sub_head)
+                    sub_tail = triple['s']['indices'][-1]
+                    _sub_tail = batch_inputs.char_to_token(i, sub_tail)
+                    sub_label = triple['s']['label']
+                    assert _sub_head is not None and _sub_tail is not None
+                except:
+                    log.warning(f'subject {(sub_head, sub_tail)} align fail in \n {text}')
+                    continue
+                
+                try:
+                    obj_head = triple['o']['indices'][0]
+                    obj_tail = triple['o']['indices'][-1]
+                    obj_label = triple['o']['label']
+                    _obj_head = batch_inputs.char_to_token(i, obj_head)
+                    _obj_tail = batch_inputs.char_to_token(i, obj_tail)
+                    assert _obj_head is not None and _obj_tail is not None
+                except:
+                    log.warning(f'object {(obj_head, obj_tail)} align fail in \n {text}')
+                    continue
+                
+                so_tags[0].add((_sub_head, _sub_tail))
+                so_tags[1].add((_obj_head, _obj_tail))
+                head_tags[self.rel2id[triple['p']]].add((_sub_head, _obj_head))
+                tail_tags[self.rel2id[triple['p']]].add((_sub_tail, _obj_tail))
+            for tag in so_tags + head_tags + tail_tags:
+                if not tag:
+                    tag.add((0,0))
+            so_tags = sequence_padding([list(l) for l in so_tags])
+            head_tags = sequence_padding([list(l) for l in head_tags])
+            tail_tags = sequence_padding([list(l) for l in tail_tags])
+            batch_so_tags.append(so_tags)
+            batch_head_tags.append(head_tags)
+            batch_tail_tags.append(tail_tags)
+        batch_inputs['so_tags'] = torch.tensor(sequence_padding(batch_so_tags, seq_dims=2), dtype=torch.long)
+        batch_inputs['head_tags'] = torch.tensor(sequence_padding(batch_head_tags, seq_dims=2), dtype=torch.long)
+        batch_inputs['tail_tags'] = torch.tensor(sequence_padding(batch_tail_tags, seq_dims=2), dtype=torch.long)
+        return batch_inputs
+    
         
-    def gplinker_transform(self, example) -> Dict:
+    def triple_transform(self, example) -> Dict:
         batch_text = example['text']
         batch_triples = example['rels']
         batch_so_ids = []
         batch_head_ids = []
         batch_tail_ids = []
+        max_length = self.get_batch_max_length(batch_text)
         batch_inputs = self.tokenizer(batch_text, 
-                                      padding='max_length',  
-                                      max_length=self.hparams.max_length,
+                                      max_length=max_length,
+                                      padding=True,
                                       truncation=True,
-                                      return_offsets_mapping=True,
                                       return_token_type_ids=False,
                                       return_tensors='pt')
-        mappings = batch_inputs.pop('offset_mapping').tolist()
         for i, text in enumerate(batch_text):
-            offset_mapping = mappings[i]
             triples = batch_triples[i]
-            so_ids = torch.zeros(2, self.hparams.max_length, self.hparams.max_length, dtype=torch.long)
-            head_ids = torch.zeros(len(self.hparams['label2id']), self.hparams.max_length, self.hparams.max_length, dtype=torch.long)
-            tail_ids = torch.zeros(len(self.hparams['label2id']), self.hparams.max_length, self.hparams.max_length, dtype=torch.long)
+            so_ids = torch.zeros(2, max_length, max_length, dtype=torch.long)
+            head_ids = torch.zeros(len(self.rel_labels), max_length, max_length, dtype=torch.long)
+            tail_ids = torch.zeros(len(self.rel_labels), max_length, max_length, dtype=torch.long)
             for triple in triples:
                 try:
                     sub_start = triple['s']['indices'][0]
                     sub_end = triple['s']['indices'][-1]
-                    sub_start = char_idx_to_token(sub_start, offset_mapping=offset_mapping)
-                    sub_end = char_idx_to_token(sub_end, offset_mapping=offset_mapping)
+                    _sub_start = batch_inputs.char_to_token(i, sub_start)
+                    _sub_end = batch_inputs.char_to_token(i, sub_end)
                     obj_start = triple['o']['indices'][0]
-                    obj_end = triple['o']['indices'][1]
-                    obj_start = char_idx_to_token(obj_start, offset_mapping=offset_mapping)
-                    obj_end = char_idx_to_token(obj_end, offset_mapping=offset_mapping)
-                    so_ids[0][sub_start][sub_end] = 1
-                    so_ids[1][obj_start][obj_end] = 1
-                    head_ids[self.hparams['label2id'][triple['p']]][sub_start][obj_start] = 1
-                    tail_ids[self.hparams['label2id'][triple['p']]][sub_end][obj_end] = 1
+                    obj_end = triple['o']['indices'][-1]
+                    _obj_start = batch_inputs.char_to_token(i, obj_start)
+                    _obj_end = batch_inputs.char_to_token(i, obj_end)
+                    so_ids[0][_sub_start][_sub_end] = 1
+                    so_ids[1][_obj_start][_obj_end] = 1
+                    head_ids[self.rel2id[triple['p']]][_sub_start][_obj_start] = 1
+                    tail_ids[self.rel2id[triple['p']]][_sub_end][_obj_end] = 1
                 except:
                     log.warning(f'sub char offset {(sub_start, sub_end)} or obj char offset {(obj_start, obj_end)} align to token offset failed in \n{text}')
                     pass

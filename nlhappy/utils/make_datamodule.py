@@ -2,7 +2,7 @@ import os
 from .utils import get_logger
 from typing import Union, List
 from torch.utils.data import DataLoader, BatchSampler, RandomSampler
-from datasets import load_from_disk, load_dataset
+from datasets import load_from_disk, load_dataset, DatasetDict
 import pytorch_lightning as pl
 from transformers import AutoConfig, AutoTokenizer, AutoModel, PreTrainedTokenizerFast
 from functools import lru_cache
@@ -211,7 +211,7 @@ class PLMBaseDataModule(pl.LightningModule):
     
     @property
     @lru_cache()
-    def dataset(self):
+    def dataset(self) -> DatasetDict:
         dataset_path = Path(self.hparams.dataset_dir, self.hparams.dataset)
         if dataset_path.exists():  
             dsd = load_from_disk(dataset_path)
