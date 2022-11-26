@@ -3,6 +3,6 @@ _target_: nlhappy.models.relation_extraction.GPLinkerForRelationExtraction
 hidden_size: 64
 lr: 3e-5
 scheduler: linear_warmup
-weight_decay: 0.001
+weight_decay: 0.01
 threshold: 0.0
 name: gplinker4re
