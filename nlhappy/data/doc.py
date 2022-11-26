@@ -148,9 +148,18 @@ class Event(BaseModel):
     - trigger(Optional[Span]): 触发词span,默认为None
     """
     
-    args: conlist(item_type=Entity, min_items=1, unique_items=True)
+    args: conlist(item_type=Entity, min_items=1)
     label: Label
     trigger: Optional[Span] = None
+    
+    @validator('args')
+    def validate_args(cls, v):
+        return list(set(v))
+    
+    @validate_arguments
+    def add_arg(self, arg: Entity):
+        if arg not in self.args:
+            self.args.append(arg)
     
     def __hash__(self):
         return hash(self.label)

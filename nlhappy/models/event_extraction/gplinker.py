@@ -2,7 +2,7 @@ from ...utils.make_model import PLMBaseModel, align_token_span
 from ...layers.classifier import EfficientGlobalPointer
 from ...layers.loss import SparseMultiLabelCrossEntropy
 from ...layers.dropout import MultiDropout
-from ...metrics.event import EventF1, Event, Role
+from ...metrics.event import EventF1, Event, Entity
 from ...metrics.span import SpanF1
 import torch
 from itertools import groupby
@@ -197,8 +197,9 @@ class GPLinkerForEventExtraction(PLMBaseModel):
                         role_label, start, end =argu[1], argu[2], argu[3]+1
                         if mapping is not None:
                             (start, end) = align_token_span((start, end), mapping)
-                        role_ls.append(Role(start=start, end=end, label=role_label))                            
-                    event = Event(label=e_label, roles=role_ls)
+                        role_ls.append(Entity(label=role_label, indices=[i for i in range(start, end)]))    
+                                            
+                    event = Event(label=e_label, args=role_ls)
                     events.add(event)
             batch_events.append(events)
         return batch_events

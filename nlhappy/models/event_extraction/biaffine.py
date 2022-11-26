@@ -1,8 +1,7 @@
 from ...utils.make_model import PLMBaseModel, align_token_span
 from ...layers.classifier import EfficientBiaffineSpanClassifier
 from ...layers.loss import SparseMultiLabelCrossEntropy
-from ...layers.dropout import MultiDropout
-from ...metrics.event import EventF1, Event, Role
+from ...metrics.event import EventF1, Event, Entity
 from ...metrics.span import SpanF1
 import torch
 from itertools import groupby
@@ -47,7 +46,7 @@ def clique_search(argus, links):
     else:
         return [list(sorted(argus))]
 
-class GPLinkerForEventExtraction(PLMBaseModel):
+class BiaffineForEventExtraction(PLMBaseModel):
     def __init__(self, 
                  lr: float = 3e-5,
                  hidden_size: int = 64,
@@ -189,13 +188,13 @@ class GPLinkerForEventExtraction(PLMBaseModel):
             events = set()
             for e_label, sub_argus in groupby(sorted(roles), key=lambda x: x[0]):
                 for event in clique_search(list(sub_argus), links):
-                    role_ls = []
+                    arg_set = set()
                     for argu in event:
                         role_label, start, end =argu[1], argu[2], argu[3]+1
                         if mapping is not None:
                             (start, end) = align_token_span((start, end), mapping)
-                        role_ls.append(Role(start=start, end=end, label=role_label))                            
-                    event = Event(label=e_label, roles=role_ls)
+                        arg_set.add(Entity(label=role_label, indices=[i for i in range(start, end)]))                            
+                    event = Event(label=e_label, args=list(arg_set))
                     events.add(event)
             batch_events.append(events)
         return batch_events
