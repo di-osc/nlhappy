@@ -157,10 +157,10 @@ def prepare_plm(plm_name: str, plm_dir: str) -> None:
         log.info('cannot found plm in {}'.format(path))
         try:
             log.info(f'download plm {plm_name} from huffingface')
-            model = AutoModel.from_pretrained(plm_name, cache_dir=path)
-            tokenizer = AutoTokenizer.from_pretrained(plm_name, cache_dir=path)
-            # model.save_pretrained(path)
-            # tokenizer.save_pretrained(path)
+            model = AutoModel.from_pretrained(plm_name)
+            tokenizer = AutoTokenizer.from_pretrained(plm_name)
+            model.save_pretrained(path)
+            tokenizer.save_pretrained(path)
             log.info(f'download plm succeed')
         except:
             log.error('download plm failed')
