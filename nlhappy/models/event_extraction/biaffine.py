@@ -1,12 +1,12 @@
 from ...utils.make_model import PLMBaseModel, align_token_span
 from ...layers.classifier import EfficientBiaffineSpanClassifier
-from ...layers.loss import MultiLabelCategoricalCrossEntropy
+from ...layers.loss import SparseMultiLabelCrossEntropy
 from ...layers.dropout import MultiDropout
 from ...metrics.event import EventF1, Event, Role
 from ...metrics.span import SpanF1
 import torch
 from itertools import groupby
-from typing import Any, Union
+from typing import Any, Union, Optional, List, Tuple
 import numpy as np
 
 
@@ -32,8 +32,8 @@ def clique_search(argus, links):
         return list(sorted(results))
     
     Argus = DedupList()
-    for i1, (h1, t1) in enumerate(argus):
-        for i2, (h2, t2) in enumerate(argus):
+    for i1, (_, _, h1, t1) in enumerate(argus):
+        for i2, (_, _, h2, t2) in enumerate(argus):
             if i2 > i1:
                 if (h1, t1, h2, t2) not in links:
                     Argus.append(neighbors(argus[i1], argus, links))
@@ -47,11 +47,11 @@ def clique_search(argus, links):
     else:
         return [list(sorted(argus))]
 
-class BiaffineForEventExtraction(PLMBaseModel):
+class GPLinkerForEventExtraction(PLMBaseModel):
     def __init__(self, 
                  lr: float = 3e-5,
                  hidden_size: int = 64,
-                 weight_decay: float = 0.00,
+                 weight_decay: float = 0.01,
                  threshold: float = 0.0,
                  scheduler: str = 'linear_warmup',
                  **kwargs: Any) -> None:
@@ -61,86 +61,111 @@ class BiaffineForEventExtraction(PLMBaseModel):
 
         self.role_classifier = EfficientBiaffineSpanClassifier(input_size=self.plm.config.hidden_size,
                                                                hidden_size=hidden_size,
-                                                               output_size=len(self.hparams.id2event))
+                                                               output_size=len(self.hparams.id2combined))
         
         self.head_classifier = EfficientBiaffineSpanClassifier(input_size=self.plm.config.hidden_size,
                                                                hidden_size=hidden_size,
-                                                               output_size=len(self.hparams.id2event),
+                                                               output_size=1,
                                                                add_rope=False)
         
         self.tail_classifier = EfficientBiaffineSpanClassifier(input_size=self.plm.config.hidden_size,
                                                                hidden_size=hidden_size,
-                                                               output_size=len(self.hparams.id2event),
+                                                               output_size=1,
                                                                add_rope=False)
         
-        self.dropout = MultiDropout()
+                
+        self.role_criterion = SparseMultiLabelCrossEntropy()
+        self.head_criterion = SparseMultiLabelCrossEntropy()
+        self.tail_criterion = SparseMultiLabelCrossEntropy()
+                 
+        self.train_role_metric = SpanF1()
+        self.train_head_metric = SpanF1()
+        self.train_tail_metric = SpanF1()
+        self.val_role_metric = SpanF1()
+        self.val_head_metric = SpanF1()
+        self.val_tail_metric = SpanF1()
+        # 以事件级别的f1最为最终指标
+        self.val_event_metric = EventF1()
         
-        self.ent_criterion = MultiLabelCategoricalCrossEntropy()
-        self.head_criterion = MultiLabelCategoricalCrossEntropy()
-        self.tail_criterion = MultiLabelCategoricalCrossEntropy()
-    
-        self.event_metric = EventF1()             
-        self.role_metric = SpanF1()
-        self.head_metric = SpanF1()
-        self.tail_metric = SpanF1()
-
+        
+    def setup(self, stage: str) -> None:
+        self.trainer.datamodule.dataset['train'].set_transform(self.trainer.datamodule.sparse_combined_transform)
+        self.trainer.datamodule.dataset['validation'].set_transform(self.trainer.datamodule.combined_transform)
+        
         
     def forward(self, input_ids, attention_mask):
         x = self.plm(input_ids=input_ids,attention_mask=attention_mask).last_hidden_state
-        x = self.dropout(x)
-        ent_logits = self.role_classifier(x, mask=attention_mask)
+        role_logits = self.role_classifier(x, mask=attention_mask)
         head_logits = self.head_classifier(x, mask=attention_mask)
         tail_logits = self.tail_classifier(x, mask=attention_mask)
-        return ent_logits, head_logits, tail_logits
+        return role_logits, head_logits, tail_logits
 
 
-    def step(self, batch):
+    def step(self, batch, is_train: bool=True):
         
         input_ids = batch['input_ids']
         attention_mask = batch['attention_mask']
         role_logits, head_logits, tail_logits = self(input_ids, attention_mask)
-        
         role_true = batch['role_tags']
         head_true = batch['head_tags']
         tail_true = batch['tail_tags']
+    
+        if is_train:
+            b,c,s,s = role_logits.shape
+            role_logits = role_logits.reshape(b,c,s*s)
+            role_true = role_true[..., 0] * s + role_true[..., 1]
+            role_loss = self.role_criterion(role_logits, role_true)
         
-        # role_loss = self.ent_criterion(role_logits.reshape(role_logits.shape[0]*role_logits.shape[1], -1), role_true.reshape(role_true.shape[0]*role_true.shape[1], -1))
-        # head_loss = self.head_criterion(head_logits.reshape(head_logits.shape[0]*head_logits.shape[1], -1), head_true.reshape(head_true.shape[0]*head_true.shape[1], -1))
-        # tail_loss = self.tail_criterion(tail_logits.reshape(tail_logits.shape[0]*tail_logits.shape[1], -1), tail_true.reshape(tail_true.shape[0]*tail_true.shape[1], -1))
-        b,e,s,s = role_logits.shape
-        role_loss = self.ent_criterion(role_logits.reshape(b,e,-1), role_true.reshape(b,e,-1))
-        head_loss = self.head_criterion(head_logits.reshape(b,e,-1), head_true.reshape(b,e,-1))
-        tail_loss = self.tail_criterion(tail_logits.reshape(b,e,-1), tail_true.reshape(b,e,-1))
-        
-        loss = (role_loss + head_loss + tail_loss) / 3
+            b,c,s,s = head_logits.shape
+            head_logits = head_logits.reshape(b,c,s*s)
+            head_true = head_true[..., 0] * s + head_true[..., 1]
+            head_loss = self.head_criterion(head_logits, head_true)
+            
+            b,c,s,s = tail_logits.shape
+            tail_logits = tail_logits.reshape(b,c,s*s)
+            tail_true = tail_true[..., 0] * s + tail_true[..., 1]
+            tail_loss = self.tail_criterion(tail_logits, tail_true)
+            self.log('train/role_loss', role_loss, prog_bar=True, on_step=True)
+            self.log('train/head_loss', head_loss, prog_bar=True, on_step=True)
+            self.log('train/tail_loss', tail_loss, prog_bar=True, on_step=True)
+            
+            loss = sum([role_loss, head_loss, tail_loss]) / 3
+        else:
+            b, c, s, s = role_logits.shape
+            role_loss = self.role_criterion(role_logits.reshape(b, -1, s*s), role_true.reshape(b, -1, s*s))
+            head_loss = self.head_criterion(head_logits.reshape(b, -1, s*s), head_true.reshape(b, -1, s*s))
+            tail_loss = self.tail_criterion(tail_logits.reshape(b, -1, s*s), tail_true.reshape(b, -1, s*s))
+            loss = sum([role_loss, head_loss, tail_loss]) / 3
+            
         
         return loss, role_logits, head_logits, tail_logits, role_true, head_true, tail_true
 
 
     def training_step(self, batch, batch_idx):
-        loss, ent_logits, head_logits, tail_logits, role_true, head_true, tail_true = self.step(batch)
-        role_pred = ent_logits.gt(self.hparams.threshold)
-        head_pred = head_logits.gt(self.hparams.threshold)
-        tail_pred = tail_logits.gt(self.hparams.threshold)
-        self.role_metric(role_pred, role_true)
-        self.head_metric(head_pred, head_true)
-        self.tail_metric(tail_pred, tail_true)
-        self.log('train/role_f1', self.role_metric, on_step=True, prog_bar=True)
-        self.log('train/head_f1', self.head_metric, on_step=True, prog_bar=True)
-        self.log('train/tail_f1', self.tail_metric, on_step=True, prog_bar=True)
+        loss, role_logits, head_logits, tail_logits, role_true, head_true, tail_true = self.step(batch)
         return {'loss': loss}
 
 
     def validation_step(self, batch, batch_idx):
-        loss, role_logits, head_logits, tail_logits, role_true, head_true, tail_true = self.step(batch)
+        loss, role_logits, head_logits, tail_logits, role_true, head_true, tail_true = self.step(batch, is_train=False)
         batch_true_events = self.extract_events(role_true, head_true, tail_true)
         batch_pred_events = self.extract_events(role_logits, head_logits, tail_logits)
-        self.event_metric(batch_pred_events, batch_true_events)
-        self.log('val/f1', self.event_metric, on_step=False, on_epoch=True, prog_bar=True)
+        self.val_event_metric(batch_pred_events, batch_true_events)
+        self.log('val/f1', self.val_event_metric, on_step=False, on_epoch=True, prog_bar=True)
+        
+        role_pred = role_logits.gt(self.hparams.threshold).float()
+        head_pred = head_logits.gt(self.hparams.threshold).float()
+        tail_pred = tail_logits.gt(self.hparams.threshold).float()
+        self.val_role_metric(role_pred, role_true)
+        self.val_head_metric(head_pred, head_true)
+        self.val_tail_metric(tail_pred, tail_true)
+        self.log('val/role_f1', self.val_role_metric, on_epoch=True, prog_bar=True)
+        self.log('val/head_f1', self.val_head_metric, on_epoch=True, prog_bar=True)
+        self.log('val/tail_f1', self.val_tail_metric, on_epoch=True, prog_bar=True)
         return {'val_loss': loss}
 
 
-    def extract_events(self, role_logits: torch.Tensor, head_logits: torch.Tensor, tail_logits: torch.Tensor, threshold: Union[None, float]=None, mapping = None):
+    def extract_events(self, role_logits: torch.Tensor, head_logits: torch.Tensor, tail_logits: torch.Tensor, threshold: Union[None, float]= None, mapping: Optional[List[Tuple]]= None):
         if threshold is None:
             threshold = self.hparams.threshold
         role_logits = role_logits.cpu().detach().numpy()
@@ -148,34 +173,30 @@ class BiaffineForEventExtraction(PLMBaseModel):
         tail_logits = tail_logits.cpu().detach().numpy()
         assert len(head_logits) == len(tail_logits) == len(role_logits)
         batch_events = []
-        # 遍历batch内的每一组
-        for rs, hs, ts in zip(role_logits, head_logits, tail_logits):
-            # 找到所有的role
+        for role_logit, head_logit, tail_logit in zip(role_logits, head_logits, tail_logits):
+            roles = set()
+            for l, h, t in zip(*np.where(role_logit > threshold)):
+                roles.add(tuple(self.hparams.id2combined[l.item()]) + (h.item(), t.item()))
+            links = set()
+            for i1, (_, _, h1, t1) in enumerate(roles):
+                for i2, (_, _, h2, t2) in enumerate(roles):
+                    if i2 > i1:
+                        # head_logits[i] 1,1,seq_len, seq_len
+                        if head_logit[0, min(h1, h2), max(h1, h2)] > threshold:
+                            if tail_logit[0, min(t1, t2), max(t1, t2)] > threshold:
+                                links.add((h1, t1, h2, t2))
+                                links.add((h2, t2, h1, t1))
             events = set()
-            roles_per_event = [set() for _ in range(len(self.hparams.id2event))]
-            for l, h, t in zip(*np.where(rs > threshold)):
-                roles_per_event[l].add((h, t))
-            for i, roles in enumerate(roles_per_event):
-                if roles:
-                    e_label = self.hparams.id2event[i]
-                    links = set()
-                    true_roles = set()
-                    for r1 in roles:
-                        for r2 in roles:
-                            if hs[i][r1[0]][r2[0]] > self.hparams.threshold and ts[i][r1[1]][r2[1]] > self.hparams.threshold:
-                                links.add((r1[0], r1[1], r2[0], r2[1]))
-                                links.add((r2[0], r2[1], r1[0], r1[1]))
-                                true_roles.add(r1)
-                                true_roles.add(r2)
-                    for event in clique_search(list(true_roles), links):
-                        role_ls = []
-                        for argu in event:
-                            start, end =argu[0], argu[1]+1
-                            if mapping is not None:
-                                (start, end) = align_token_span((start, end), mapping)
-                            role_ls.append(Role(start=start, end=end, label=None))                            
-                        event = Event(label=e_label, roles=role_ls)
-                        events.add(event)
+            for e_label, sub_argus in groupby(sorted(roles), key=lambda x: x[0]):
+                for event in clique_search(list(sub_argus), links):
+                    role_ls = []
+                    for argu in event:
+                        role_label, start, end =argu[1], argu[2], argu[3]+1
+                        if mapping is not None:
+                            (start, end) = align_token_span((start, end), mapping)
+                        role_ls.append(Role(start=start, end=end, label=role_label))                            
+                    event = Event(label=e_label, roles=role_ls)
+                    events.add(event)
             batch_events.append(events)
         return batch_events
 
@@ -188,15 +209,19 @@ class BiaffineForEventExtraction(PLMBaseModel):
             {'params': [p for n, p in self.named_parameters() if any(nd in n for nd in no_decay)],
             'weight_decay': 0.0, 'lr': self.hparams.lr}
         ]
+        
         optimizer = torch.optim.AdamW(grouped_params)
         scheduler_config = self.get_scheduler_config(optimizer=optimizer, name=self.hparams.scheduler)
         return [optimizer], [scheduler_config]
 
 
-    def predict(self, text: str, device: str = 'cpu'):
+    def predict(self, text: str, device: str = 'cpu', threshold: Optional[float] = None):
+        if threshold is None:
+            threshold = self.hparams.threshold
         inputs = self.tokenizer(text,
                                 add_special_tokens=True,
-                                max_length=self.hparams.max_length,
+                                max_length=self.hparams.plm_max_length,
+                                padding=True,
                                 truncation=True,
                                 return_offsets_mapping=True,
                                 return_tensors='pt',
@@ -205,5 +230,7 @@ class BiaffineForEventExtraction(PLMBaseModel):
         mapping = mapping[0].tolist()
         inputs.to(device)
         role_logits, head_logits, tail_logits = self(**inputs)
-        events = self.extract_events(role_logits, head_logits, tail_logits, mapping=mapping)
-        return events
+        events = self.extract_events(role_logits, head_logits, tail_logits, threshold=threshold, mapping=mapping)
+        return [e for e in events[0]]
+
+

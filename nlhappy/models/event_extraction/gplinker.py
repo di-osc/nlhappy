@@ -61,7 +61,7 @@ class GPLinkerForEventExtraction(PLMBaseModel):
 
         self.role_classifier = EfficientGlobalPointer(input_size=self.plm.config.hidden_size,
                                                       hidden_size=hidden_size,
-                                                      output_size=len(self.hparams.id2label))
+                                                      output_size=len(self.hparams.id2combined))
         
         self.head_classifier = EfficientGlobalPointer(input_size=self.plm.config.hidden_size,
                                                       hidden_size=hidden_size,
@@ -88,7 +88,12 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         self.val_tail_metric = SpanF1()
         # 以事件级别的f1最为最终指标
         self.val_event_metric = EventF1()
-
+        
+        
+    def setup(self, stage: str) -> None:
+        self.trainer.datamodule.dataset['train'].set_transform(self.trainer.datamodule.sparse_combined_transform)
+        self.trainer.datamodule.dataset['validation'].set_transform(self.trainer.datamodule.combined_transform)
+        
         
     def forward(self, input_ids, attention_mask):
         x = self.plm(input_ids=input_ids,attention_mask=attention_mask).last_hidden_state
@@ -174,7 +179,7 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         for role_logit, head_logit, tail_logit in zip(role_logits, head_logits, tail_logits):
             roles = set()
             for l, h, t in zip(*np.where(role_logit > threshold)):
-                roles.add(tuple(self.hparams.id2label[l.item()]) + (h.item(), t.item()))
+                roles.add(tuple(self.hparams.id2combined[l.item()]) + (h.item(), t.item()))
             links = set()
             for i1, (_, _, h1, t1) in enumerate(roles):
                 for i2, (_, _, h2, t2) in enumerate(roles):
@@ -219,14 +224,13 @@ class GPLinkerForEventExtraction(PLMBaseModel):
         inputs = self.tokenizer(text,
                                 add_special_tokens=True,
                                 max_length=self.hparams.plm_max_length,
+                                padding=True,
                                 truncation=True,
                                 return_offsets_mapping=True,
                                 return_tensors='pt',
                                 return_token_type_ids=False)
         mapping = inputs.pop('offset_mapping')
         mapping = mapping[0].tolist()
-        self.freeze()
-        self.to(device)
         inputs.to(device)
         role_logits, head_logits, tail_logits = self(**inputs)
         events = self.extract_events(role_logits, head_logits, tail_logits, threshold=threshold, mapping=mapping)

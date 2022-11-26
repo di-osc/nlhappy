@@ -11,7 +11,7 @@ Label = constr(strip_whitespace=True, min_length=1)
 Index = conint(ge=0, strict=True)
 
 
-def assert_span_text_in_doc(doc_text: str, span_text: str, span_indices: List[Index]):
+def assert_span_text_in_doc(doc_text: str, span_text: str, span_indices: List[Index]) -> None:
     """检查制定下标的文本序列在文档中存在
 
     Args:

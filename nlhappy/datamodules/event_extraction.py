@@ -3,7 +3,7 @@ from functools import lru_cache
 import torch
 import pandas as pd
 import numpy as np
-from typing import List
+from typing import List, Dict
 
 
 log = get_logger()
@@ -19,22 +19,16 @@ class EventExtractionDataModule(PLMBaseDataModule):
                 dataset: str, 
                 plm: str, 
                 batch_size: int,
-                transform: str = 'sparse-combined',
                 **kwargs):
         super().__init__()
-        self.transforms = ['combined',
-                           'sparse-combined']
-        assert self.hparams.transform in self.transforms, f'available transforms: {self.transforms}'
 
 
     def setup(self, stage: str = 'fit') -> None:
-        if self.hparams.transform == 'combined':
-            self.hparams.id2label = {i:l for l,i in self.combined2id.items()}
-            self.dataset.set_transform(self.combined_transform)
-        elif self.hparams.transform == 'sparse-combined':
-            self.hparams.id2label = {i:l for l,i in self.combined2id.items()}
-            self.dataset['train'].set_transform(self.sparse_combined_transform)
-            self.dataset['validation'].set_transform(self.combined_transform)
+        self.hparams.id2event = self.id2event
+        self.hparams.id2arg = self.id2arg
+        self.hparams.id2ent = self.id2ent
+        self.hparams.id2combined = self.id2combined
+        
             
             
     @property
@@ -49,6 +43,10 @@ class EventExtractionDataModule(PLMBaseDataModule):
         return {l:i for i, l in enumerate(self.event_labels)}
     
     @property
+    def id2event(self):
+        return {i:l for l,i in self.event2id.items()}
+    
+    @property
     def trigger_labels(self):
         "将触发词改为 XX事件-触发词 这种样式"
         return [e + '-' + '触发词' for e in self.event_labels]
@@ -56,29 +54,36 @@ class EventExtractionDataModule(PLMBaseDataModule):
     
     @property
     @lru_cache()
-    def arg_labels(self):
+    def arg_labels(self) -> Dict:
         labels = pd.Series(np.concatenate(pd.Series(np.concatenate(self.train_df.events.values)).apply(lambda x: x['args']).values)).apply(lambda x: x['label']).drop_duplicates().values
         return labels.tolist()
     
     
     @property
-    def arg2id(self):
+    def arg2id(self) -> Dict:
         return {l:i for i, l in enumerate(self.arg_labels)}
     
+    @property
+    def id2arg(self) -> Dict:
+        return {i:l for l,i in self.arg2id.items()}
     
     @property
-    def ent_labels(self):
+    def ent_labels(self) -> List:
         """将触发词与各个事件角色当做实体"""
         return sorted(self.trigger_labels + self.arg_labels)
     
     @property
-    def ent2id(self):
+    def ent2id(self) -> Dict:
         return {l:i for i,l in enumerate(self.ent_labels)}
+    
+    @property
+    def id2ent(self) -> Dict:
+        return {i:l for l,i in self.ent2id.items()}
 
 
     @property
     @lru_cache()
-    def combined_labels(self):
+    def combined_labels(self) -> List:
         """将事件类型跟所有事件角色(包括触发词)拼接为一个标签
         - 例如: 裁员事件-触发词, 裁员事件-裁员方
         """
@@ -97,11 +102,11 @@ class EventExtractionDataModule(PLMBaseDataModule):
 
 
     @property
-    def combined2id(self):
+    def combined2id(self) -> Dict:
         return {l:i for i,l in enumerate(self.combined_labels)}
     
     @property
-    def id2combined(self):
+    def id2combined(self) -> Dict:
         return {i:l for i,l in enumerate(self.combined_labels)}
 
 
