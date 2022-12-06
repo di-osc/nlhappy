@@ -25,7 +25,7 @@ def assert_span_text_in_doc(doc_text: str, span_text: str, span_indices: List[In
     
     
 def strip_span(span_text: str, span_indices: List[Index]) -> Tuple[str, List[Index]]:
-    """去除文本左右空格字符并将下表对齐
+    """去除文本左右空格字符并将下标对齐
 
     Args:
         span_text (str): 文本
@@ -50,7 +50,7 @@ class Span(BaseModel):
     - indices (List[int]): 对应文本的下标
     
     说明:
-    - 初始化时如果文本不为空,则会自动去除收尾的空格,
+    - 初始化时如果文本不为空,则会自动去除首尾的空格,
     - 当文本去除收尾空格后,下标会自动修正,例如当text=' 中国'变为'中国', 下标[0,1,2]会变为[1,2]
     """
     text: constr(min_length=1) = None
@@ -286,6 +286,14 @@ class Doc(BaseModel):
                 arg_text, arg_indices = strip_span(span_text=arg_text, span_indices=arg.indices)
                 arg.text = arg_text
                 arg.indices = arg_indices
+        if event.trigger:
+            if event.trigger.text:
+                assert_span_text_in_doc(doc_text=self.text, span_indices=event.trigger.indices, span_text=event.trigger.text)
+            else:
+                trigger_text = self._get_indices_text(indices=event.trigger.indices)
+                trigger_text, trigger_indices = strip_span(span_text=trigger_text, span_indices=event.trigger.indices)
+                event.trigger.text = trigger_text
+                event.trigger.indices = trigger_indices
         if not self.events:
             self.events = [event]
         else:

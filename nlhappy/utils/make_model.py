@@ -80,10 +80,8 @@ class PLMBaseModel(LightningModule):
         self.save_hyperparameters()
         assert self.hparams.scheduler in self.scheduler_names, f'availabel names {self.scheduler_names}'
         assert 'plm' in self.hparams and 'plm_dir' in self.hparams, 'you have to at least pass in plm and plm_dir'
-        if 'label2id' not in self.hparams and 'id2label' in self.hparams:
-            self.hparams.label2id = {l:i for i,l in self.hparams.id2label.items()}
         
-    
+        
     @property
     @lru_cache()
     def tokenizer(self):
@@ -94,7 +92,6 @@ class PLMBaseModel(LightningModule):
             plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
             return AutoTokenizer.from_pretrained(plm_path)
 
-
     def get_plm_config(self):
         if 'trf_config' in self.hparams.keys():
             return get_hf_config_object(self.hparams.trf_config)
@@ -102,7 +99,6 @@ class PLMBaseModel(LightningModule):
             plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
             plm_config = AutoConfig.from_pretrained(plm_path)    
             return plm_config
-    
     
     def get_plm_architecture(self, add_pooler_layer: bool = False) -> torch.nn.Module:
         if 'trf_config' in self.hparams.keys():
@@ -115,14 +111,12 @@ class PLMBaseModel(LightningModule):
         plm_config.add_pooler_layer = add_pooler_layer
         return AutoModel.from_config(plm_config)    
     
-    
     def get_linear_warmup_step_scheduler_config(self, optimizer) -> Dict:
         total_steps = self.get_total_steps()
         warmup_steps = self.get_one_epoch_steps() // 3
         scheduler = get_linear_schedule_with_warmup(optimizer=optimizer, num_training_steps=total_steps, num_warmup_steps=warmup_steps)
         scheduler_config = {'scheduler': scheduler, 'interval':'step'}
         return scheduler_config
-    
     
     def get_cosine_warmup_step_scheduler_config(self, optimizer) -> Dict:
         total_steps = self.get_total_steps()
@@ -131,23 +125,19 @@ class PLMBaseModel(LightningModule):
         scheduler_config = {'scheduler': scheduler, 'interval':'step'}
         return scheduler_config
     
-    
     def get_harmonic_epoch_scheduler_config(self, optimizer):
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 1.0 / (epoch + 1.0))
         scheduler_config = {'scheduler': scheduler, 'interval':'epoch'}
         return scheduler_config
     
-    
     def get_total_steps(self):
         return self.trainer.estimated_stepping_batches
-    
     
     def get_one_epoch_steps(self):
         total_steps = self.get_total_steps()
         max_epochs = self.trainer.max_epochs
         return total_steps // max_epochs
         
-    
     def get_scheduler_config(self, optimizer, name: str):
         """
 
@@ -165,7 +155,6 @@ class PLMBaseModel(LightningModule):
         elif name == 'cosine_warmup':
             return self.get_cosine_warmup_step_scheduler_config(optimizer=optimizer)
 
-    
     def to_onnx(self, 
                 file_path: str, 
                 text_a: str = '中国人', 

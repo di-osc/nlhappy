@@ -2,7 +2,7 @@ from torchmetrics import Metric
 from typing import List, Set, Union, Optional
 import torch
 from collections import namedtuple
-from ..data.doc import Event, Entity
+from ..data.doc import Event, Entity, Span
     
     
 class EventF1(Metric):

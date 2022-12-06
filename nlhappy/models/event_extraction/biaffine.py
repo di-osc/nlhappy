@@ -1,7 +1,7 @@
 from ...utils.make_model import PLMBaseModel, align_token_span
 from ...layers.classifier import EfficientBiaffineSpanClassifier
 from ...layers.loss import SparseMultiLabelCrossEntropy
-from ...metrics.event import EventF1, Event, Entity
+from ...metrics.event import EventF1, Event, Entity, Span
 from ...metrics.span import SpanF1
 import torch
 from itertools import groupby
@@ -189,12 +189,16 @@ class BiaffineForEventExtraction(PLMBaseModel):
             for e_label, sub_argus in groupby(sorted(roles), key=lambda x: x[0]):
                 for event in clique_search(list(sub_argus), links):
                     arg_set = set()
+                    trigger = None
                     for argu in event:
                         role_label, start, end =argu[1], argu[2], argu[3]+1
                         if mapping is not None:
                             (start, end) = align_token_span((start, end), mapping)
-                        arg_set.add(Entity(label=role_label, indices=[i for i in range(start, end)]))                            
-                    event = Event(label=e_label, args=list(arg_set))
+                        if role_label == '触发词':
+                            trigger = Span(indices=[i for i in range(start, end)])
+                        else:
+                            arg_set.add(Entity(label=role_label, indices=[i for i in range(start, end)]))  
+                    event = Event(label=e_label, args=list(arg_set), trigger=trigger)
                     events.add(event)
             batch_events.append(events)
         return batch_events

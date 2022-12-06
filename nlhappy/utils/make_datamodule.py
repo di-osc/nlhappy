@@ -8,6 +8,7 @@ from transformers import AutoConfig, AutoTokenizer, AutoModel, PreTrainedTokeniz
 from functools import lru_cache
 from pathlib import Path
 import numpy as np
+from pytorch_lightning import LightningDataModule
 
 
 log = get_logger()
@@ -209,7 +210,6 @@ class PLMBaseDataModule(pl.LightningModule):
                                  plm=self.hparams.plm,
                                  plm_dir=self.hparams.plm_dir)
     
-    
     @property
     @lru_cache()
     def dataset(self) -> DatasetDict:
@@ -281,18 +281,15 @@ class PLMBaseDataModule(pl.LightningModule):
     def train_df(self):
         return self.dataset['train'].to_pandas()
     
-    
     @property
     @lru_cache()
     def val_df(self):
         return self.dataset['validation'].to_pandas()
     
-    
     @property
     @lru_cache()
     def test_df(self):
         return self.dataset['test'].to_pandas()
-    
     
     def train_dataloader(self):
         return DataLoader(dataset= self.dataset['train'], 
@@ -302,20 +299,84 @@ class PLMBaseDataModule(pl.LightningModule):
                           batch_size=None,
                           sampler=BatchSampler(RandomSampler(self.dataset['train']), batch_size=self.hparams.batch_size, drop_last=False))
     
-    
     def val_dataloader(self):
         return DataLoader(dataset=self.dataset['validation'], 
                           batch_size=None, 
-                          num_workers=2, 
-                          pin_memory=False,
+                          num_workers=self.hparams.num_workers, 
+                          pin_memory=self.hparams.pin_memory,
                           shuffle=self.hparams.shuffle_val,
                           sampler=BatchSampler(RandomSampler(self.dataset['validation']), batch_size=self.hparams.batch_size, drop_last=False))
-
 
     def test_dataloader(self):
         return DataLoader(dataset=self.dataset['test'], 
                           batch_size=None, 
-                          num_workers=2, 
-                          pin_memory=False,
+                          num_workers=self.hparams.num_workers, 
+                          pin_memory=self.hparams.pin_memory,
                           shuffle=self.hparams.shuffle_test,
                           sampler=BatchSampler(RandomSampler(self.dataset['test']), batch_size=self.hparams.batch_size, drop_last=False))
+
+
+class BaseDataModule(LightningDataModule):
+    def __init__(self,
+                 num_workers: int = 0,
+                 pin_memory: bool = True,
+                 shuffle_train: bool = False,
+                 shuffle_val: bool = False,
+                 shuffle_test: bool = False,
+                 drop_last: bool = False):
+        super().__init__()
+        self.save_hyperparameters()
+        assert 'batch_size' in self.hparams and 'dataset_path' in self.hparams and 'tokenizer_path' in self.hparams, '子类至少需要传入dataset_path, tokenizer_path, batch_size参数'
+        
+    @property
+    @lru_cache()
+    def dataset(self):
+        path = Path(self.hparams.dataset_path)
+        if path.exists():
+            return load_from_disk(path)
+        else:
+            return load_dataset(path=self.hparams.dataset_path)
+        
+    @property
+    @lru_cache()
+    def tokenizer(self):
+        return AutoTokenizer.from_pretrained(self.hparams.tokenizer_path)
+        
+    @property
+    @lru_cache()
+    def train_df(self):
+        return self.dataset['train'].to_pandas()
+    
+    @property
+    @lru_cache()
+    def val_df(self):
+        return self.dataset['validation'].to_pandas()
+    
+    @property
+    @lru_cache()
+    def test_df(self):
+        return self.dataset['test'].to_pandas()
+    
+    def train_dataloader(self):
+        return DataLoader(dataset= self.dataset['train'], 
+                          num_workers=self.hparams.num_workers, 
+                          pin_memory=self.hparams.pin_memory,
+                          shuffle=self.hparams.shuffle_train,
+                          batch_size=None,
+                          sampler=BatchSampler(RandomSampler(self.dataset['train']), batch_size=self.hparams.batch_size, drop_last=self.hparams.drop_last))
+    
+    def val_dataloader(self):
+        return DataLoader(dataset=self.dataset['validation'], 
+                          batch_size=None, 
+                          num_workers=self.hparams.num_workers, 
+                          pin_memory=self.hparams.pin_memory,
+                          shuffle=self.hparams.shuffle_val,
+                          sampler=BatchSampler(RandomSampler(self.dataset['validation']), batch_size=self.hparams.batch_size, drop_last=self.hparams.drop_last))
+
+    def test_dataloader(self):
+        return DataLoader(dataset=self.dataset['test'], 
+                          batch_size=None, 
+                          num_workers=self.hparams.num_workers, 
+                          pin_memory=self.hparams.pin_memory,
+                          shuffle=self.hparams.shuffle_test,
+                          sampler=BatchSampler(RandomSampler(self.dataset['test']), batch_size=self.hparams.batch_size, drop_last=self.hparams.drop_last))
