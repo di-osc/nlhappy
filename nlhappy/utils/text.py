@@ -25,7 +25,6 @@ def match(s: str, text: str):
     return starts
             
         
-
 def truncate_sequences(maxlen, indices, *sequences):
     """截断总长度至不超过maxlen
     """
@@ -201,8 +200,14 @@ def _replace_with_separator(text, separator, regexs):
         result = regex.sub(replacement, result)
     return result
 
+ 
+def split_sentence(text: str, best: bool =True):
+    """将文本切分为句子
 
-def split_sentence(text, best=True):
+    Args:
+        text (str): 原始文本
+        best (bool, optional): . Defaults to True.
+    """
     text = re.sub(r'([。！？?])([^”’])', r"\1\n\2", text)
     text = re.sub(r'(\.{6})([^”’])', r"\1\n\2", text)
     text = re.sub(r'(…{2})([^”’])', r"\1\n\2", text)
