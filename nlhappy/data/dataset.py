@@ -1,12 +1,13 @@
 from datasets import Dataset as Ds
-from datasets import DatasetDict
+from datasets import DatasetDict as DsD
+from datasets import load_from_disk
 from typing import Union, Tuple
 
 
 class Dataset(Ds):
     def train_val_split(self, 
                         val_frac: float =0.1,
-                        return_dataset_dict: bool =True) -> Union[Tuple["Dataset", "Dataset"], DatasetDict]:
+                        return_dataset_dict: bool =True) -> Union[Tuple["Dataset", "Dataset"], "DatasetDict"]:
         """split dataset into tarin and validation datasets
         Args:
             dataset (Dataset): dataset to split
@@ -31,7 +32,7 @@ class Dataset(Ds):
     def train_val_test_split(self,
                              val_frac: float =0.1,
                              test_frac: float =0.1,
-                             return_dataset_dict: bool =True) -> Union[Tuple["Dataset", "Dataset", "Dataset"], DatasetDict]:
+                             return_dataset_dict: bool =True) -> Union[Tuple["Dataset", "Dataset", "Dataset"], "DatasetDict"]:
         """split dataset into tarin vlidation and test datasets
 
         Args:
@@ -56,3 +57,8 @@ class Dataset(Ds):
             return train_ds, val_ds, test_ds
         else:
             return DatasetDict({'train': train_ds, 'validation': val_ds, 'test': test_ds})
+        
+class DatasetDict(DsD):
+    @staticmethod
+    def load_from_disk(dataset_path: str) -> "DatasetDict":
+        return load_from_disk(dataset_path=dataset_path)

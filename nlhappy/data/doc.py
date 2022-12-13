@@ -1,10 +1,13 @@
 from pydantic import BaseModel, conint, conint, constr, validator, conlist, validate_arguments
-from typing import List, Optional, Union, Tuple
+from typing import List, Optional, Union, Tuple, DefaultDict, Dict, Any, Set, Generator
 import srsly
 from pathlib import Path
 import pandas as pd
 from .dataset import Dataset
 from ..utils.text import split_sentence
+from tqdm import tqdm
+from functools import reduce
+from operator import add
 
 
 Label = constr(strip_whitespace=True, min_length=1)
@@ -12,16 +15,21 @@ Index = conint(ge=0, strict=True)
 
 
 def assert_span_text_in_doc(doc_text: str, span_text: str, span_indices: List[Index]) -> None:
-    """检查制定下标的文本序列在文档中存在
+    """检查span的文本与标注的下标对应doc文本一致
 
     Args:
-        doc_text (str): 文档文本
-        ent_text (str): 实体文本
-        span_indices (List[Index]): 实体在文档中的字符下标
+        doc_text (str): doc文本
+        span_text (str): span文本
+        span_indices (List[Index]): 在文档中的下标
     """
-    span = ''.join([doc_text[i] for i in span_indices])
+    try:
+        text = ''.join([doc_text[i] for i in span_indices])
+    except Exception as e:
+        print(span_indices)
+        print(len(span_indices))
+        raise e
     # 如果实体文本存在则确保实体文本与下标对应文本一致,确保标注正确
-    assert span == span_text, f'文本: <{span_text}> 与下标文本: <{span}> 不一致'
+    assert text == span_text, f'文本: <{span_text}> 与下标文本: <{text}> 不一致'
     
     
 def strip_span(span_text: str, span_indices: List[Index]) -> Tuple[str, List[Index]]:
@@ -39,22 +47,22 @@ def strip_span(span_text: str, span_indices: List[Index]) -> Tuple[str, List[Ind
     start = ori_text.index(text)
     indices = span_indices[start: start + len(text)]
     return text, indices
-    
+        
     
 class Span(BaseModel):
     """原始文本的一个片段,可以连续也可以非连续
     
     参数:
     - text (str): 文本,默认None
-    - is_continuous (bool): 是否连续,默认True
     - indices (List[int]): 对应文本的下标
     
     说明:
     - 初始化时如果文本不为空,则会自动去除首尾的空格,
-    - 当文本去除收尾空格后,下标会自动修正,例如当text=' 中国'变为'中国', 下标[0,1,2]会变为[1,2]
+    - 下标会自动按照升序排列
+    - 当文本去除首尾空格后,下标会自动修正,例如当text=' 中国'变为'中国', 下标[0,1,2]会变为[1,2]
     """
-    text: constr(min_length=1) = None
-    indices: List[Index]
+    text: str
+    indices: Set[int]
     
     @property
     def is_continuous(self) -> bool:
@@ -65,33 +73,66 @@ class Span(BaseModel):
             
     @validator('text')
     def validate_text(cls, v: str, values: dict):
-        if v:
-            values['ori_text'] = v
+        if v is not None:
+            values['ori_text'] = v # 记录原始文本,以此修改下边列表
             return v.strip() # 左右没有空格并且有效字符不为0则返回原文
         else:
             return v
     
     @validator('indices')
-    def validate_indices(cls, v, values):
-        if values['text']:
-            assert len(values['ori_text']) == len(v), '下标长度与原始文本长度不符'
-            start = values['ori_text'].index(values['text'])
-            indices = v[start: start+len(values['text'])]
-            del values['ori_text']
-            return indices
+    def validate_indices(cls, v: List[Index], values):
+        v = sorted(v)
+        if 'text' in values:
+            if values['text']:
+                assert len(values['ori_text']) == len(v), f'下标: <{v}>与原始文本: <{values["ori_text"]}>长度不符'
+                start = values['ori_text'].index(values['text'])
+                indices = v[start: start+len(values['text'])]
+                del values['ori_text']
+                return indices
+            else:
+                return v
         else:
             return v
     
     def __hash__(self):
         return hash(self.text)
     
+    def __gt__(self, other: "Span") -> bool:
+        return self.indices[-1] > other.indices[0] 
+    
+    def __lt__(self, other: "Span") -> bool:
+        return self.indices[-1] < other.indices[0]
+    
+    def __len__(self):
+        return len(self.indices)
+    
+    def __add__(self, other: "Span"):
+        if self.text is not None and other.text is not None:
+            text = self.text + other.text
+        else:
+            text = None
+        indices = self.indices + other.indices
+        return Span(text=text, indices=indices)
+    
+    def __and__(self, other: "Span") -> "Span":
+        indices = set(self.indices) & set(other.indices)
+        if len(indices) == 0:
+            return None
+        else:
+            indices = sorted(list(indices))
+            chars = []
+            for idx in indices:
+                chars.append(self.text[self.indices.index(idx)])
+            text = ''.join(chars)
+            return Span(indices=indices, text=text)
+        
     def __eq__(self, other: "Span") -> bool:
         if self.is_continuous and other.is_continuous:
             return self.indices[0] == other.indices[0] and self.indices[-1] == other.indices[-1]
         else:
             return self.indices == other.indices
     
-    def __contains__(self, item: "Span"):
+    def __contains__(self, item: "Span") -> bool:
         if self.is_continuous and item.is_continuous:
             return self.indices[0] <= item.indices[0] and self.indices[-1] >= item.indices[-1]
         else:
@@ -166,6 +207,26 @@ class Event(BaseModel):
     
     def __eq__(self, other: "Event") -> bool:
         return self.args == other.args and self.label == other.label and self.trigger == other.trigger
+    
+    
+class Answer(BaseModel):
+    spans: List[Span] = []
+    
+    @property
+    def text(self):
+        if len(self.spans) == 0:
+            return ''
+        else:
+            text_list = []
+            for span in self.spans:
+                if span.text not in text_list and span.text is not None:
+                    text_list.append(span.text)
+            return ' '.join(text_list)
+        
+    def add_span(self, span: Span):
+        if span not in self.spans:
+            self.spans.append(span)
+        self.spans = sorted(self.spans)
 
 
 class Doc(BaseModel):
@@ -181,6 +242,7 @@ class Doc(BaseModel):
     - summary(str): 摘要
     - title(str): 标题
     - id(str): 唯一标识符
+    - questions(Dict[str, Answer]): 问题对应答案
     """
     
     text: constr(min_length=1)
@@ -192,21 +254,31 @@ class Doc(BaseModel):
     events: List[Event] = None   
     summary: constr(min_length=1, strip_whitespace=True, strict=True) = None
     title: constr(min_length=1, strip_whitespace=True, strict=True) = None
+    questions : Dict[str, Answer] = None
     
     @property
-    def sents(self):
-        sents = []
-        for s in split_sentence(self.text):
-            start = 0 if len(sents)==0 else sents[-1].indices[-1] + 1
+    def sents(self) -> Generator:
+        start = 0
+        for s in split_sentence(self.text, best=False):
             end = start + len(s)
-            sents.append(Span(text=s, indices=[i for i in range(start, end)]))
-        return sents
+            yield Span(text=s, indices=[i for i in range(start, end)])
+            start = end
     
     @validator('text')
     def validate_text(cls, v: str):
         assert len(v.strip()) > 0, f'文本为空格'
         return v
-
+    
+    @validator('questions')
+    def validate_questions(cls, v: Dict, values):
+        for q, a in v.items():
+            a: Answer
+            for span in a.spans:
+                assert type(span) == Span, '答案必须为Span'
+                if span.text:
+                    assert_span_text_in_doc(doc_text=values['text'], span_indices=span.indices, span_text=span.text)
+        return v
+    
     @validator('ents', each_item=True)
     def validate_ents(cls, v: Entity, values):      
         if v.text:
@@ -320,6 +392,80 @@ class Doc(BaseModel):
     def set_title(self, title: constr(strip_whitespace=True, strict=True, max_length=1)):
         self.title = title
         
+    @validate_arguments
+    def add_question(self, question: constr(min_length=1, strip_whitespace=True)) -> None:
+        if self.questions is None:
+            self.questions = {}  
+        if not question in self.questions:
+            empty_ans = Answer()
+            self.questions[question] = empty_ans
+            
+    def _combine_spans(self, spans: List[Span]) -> Optional[Span]:
+        if len(spans) == 0:
+            return None
+        else:
+            indices = [span.indices for span in spans]
+            indices = reduce(add, indices)
+            indices = sorted(list(set(indices)))
+            text = self._get_indices_text(indices=indices)
+            return Span(text=text, indices=indices)
+        
+    def combine_spans_to_contiguous(self, spans: List[Span]) -> Optional[Span]:
+        if len(spans) == 0:
+            return None
+        else:
+            start = spans[0].indices[0]
+            end = spans[-1].indices[-1] + 1
+            indices = [i for i in range(start, end)]
+            text = self._get_indices_text(indices=indices)
+            return Span(text=text, indices=indices)
+
+    def split_by_sents(self, max_length: int) -> List[Span]:
+        """将文本按照句子切分为不超过固定长度的片段
+
+        Args:
+            max_piece_length (int): 最大片段长度
+
+        Returns:
+            List[span]: 切分后的片段列表
+        """
+        pieces = []
+        piece: List[Span] = []
+        for sent in self.sents:
+            sent: Span
+            if len(piece)>0:
+                cur_length = sent.indices[-1] + 1 - piece[0].indices[0]
+            else:
+                cur_length = sent.indices[-1] + 1
+            if cur_length < max_length:
+                piece.append(sent)
+            else:
+                if len(piece) > 0:
+                    pieces.append(self.combine_spans_to_contiguous(spans=piece))
+                if len(sent) > max_length:
+                    continue
+                else:
+                    piece = [sent]
+        if len(piece) > 0:
+            pieces.append(self.combine_spans_to_contiguous(spans=piece))
+        return pieces
+    
+    def get_answer(self, question: str) -> Answer:
+        q = question.strip()
+        return self.questions.get(q)
+    
+    def add_answer_span(self, question: str, answer_indices: List[int], answer_text: Optional[str] = None) -> None:
+        question = question.strip()
+        ans = self.questions.get(question)
+        assert ans is not None, f'未能找到相应问题:{question},请确保问题已经设置'
+        if answer_text is None:
+            answer_text = self._get_indices_text(indices=answer_indices)
+        else:
+            assert_span_text_in_doc(doc_text=self.text, span_text=answer_text, span_indices=answer_indices)
+        span = Span(indices=answer_indices, text=answer_text)
+        ans.add_span(span=span)
+        
+        
     class Config:
         extra = 'forbid'
         allow_mutation = True
@@ -331,12 +477,13 @@ class Doc(BaseModel):
         if self.id and other.id:
             return self.id == other.id
         else:
-            return self.label == other.label and \
+            return self.text == other.text and \
+                   self.label == other.label and \
                    self.labels == other.labels and \
                    self.ents == other.ents and \
                    self.rels == other.rels and \
                    self.events == other.events and \
-                   self.summary == other.summary
+                   self.summary == other.summary 
                 
                    
 class DocBin():
@@ -437,8 +584,45 @@ class DocBin():
         assert len(df)>0, '数据集为空'
         return Dataset.from_pandas(df, preserve_index=False)
     
+    def to_qa_dataset(self, max_length: int = 450) -> Dataset:
+        """转换为问答数据集
+
+        Args:
+            max_length (int, optional): 按照句子级别切分的最大文本长度. Defaults to 500.
+
+        Returns:
+            Dataset : 按照句子切分后的问答数据集
+        """
+        data = {'text': [], 'question': [], 'answer': [], 'spans': []}
+        for doc in tqdm(self._docs):
+            doc: Doc
+            pieces = doc.split_by_sents(max_length=max_length)
+            for p in pieces:
+                p: Span
+                for q, a in doc.questions.items():
+                    a: Answer
+                    new_a = Answer()
+                    for span in a.spans:
+                        _span = span & p
+                        if _span:
+                            indices = [i - p.indices[0] for i in _span.indices]
+                            p_span = Span(text=_span.text, indices=indices)
+                            assert_span_text_in_doc(doc_text=p.text, span_text=p_span.text, span_indices=p_span.indices)
+                            new_a.add_span(span=p_span)
+                    data['text'].append(p.text)
+                    data['question'].append(q)
+                    data['answer'].append(new_a.text)
+                    data['spans'].append(new_a.dict()['spans'])    
+        return Dataset.from_dict(data)
+    
+    @validate_arguments
     def append(self, doc: Doc):
         self._docs.append(doc)
+    
+    @validate_arguments
+    def add(self, doc: Doc):
+        if doc not in self._docs:
+            self._docs.append(doc)
     
     def __getitem__(self, i):
         return self._docs[i]

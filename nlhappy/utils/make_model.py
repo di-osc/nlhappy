@@ -80,8 +80,7 @@ class PLMBaseModel(LightningModule):
         self.save_hyperparameters()
         assert self.hparams.scheduler in self.scheduler_names, f'availabel names {self.scheduler_names}'
         assert 'plm' in self.hparams and 'plm_dir' in self.hparams, 'you have to at least pass in plm and plm_dir'
-        
-        
+          
     @property
     @lru_cache()
     def tokenizer(self):

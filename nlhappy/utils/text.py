@@ -213,7 +213,6 @@ def split_sentence(text: str, best: bool =True):
     text = re.sub(r'(…{2})([^”’])', r"\1\n\2", text)
     text = re.sub(r'([。！？?][”’])([^，。！？?])', r'\1\n\2', text)
     for chunk in text.split("\n"):
-        chunk = chunk.strip()
         if not chunk:
             continue
         if not best:
