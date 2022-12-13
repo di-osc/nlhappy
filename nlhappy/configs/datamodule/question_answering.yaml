@@ -1,0 +1,10 @@
+_target_: nlhappy.datamodules.QuestionAnsweringDataModule
+dataset_dir: ${dataset_dir}
+plm_dir: ${plm_dir}
+
+
+dataset: 
+batch_size: 
+plm: hfl/chinese-roberta-wwm-ext
+pin_memory: True
+num_workers: 4
