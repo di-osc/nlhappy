@@ -1,4 +1,4 @@
-from pydantic import BaseModel, conint, conint, constr, validator, conlist, validate_arguments
+from pydantic import BaseModel, conint, conint, constr, validator, conlist, conset, validate_arguments
 from typing import List, Optional, Union, Tuple, DefaultDict, Dict, Any, Set, Generator
 import srsly
 from pathlib import Path
@@ -61,7 +61,7 @@ class Span(BaseModel):
     - 下标会自动按照升序排列
     - 当文本去除首尾空格后,下标会自动修正,例如当text=' 中国'变为'中国', 下标[0,1,2]会变为[1,2]
     """
-    text: str
+    text: constr(min_length=1)
     indices: Set[int]
     
     @property
@@ -584,7 +584,7 @@ class DocBin():
         assert len(df)>0, '数据集为空'
         return Dataset.from_pandas(df, preserve_index=False)
     
-    def to_qa_dataset(self, max_length: int = 450) -> Dataset:
+    def to_qa_dataset(self, max_length: int = 450, only_have_answer: bool = False) -> Dataset:
         """转换为问答数据集
 
         Args:
@@ -609,10 +609,17 @@ class DocBin():
                             p_span = Span(text=_span.text, indices=indices)
                             assert_span_text_in_doc(doc_text=p.text, span_text=p_span.text, span_indices=p_span.indices)
                             new_a.add_span(span=p_span)
-                    data['text'].append(p.text)
-                    data['question'].append(q)
-                    data['answer'].append(new_a.text)
-                    data['spans'].append(new_a.dict()['spans'])    
+                    if only_have_answer:
+                        if len(new_a.spans) > 0:
+                            data['text'].append(p.text)
+                            data['question'].append(q)
+                            data['answer'].append(new_a.text)
+                            data['spans'].append(new_a.dict()['spans'])  
+                    else:
+                        data['text'].append(p.text)
+                        data['question'].append(q)
+                        data['answer'].append(new_a.text)
+                        data['spans'].append(new_a.dict()['spans'])
         return Dataset.from_dict(data)
     
     @validate_arguments

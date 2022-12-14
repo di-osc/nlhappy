@@ -25,31 +25,24 @@ class TextClassificationDataModule(PLMBaseDataModule):
                 dataset: str,
                 batch_size: int ,
                 plm: str = 'hfl/chinese-roberta-wwm-ext',
-                transform: str = 'bert',
                 **kwargs):
-        super().__init__()        
-        self.transforms = {'bert': self.bert_transform}
-        assert self.hparams.transform in self.transforms.keys(), f'available models for text classification dm: {self.transforms.keys()}'
+        super().__init__()       
         
-        
-    def setup(self, stage: str = 'fit') -> None:
-        self.hparams.max_length = self.get_max_length()
-        self.hparams.label2id = self.label2id
-        self.hparams.id2label = {i:l for l, i in self.label2id.items()}
-        self.dataset.set_transform(transform=self.transforms.get(self.hparams.transform))
+    def setup(self, stage: str) -> None:
+        self.hparams.id2label = self.id2label
 
     
     def bert_transform(self, examples) -> Dict:
         batch_text = examples['text']
         batch_label_ids = []
-        max_length = self.hparams.max_length
+        max_length = self.get_batch_max_length(batch_text=batch_text)
         batch_inputs = self.tokenizer(batch_text,
-                                      padding='max_length',
+                                      padding=True,
                                       max_length=max_length,
                                       truncation=True,
                                       return_tensors='pt')
         for i, text in enumerate(batch_text):
-            label_id = self.hparams['label2id'][examples['label'][i]]
+            label_id = self.label2id[examples['label'][i]]
             batch_label_ids.append(label_id)
         batch_inputs['label_ids'] = torch.LongTensor(batch_label_ids)        
         return batch_inputs
@@ -75,8 +68,3 @@ class TextClassificationDataModule(PLMBaseDataModule):
     @classmethod
     def get_one_example(cls):
         return {'label': '新闻', 'text': '怎么给这个图片添加超级链接呢？'}
-    
-    
-    @classmethod
-    def get_available_transforms(cls):
-        return ['bert']

@@ -21,16 +21,19 @@ class BertForTextClassification(PLMBaseModel):
         self.bert = self.get_plm_architecture(add_pooler_layer=True)
         self.classifier = SimpleDense(input_size=self.bert.config.hidden_size, 
                                       hidden_size=hidden_size, 
-                                      output_size=len(self.hparams.label2id))
+                                      output_size=len(self.hparams.id2label))
         self.dropout = MultiDropout()
         
         # 损失函数
         self.criterion = torch.nn.CrossEntropyLoss()
 
         # 评价指标
-        self.train_f1 = F1Score(num_classes=len(self.hparams.label2id), average='macro')
-        self.val_f1= F1Score(num_classes=len(self.hparams.label2id), average='macro')
-        self.test_f1 = F1Score(num_classes=len(self.hparams.label2id), average='macro')
+        self.train_f1 = F1Score(num_classes=len(self.hparams.id2label), average='macro')
+        self.val_f1= F1Score(num_classes=len(self.hparams.id2label), average='macro')
+        self.test_f1 = F1Score(num_classes=len(self.hparams.id2label), average='macro')
+        
+    def setup(self, stage: str):
+        self.trainer.datamodule.dataset.set_transform(self.trainer.datamodule.bert_transform)
 
 
     def forward(self, input_ids, token_type_ids, attention_mask):

@@ -1,8 +1,8 @@
 import torch
 from ...metrics.span import SpanIndexF1
 from ...utils.make_model import PLMBaseModel
-from ...layers import SimpleDense, MultiLabelCategoricalCrossEntropy
-from ...data.doc import Doc, Span
+from ...layers import SimpleDense, MultiLabelCategoricalCrossEntropy, MultiDropout
+from ...data.doc import Doc
 from typing import List, Set, Tuple
 
 class PointerForQuestionAnswering(PLMBaseModel):
@@ -16,7 +16,7 @@ class PointerForQuestionAnswering(PLMBaseModel):
         super().__init__()
 
         self.plm = self.get_plm_architecture()
-        
+        self.dropout = MultiDropout()
         self.start_classifier = SimpleDense(input_size=self.plm.config.hidden_size, hidden_size=hidden_size, output_size=1)
         self.end_classifier = SimpleDense(input_size=self.plm.config.hidden_size, hidden_size=hidden_size, output_size=1)
 
@@ -33,6 +33,7 @@ class PointerForQuestionAnswering(PLMBaseModel):
 
     def forward(self, input_ids, token_type_ids, attention_mask=None) -> torch.Tensor:
         x = self.plm(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask).last_hidden_state
+        x = self.dropout(x)
         start_logits = self.start_classifier(x)
         end_logits = self.end_classifier(x)
         return start_logits, end_logits
@@ -71,7 +72,7 @@ class PointerForQuestionAnswering(PLMBaseModel):
                 end = ends[i]
                 if end >= start:
                     spans.append((start, end+1))
-                    for j in range(start, end):
+                    for j in range(start, end+1):
                         indices.add(j)
             batch_indices.append(indices)
             batch_spans.append(spans)
@@ -136,22 +137,21 @@ class PointerForQuestionAnswering(PLMBaseModel):
                 end = span[-1] - 1
                 start_char_span= inputs.token_to_chars(start)
                 end_char_span = inputs.token_to_chars(end)
-                if start_char_span and end_char_span:
+                if start_char_span is not None and end_char_span is not None:
                     align_spans.append((start_char_span.start, end_char_span.end))
             align_batch_spans.append(align_spans)
         return align_batch_spans
     
     
-    def set_annotation(self, doc: Doc, device: str = 'cpu') -> Doc:
+    def set_annotation(self, doc: Doc, device: str = 'cpu', max_split_length: int = 480) -> Doc:
         for q, a in doc.questions.items():
-            pieces = doc.split_by_sents(max_length=480)
-            batch_text = [p.text for p in pieces]
-            batch_question = [q for _ in range(len(pieces))]
-            if len(batch_text) > 0 and len(batch_question) > 0:
-                batch_spans = self.predict(batch_question=batch_question, batch_text=batch_text, device=device)
-                for piece, spans in zip(pieces, batch_spans):
-                    for span in spans:
-                        doc.add_answer_span(question=q, answer_indices=piece.indices[span[0]: span[1]])
-        return doc
-
-                
+            pieces = doc.split_by_sents(max_length=max_split_length)
+            for piece in pieces:
+                batch_text = [piece.text]
+                batch_question = [q]
+                spans = self.predict(batch_question=batch_question, batch_text=batch_text, device=device)[0]
+                for span in spans:
+                    answer_indices = piece.indices[span[0]: span[1]]
+                    if len(answer_indices) > 0:
+                        doc.add_answer_span(question=q, answer_indices=answer_indices)
+        return doc  
