@@ -106,13 +106,13 @@ class PointerForQuestionAnswering(PLMBaseModel):
             {'params': [p for n, p in self.plm.named_parameters() if any(nd in n for nd in no_decay)],
              'lr': self.hparams.lr, 'weight_decay': 0.0},
             {'params': [p for n, p in self.start_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
-             'lr': self.hparams.lr * 5, 'weight_decay': self.hparams.weight_decay},
+             'lr': self.hparams.lr, 'weight_decay': self.hparams.weight_decay},
             {'params': [p for n, p in self.start_classifier.named_parameters() if any(nd in n for nd in no_decay)],
-             'lr': self.hparams.lr * 5, 'weight_decay': 0.0},
+             'lr': self.hparams.lr, 'weight_decay': 0.0},
             {'params': [p for n, p in self.end_classifier.named_parameters() if not any(nd in n for nd in no_decay)],
-             'lr': self.hparams.lr * 5, 'weight_decay': self.hparams.weight_decay},
+             'lr': self.hparams.lr, 'weight_decay': self.hparams.weight_decay},
             {'params': [p for n, p in self.end_classifier.named_parameters() if any(nd in n for nd in no_decay)],
-             'lr': self.hparams.lr * 5, 'weight_decay': 0.0}
+             'lr': self.hparams.lr, 'weight_decay': 0.0}
         ]
         optimizer = torch.optim.AdamW(grouped_parameters)
         scheduler = self.get_scheduler_config(optimizer=optimizer, name=self.hparams.scheduler)
@@ -143,7 +143,7 @@ class PointerForQuestionAnswering(PLMBaseModel):
         return align_batch_spans
     
     
-    def set_annotation(self, doc: Doc, device: str = 'cpu', max_split_length: int = 480) -> Doc:
+    def set_annotation(self, doc: Doc, device: str = 'cpu', max_split_length: int = 350) -> Doc:
         for q, a in doc.questions.items():
             pieces = doc.split_by_sents(max_length=max_split_length)
             for piece in pieces:

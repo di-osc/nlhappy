@@ -248,13 +248,13 @@ class Doc(BaseModel):
     text: constr(min_length=1)
     id: Optional[str] = None
     label: Optional[Label] = None
-    labels: conlist(item_type=Entity, unique_items=True, min_items=1) = None
-    ents: conlist(item_type=Entity, unique_items=True, min_items=1) = None
-    rels: List[Relation] = None
-    events: List[Event] = None   
-    summary: constr(min_length=1, strip_whitespace=True, strict=True) = None
-    title: constr(min_length=1, strip_whitespace=True, strict=True) = None
-    questions : Dict[str, Answer] = None
+    labels: Optional[List[Label]] = None
+    ents: Optional[List[Entity]] = None
+    rels: Optional[List[Relation]] = None
+    events: Optional[List[Event]] = None   
+    summary: Optional[str] = None
+    title: Optional[str] = None
+    questions : Optional[Dict[str, Answer]] = None
     
     @property
     def sents(self) -> Generator:
@@ -506,7 +506,7 @@ class DocBin():
         - file_path (Path): 数据保存地址,例如./test.jsonl
         """
         path = Path(file_path)
-        srsly.write_jsonl(path=path, lines=[doc.dict() for doc in self.docs])
+        srsly.write_jsonl(path=path, lines=[doc.dict() for doc in self._docs])
     
     def _get_docs_from_jsonl(self, file_path: Path) -> List[Doc]:
         path = Path(file_path)
