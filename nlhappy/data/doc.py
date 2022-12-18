@@ -636,6 +636,12 @@ class DocBin():
     
     def __len__(self):
         return len(self._docs)
-
+    
     def __repr__(self) -> str:
-        return f"{len(self)} docs"
+        return f"{len(self._docs)} docs"
+    
+    def __str__(self) -> str:
+        return f"{len(self._docs)} docs"
+    
+    def __add__(self, other: "DocBin") -> "DocBin":
+        return DocBin(self._docs + other._docs)
