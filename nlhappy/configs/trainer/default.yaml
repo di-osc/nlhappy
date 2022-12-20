@@ -5,7 +5,7 @@ devices: 1
 precision: 32
 
 min_epochs: 1
-max_epochs: 20
+max_epochs: 10
 
 profiler: "simple"
 
