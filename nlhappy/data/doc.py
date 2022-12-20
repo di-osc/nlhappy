@@ -1,4 +1,4 @@
-from pydantic import BaseModel, conint, conint, constr, validator, conlist, conset, validate_arguments
+from pydantic import BaseModel, conint, conint, constr, validator, conlist, validate_arguments, conset
 from typing import List, Optional, Union, Tuple, DefaultDict, Dict, Any, Set, Generator
 import srsly
 from pathlib import Path
@@ -7,7 +7,6 @@ from .dataset import Dataset
 from ..utils.text import split_sentence
 from tqdm import tqdm
 from functools import reduce
-from operator import add
 
 
 Label = constr(strip_whitespace=True, min_length=1)
@@ -62,7 +61,7 @@ class Span(BaseModel):
     - 当文本去除首尾空格后,下标会自动修正,例如当text=' 中国'变为'中国', 下标[0,1,2]会变为[1,2]
     """
     text: constr(min_length=1)
-    indices: Set[int]
+    indices: conset(item_type=int, min_items=1)
     
     @property
     def is_continuous(self) -> bool:
@@ -233,6 +232,7 @@ class Doc(BaseModel):
     """存放所有标注数据,由模型或者原始数据构建
     参数:
     - text(str): 文本
+    - id(str): 唯一标识符
     - label(str): 唯一标签
     - labels(List[str]): 多标签
     - ents(List[Entity]): 实体列表
@@ -241,7 +241,6 @@ class Doc(BaseModel):
     - sents(List(Span)): 文本连续的句子,不需要初始化,自动生成
     - summary(str): 摘要
     - title(str): 标题
-    - id(str): 唯一标识符
     - questions(Dict[str, Answer]): 问题对应答案
     """
     
@@ -499,8 +498,23 @@ class DocBin():
             self._docs = []
         else:
             self._docs = docs
+            
+    def __getitem__(self, i):
+        return self._docs[i]
+    
+    def __len__(self):
+        return len(self._docs)
+    
+    def __repr__(self) -> str:
+        return f"{len(self._docs)} docs"
+    
+    def __str__(self) -> str:
+        return f"{len(self._docs)} docs"
+    
+    def __add__(self, other: "DocBin") -> "DocBin":
+        return DocBin(self._docs + other._docs)
         
-    def save_jsonl(self, file_path: Path):
+    def save_to_disk(self, file_path: Path):
         """将数据以jsonl的格式保存到硬盘
         参数:
         - file_path (Path): 数据保存地址,例如./test.jsonl
@@ -543,6 +557,12 @@ class DocBin():
                 return df.dropna(how='all', axis=1)
             else:
                 return df
+            
+    @classmethod
+    def from_pandas(cls, df: pd.DataFrame) -> "DocBin":
+        records = df.to_dict(orient='records')
+        docs = [Doc(**r) for r in records]
+        return DocBin(docs=docs)
     
     def to_ner_dataset(self) -> Dataset:
         """转换为实体抽取数据集,自动过滤实体为None的doc
@@ -588,7 +608,8 @@ class DocBin():
         """转换为问答数据集
 
         Args:
-            max_length (int, optional): 按照句子级别切分的最大文本长度. Defaults to 500.
+            max_length (int, optional): 按照句子级别切分的最大文本长度. Defaults to 450.
+            only_have_answer (bool): 仅选取有答案的数据. Defaults to False.
 
         Returns:
             Dataset : 按照句子切分后的问答数据集
@@ -630,18 +651,3 @@ class DocBin():
     def add(self, doc: Doc):
         if doc not in self._docs:
             self._docs.append(doc)
-    
-    def __getitem__(self, i):
-        return self._docs[i]
-    
-    def __len__(self):
-        return len(self._docs)
-    
-    def __repr__(self) -> str:
-        return f"{len(self._docs)} docs"
-    
-    def __str__(self) -> str:
-        return f"{len(self._docs)} docs"
-    
-    def __add__(self, other: "DocBin") -> "DocBin":
-        return DocBin(self._docs + other._docs)

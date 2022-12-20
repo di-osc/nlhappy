@@ -1,7 +1,8 @@
 import torch
+import torch.nn as nn
 from ...metrics.span import SpanIndexF1
 from ...utils.make_model import PLMBaseModel
-from ...layers import SimpleDense, MultiLabelCategoricalCrossEntropy, MultiDropout
+from ...layers import MultiLabelCategoricalCrossEntropy, MultiDropout
 from ...data.doc import Doc
 from typing import List, Set, Tuple
 
@@ -11,14 +12,13 @@ class PointerForQuestionAnswering(PLMBaseModel):
                  scheduler: str = 'linear_warmup',
                  weight_decay: float = 0.01,
                  threshold: float = 0.0,
-                 hidden_size: int = 256,
                  **kwargs) : 
         super().__init__()
 
         self.plm = self.get_plm_architecture()
         self.dropout = MultiDropout()
-        self.start_classifier = SimpleDense(input_size=self.plm.config.hidden_size, hidden_size=hidden_size, output_size=1)
-        self.end_classifier = SimpleDense(input_size=self.plm.config.hidden_size, hidden_size=hidden_size, output_size=1)
+        self.start_classifier = nn.Linear(in_features=self.plm.config.hidden_size, out_features=1)
+        self.end_classifier = nn.Linear(in_features=self.plm.config.hidden_size, out_features=1)
 
         self.criterion = MultiLabelCategoricalCrossEntropy()
 
@@ -34,8 +34,8 @@ class PointerForQuestionAnswering(PLMBaseModel):
     def forward(self, input_ids, token_type_ids, attention_mask=None) -> torch.Tensor:
         x = self.plm(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask).last_hidden_state
         x = self.dropout(x)
-        start_logits = self.start_classifier(x)
-        end_logits = self.end_classifier(x)
+        start_logits = self.start_classifier(x).squeeze(-1)
+        end_logits = self.end_classifier(x).squeeze(-1)
         return start_logits, end_logits
 
 
@@ -44,16 +44,14 @@ class PointerForQuestionAnswering(PLMBaseModel):
         start_tags = batch['start_tags']
         end_tags = batch['end_tags']
         start_logits, end_logits = self(input_ids=batch['input_ids'], token_type_ids=batch['token_type_ids'], attention_mask=batch['attention_mask'])
-        start_loss = self.criterion(start_logits.squeeze(-1), start_tags)
-        end_loss = self.criterion(end_logits.squeeze(-1), end_tags)
+        start_loss = self.criterion(start_logits, start_tags)
+        end_loss = self.criterion(end_logits, end_tags)
         loss = (start_loss + end_loss) / 2
         pred, _ = self.extract_spans(start_logits=start_logits, end_logits=end_logits, threshold=self.hparams.threshold)
         true, _ = self.extract_spans(start_logits=start_tags, end_logits=end_tags, threshold=self.hparams.threshold)
         return loss, pred, true
     
     def extract_spans(self, start_logits: torch.Tensor, end_logits: torch.Tensor, threshold: float) -> Tuple[List[Set], List[List[Tuple]]]:
-        start_logits = start_logits.squeeze(-1)
-        end_logits = end_logits.squeeze(-1)
         start_logits = start_logits.chunk(start_logits.shape[0])
         end_logits = end_logits.chunk(end_logits.shape[0])
         spans = []
@@ -143,7 +141,7 @@ class PointerForQuestionAnswering(PLMBaseModel):
         return align_batch_spans
     
     
-    def set_annotation(self, doc: Doc, device: str = 'cpu', max_split_length: int = 350) -> Doc:
+    def set_annotation(self, doc: Doc, device: str = 'cpu', max_split_length: int = 450) -> Doc:
         for q, a in doc.questions.items():
             pieces = doc.split_by_sents(max_length=max_split_length)
             for piece in pieces:

@@ -8,6 +8,9 @@ import torch
 import tempfile
 import json
 from omegaconf import OmegaConf, DictConfig
+from pathlib import Path
+from torch.utils.data import DataLoader, BatchSampler, RandomSampler
+from datasets import load_from_disk, load_dataset, DatasetDict
 
 
 def get_hf_tokenizer(config: Union[Dict, DictConfig] , vocab: Union[Dict, DictConfig]):
@@ -69,7 +72,7 @@ class PLMBaseModel(LightningModule):
     
     - 内置了scheduler,可以通过cls.scheduler_names查看所有的scheduler,通过self.get_scheduler_config方法得到pl的scheduler config
     - 通过self.tokenizer直接调用tokenizer
-    - 通过self.get_plm_architecture可以得到预训练模型的架构,主要并没有加载预训练参数
+    - 通过self.get_plm_architecture可以得到没有加载参数的预训练模型的架构
     """
     
     scheduler_names = ['linear_warmup', 'cosine_warmup', 'harmonic']
@@ -88,8 +91,11 @@ class PLMBaseModel(LightningModule):
         if 'trf_config' in keys and 'vocab' in keys:
             return get_hf_tokenizer(self.hparams.trf_config, self.hparams.vocab)
         elif 'plm' in keys and 'plm_dir' in keys:
-            plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
-            return AutoTokenizer.from_pretrained(plm_path)
+            plm_path = Path(self.hparams.plm_dir, self.hparams.plm)
+            if plm_path.exists():
+                return AutoTokenizer.from_pretrained(plm_path)
+            else:
+                return AutoTokenizer.from_pretrained(self.hparams.plm)
 
     def get_plm_config(self):
         if 'trf_config' in self.hparams.keys():
@@ -156,9 +162,8 @@ class PLMBaseModel(LightningModule):
 
     def to_onnx(self, 
                 file_path: str, 
-                text_a: str = '中国人', 
-                text_b : str = '中国'):
-        torch_inputs = self.tokenizer(text_a, text_b, return_tensors='pt')
+                text: str = '中国人'):
+        torch_inputs = self.tokenizer(text, return_tensors='pt')
         dynamic_axes = {
                     'input_ids': {0: 'batch', 1: 'seq'},
                     'attention_mask': {0: 'batch', 1: 'seq'},
@@ -174,3 +179,170 @@ class PLMBaseModel(LightningModule):
                               output_names=['logits'],
                               export_params=True)
         print('export to onnx successfully')
+        
+
+class NLPBaseModel(LightningModule):
+    """配置了所有功能的模型基类
+    
+    - 内置了scheduler,可以通过cls.scheduler_names查看所有的scheduler,通过self.get_scheduler_config方法得到pl的scheduler config
+    - 通过self.tokenizer直接调用tokenizer
+    - 通过self.get_plm_architecture可以得到没有加载参数的预训练模型的架构
+    """
+    
+    scheduler_names = ['linear_warmup', 'cosine_warmup', 'harmonic']
+    
+    def __init__(self,
+                 plm_max_length: int = 512,
+                 num_workers: int = 4,
+                 pin_memory: bool = True,
+                 drop_last_batch: bool = False,
+                 shuffle_train: bool = False,
+                 shuffle_val: bool = False,
+                 shuffle_test: bool = False):
+        super().__init__()
+        # 保存所有参数
+        self.save_hyperparameters()
+        assert self.hparams.scheduler in self.scheduler_names, f'availabel names {self.scheduler_names}'
+        assert 'plm' in self.hparams in self.hparams, 'you have to at least pass in plm'
+        
+    @property
+    @lru_cache()
+    def dataset(self):
+        path = Path(self.hparams.dataset)
+        if path.exists():
+            return load_from_disk(path)
+        else:
+            return load_dataset(path=self.hparams.dataset)
+          
+    @property
+    @lru_cache()
+    def tokenizer(self):
+        keys = self.hparams.keys()
+        if 'trf_config' in keys and 'vocab' in keys:
+            return get_hf_tokenizer(self.hparams.trf_config, self.hparams.vocab)
+        elif 'plm' in keys:
+            plm_path = Path(self.hparams.plm)
+            tokenizer = AutoTokenizer.from_pretrained(plm_path)
+            return tokenizer
+
+    def get_plm_config(self):
+        if 'trf_config' in self.hparams.keys():
+            return get_hf_config_object(self.hparams.trf_config)
+        elif 'plm' in self.hparams.keys():
+            plm_config = AutoConfig.from_pretrained(self.hparams.plm)    
+            return plm_config
+    
+    def get_plm_architecture(self, add_pooler_layer: bool = False) -> torch.nn.Module:
+        if 'trf_config' in self.hparams.keys():
+            plm_config = get_hf_config_object(self.hparams.trf_config)
+        elif 'plm' in self.hparams.keys() and 'plm_dir' in self.hparams.keys():
+            plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
+            plm_config = AutoConfig.from_pretrained(plm_path)
+            self.hparams.trf_config = plm_config.to_dict()
+            self.hparams.vocab = dict(sorted(self.tokenizer.vocab.items(), key=lambda x: x[1]))
+        plm_config.add_pooler_layer = add_pooler_layer
+        return AutoModel.from_config(plm_config)    
+    
+    def get_linear_warmup_step_scheduler_config(self, optimizer) -> Dict:
+        total_steps = self.get_total_steps()
+        warmup_steps = self.get_one_epoch_steps() // 3
+        scheduler = get_linear_schedule_with_warmup(optimizer=optimizer, num_training_steps=total_steps, num_warmup_steps=warmup_steps)
+        scheduler_config = {'scheduler': scheduler, 'interval':'step'}
+        return scheduler_config
+    
+    def get_cosine_warmup_step_scheduler_config(self, optimizer) -> Dict:
+        total_steps = self.get_total_steps()
+        warmup_steps = self.get_one_epoch_steps() // 3
+        scheduler = get_cosine_schedule_with_warmup(optimizer=optimizer, num_training_steps=total_steps, num_warmup_steps=warmup_steps)
+        scheduler_config = {'scheduler': scheduler, 'interval':'step'}
+        return scheduler_config
+    
+    def get_harmonic_epoch_scheduler_config(self, optimizer):
+        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 1.0 / (epoch + 1.0))
+        scheduler_config = {'scheduler': scheduler, 'interval':'epoch'}
+        return scheduler_config
+    
+    def get_total_steps(self):
+        return self.trainer.estimated_stepping_batches
+    
+    def get_one_epoch_steps(self):
+        total_steps = self.get_total_steps()
+        max_epochs = self.trainer.max_epochs
+        return total_steps // max_epochs
+        
+    def get_scheduler_config(self, optimizer, name: str):
+        """
+
+        Args:
+            optimizer (): 优化器实例
+            name (str): 'harmonic_epoch', 'linear_warmup_step', 'cosine_warmup_step'之一
+
+        Returns:
+            dict: scheduler配置字典
+        """
+        if name == 'harmonic':
+            return self.get_harmonic_epoch_scheduler_config(optimizer=optimizer)
+        elif name == 'linear_warmup':
+            return self.get_linear_warmup_step_scheduler_config(optimizer=optimizer)
+        elif name == 'cosine_warmup':
+            return self.get_cosine_warmup_step_scheduler_config(optimizer=optimizer)
+
+    def to_onnx(self, 
+                file_path: str, 
+                text: str = '中国人'):
+        torch_inputs = self.tokenizer(text, return_tensors='pt')
+        dynamic_axes = {
+                    'input_ids': {0: 'batch', 1: 'seq'},
+                    'attention_mask': {0: 'batch', 1: 'seq'},
+                    'token_type_ids': {0: 'batch', 1: 'seq'},
+                }
+        with torch.no_grad():
+            torch.onnx.export(model=self,
+                              args=tuple(torch_inputs.values()), 
+                              f=file_path, 
+                              input_names=list(torch_inputs.keys()),
+                              dynamic_axes=dynamic_axes, 
+                              opset_version=14,
+                              output_names=['logits'],
+                              export_params=True)
+        print('export to onnx successfully')
+        
+    
+    @property
+    @lru_cache()
+    def train_df(self):
+        return self.dataset['train'].to_pandas()
+    
+    @property
+    @lru_cache()
+    def val_df(self):
+        return self.dataset['validation'].to_pandas()
+    
+    @property
+    @lru_cache()
+    def test_df(self):
+        return self.dataset['test'].to_pandas()
+    
+    def train_dataloader(self):
+        return DataLoader(dataset= self.dataset['train'], 
+                          num_workers=self.hparams.num_workers, 
+                          pin_memory=self.hparams.pin_memory,
+                          shuffle=self.hparams.shuffle_train,
+                          batch_size=None,
+                          sampler=BatchSampler(RandomSampler(self.dataset['train']), batch_size=self.hparams.batch_size, drop_last=self.hparams.drop_last_batch))
+    
+    def val_dataloader(self):
+        return DataLoader(dataset=self.dataset['validation'], 
+                          batch_size=None, 
+                          num_workers=self.hparams.num_workers, 
+                          pin_memory=self.hparams.pin_memory,
+                          shuffle=self.hparams.shuffle_val,
+                          sampler=BatchSampler(RandomSampler(self.dataset['validation']), batch_size=self.hparams.batch_size, drop_last=self.hparams.drop_last_batch))
+
+    def test_dataloader(self):
+        return DataLoader(dataset=self.dataset['test'], 
+                          batch_size=None, 
+                          num_workers=self.hparams.num_workers, 
+                          pin_memory=self.hparams.pin_memory,
+                          shuffle=self.hparams.shuffle_test,
+                          sampler=BatchSampler(RandomSampler(self.dataset['test']), batch_size=self.hparams.batch_size, drop_last=self.hparams.drop_last_batch))

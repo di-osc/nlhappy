@@ -23,8 +23,8 @@ class MultiLabelCategoricalCrossEntropy(torch.nn.Module):
             y_true : [batch_size * num_classes, seq_len * seq_len]
         """
         y_pred = (1 - 2 * y_true) * y_pred  # -1 -> pos classes, 1 -> neg classes
-        y_pred_neg = y_pred - y_true * 1e12  # mask the pred outputs of pos classes
-        y_pred_pos =  y_pred - (1 - y_true) * 1e12  # mask the pred outputs of neg classes
+        y_pred_neg = y_pred - y_true * 1e7  # mask the pred outputs of pos classes
+        y_pred_pos =  y_pred - (1 - y_true) * 1e7  # mask the pred outputs of neg classes
         
         zeros = torch.zeros_like(y_pred[..., :1])
         
