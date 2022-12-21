@@ -60,8 +60,9 @@ class Span(BaseModel):
     - 下标会自动按照升序排列
     - 当文本去除首尾空格后,下标会自动修正,例如当text=' 中国'变为'中国', 下标[0,1,2]会变为[1,2]
     """
-    text: constr(min_length=1)
+    text: Optional[constr(min_length=1)] = None
     indices: conset(item_type=int, min_items=1)
+    score: Optional[float] = None
     
     @property
     def is_continuous(self) -> bool:
@@ -145,7 +146,7 @@ class Entity(Span):
     - label (str): 实体标签
     - indices (List[int]): 字符级别下标
     """
-    label: Label = None
+    label: Optional[Label] = None
         
     def __hash__(self):
         return hash(self.label)
@@ -310,14 +311,13 @@ class Doc(BaseModel):
         return ''.join([self.text[i] for i in indices])
     
     @validate_arguments
-    def add_ent(self, ent: Entity):
-        if ent.text:
-            assert_span_text_in_doc(doc_text=self.text, span_indices=ent.indices, span_text=ent.text)
+    def add_ent(self, indices: List[int], label: str, text: Optional[str] = None, score: Optional[float] = None):
+        if text:
+            assert_span_text_in_doc(doc_text=self.text, span_indices=indices, span_text=text)
         else:
-            ent_text = self._get_indices_text(indices=ent.indices)
-            ent_text, ent_indices = strip_span(span_text=ent_text, span_indices=ent.indices)
-            ent.text = ent_text
-            ent.indices = ent_indices
+            text = self._get_indices_text(indices=indices)
+            text, indices = strip_span(span_text=text, span_indices=indices)
+        ent = Entity(text=text, indices=indices, label=label, score=score)
         if not self.ents:
             self.ents = [ent]
         else:
@@ -564,13 +564,23 @@ class DocBin():
         docs = [Doc(**r) for r in records]
         return DocBin(docs=docs)
     
-    def to_ner_dataset(self) -> Dataset:
-        """转换为实体抽取数据集,自动过滤实体为None的doc
+    def to_ner_dataset(self, piece_max_length: int = 500, only_have_ent: bool = True) -> Dataset:
+        """转换为实体抽取数据集
+        - piece_max_length (int): 长文本切分的每个片段长度
+        - only_have_ent (bool): 是否仅保存含有实体的数据
         """
-        df = self.to_dataframe(include=['text', 'ents'])
-        df = df[df['ents'].notna()]
-        assert len(df)>0, '数据集为空'
-        return Dataset.from_pandas(df, preserve_index=False)
+        data = {'text': [], 'ents': []}
+        for doc in self._docs:
+            doc: Doc
+            for piece in doc.split_by_sents(max_length=piece_max_length):
+                ents = []
+                for ent in doc.ents:
+                    if ent in piece:
+                        ents.append(ent.dict())
+                if len(ents)>0:
+                    data['text'].append(piece.text)
+                    data['ents'].append(ents)
+        return Dataset.from_dict(data)
     
     def to_tc_dataset(self) -> Dataset:
         """转换为单目标文本分类数据集

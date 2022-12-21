@@ -115,6 +115,4 @@ class SentenceBERT(pl.LightningModule):
             embed_a = self(**inputs_a)
             embed_b = self(**inputs_b)
             cos_sim = torch.cosine_similarity(embed_a, embed_b)
-        return cos_sim
-            
-            
+        return cos_sim       

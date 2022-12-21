@@ -1,11 +1,11 @@
 from ...layers import MultiDropout, EfficientGlobalPointer
-from ...layers.loss import MultiLabelCategoricalCrossEntropy, SparseMultiLabelCrossEntropy
+from ...layers.loss import SparseMultiLabelCrossEntropy
 from ...metrics.triple import TripleF1, Triple
 from ...metrics.span import SpanF1
 import torch
 from torch import Tensor
 from typing import List, Set
-from ...utils.make_model import align_token_span, PLMBaseModel
+from ...utils.make_model import PLMBaseModel
 
 
 class GPLinkerForRelationExtraction(PLMBaseModel):
@@ -194,14 +194,10 @@ class GPLinkerForRelationExtraction(PLMBaseModel):
         rels = []
         if len(batch_triples) >0:
             triples = [(triple[0], triple[1], triple[2], triple[3], triple[4])  for s in batch_triples for triple in s]
-            offset_mapping = self.tokenizer(
-                text,
-                max_length=max_length,
-                padding='max_length',
-                truncation=True,
-                return_offsets_mapping=True)['offset_mapping']
             for triple in triples:
-                sub = align_token_span((triple[0], triple[1]+1), offset_mapping)
-                obj = align_token_span((triple[3], triple[4]+1), offset_mapping)
-                rels.append((sub[0],sub[1],triple[2],obj[0],obj[1]))
+                sub_start_char = inputs.token_to_chars(triple[0])[0]
+                sub_end_char = inputs.token_to_chars(triple[1])[0]
+                obj_start_char = inputs.token_to_chars(triple[3])[0]
+                obj_end_char = inputs.token_to_chars(triple[4])[0]
+                rels.append((sub_start_char, sub_end_char, triple[2], obj_start_char, obj_end_char))
         return rels

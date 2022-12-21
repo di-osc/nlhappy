@@ -10,7 +10,7 @@ import json
 from omegaconf import OmegaConf, DictConfig
 from pathlib import Path
 from torch.utils.data import DataLoader, BatchSampler, RandomSampler
-from datasets import load_from_disk, load_dataset, DatasetDict
+from datasets import load_from_disk, load_dataset
 
 
 def get_hf_tokenizer(config: Union[Dict, DictConfig] , vocab: Union[Dict, DictConfig]):
@@ -30,7 +30,7 @@ def get_hf_tokenizer(config: Union[Dict, DictConfig] , vocab: Union[Dict, DictCo
     return tokenizer
 
 
-def get_hf_config_object(config: Union[DictConfig , Dict]):
+def get_hf_config_object(config: Union[DictConfig , Dict]) -> AutoConfig:
     with tempfile.TemporaryDirectory() as tmpdirname:
         config_path = os.path.join(tmpdirname, 'config.json')
         with open(config_path, 'w') as f:
@@ -68,7 +68,7 @@ def align_token_span(token_span_offset: Tuple, token_offset_mapping: List[Tuple]
     
     
 class PLMBaseModel(LightningModule):
-    """基于预训练语音模型的基类,在继承类的时候需要传入plm和plm_dir
+    """基于预训练语言模型的基类,在继承类的时候需要传入plm和plm_dir
     
     - 内置了scheduler,可以通过cls.scheduler_names查看所有的scheduler,通过self.get_scheduler_config方法得到pl的scheduler config
     - 通过self.tokenizer直接调用tokenizer
@@ -83,6 +83,9 @@ class PLMBaseModel(LightningModule):
         self.save_hyperparameters()
         assert self.hparams.scheduler in self.scheduler_names, f'availabel names {self.scheduler_names}'
         assert 'plm' in self.hparams and 'plm_dir' in self.hparams, 'you have to at least pass in plm and plm_dir'
+        
+    def prepare_data(self) -> None:
+        self.prepare_vocab_and_trf_config()
           
     @property
     @lru_cache()
@@ -93,28 +96,30 @@ class PLMBaseModel(LightningModule):
         elif 'plm' in keys and 'plm_dir' in keys:
             plm_path = Path(self.hparams.plm_dir, self.hparams.plm)
             if plm_path.exists():
-                return AutoTokenizer.from_pretrained(plm_path)
+                tokenizer = AutoTokenizer.from_pretrained(plm_path)
             else:
-                return AutoTokenizer.from_pretrained(self.hparams.plm)
+                tokenizer = AutoTokenizer.from_pretrained(self.hparams.plm)
+            return tokenizer
 
-    def get_plm_config(self):
+    @property
+    @lru_cache()
+    def trf_config(self) -> AutoConfig:
         if 'trf_config' in self.hparams.keys():
             return get_hf_config_object(self.hparams.trf_config)
         elif 'plm' in self.hparams.keys() and 'plm_dir' in self.hparams.keys():
             plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
-            plm_config = AutoConfig.from_pretrained(plm_path)    
+            plm_config = AutoConfig.from_pretrained(plm_path)   
             return plm_config
     
-    def get_plm_architecture(self, add_pooler_layer: bool = False) -> torch.nn.Module:
-        if 'trf_config' in self.hparams.keys():
-            plm_config = get_hf_config_object(self.hparams.trf_config)
-        elif 'plm' in self.hparams.keys() and 'plm_dir' in self.hparams.keys():
-            plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
-            plm_config = AutoConfig.from_pretrained(plm_path)
-            self.hparams.trf_config = plm_config.to_dict()
+    def prepare_vocab_and_trf_config(self):
+        if 'vocab' not in self.hparams and 'trf_config' not in self.hparams:
             self.hparams.vocab = dict(sorted(self.tokenizer.vocab.items(), key=lambda x: x[1]))
-        plm_config.add_pooler_layer = add_pooler_layer
-        return AutoModel.from_config(plm_config)    
+            self.hparams.trf_config = self.trf_config.to_dict() 
+    
+    def get_plm_architecture(self, add_pooler_layer: bool = False) -> torch.nn.Module:
+        trf_config = self.trf_config
+        trf_config.add_pooler_layer = add_pooler_layer
+        return AutoModel.from_config(trf_config)    
     
     def get_linear_warmup_step_scheduler_config(self, optimizer) -> Dict:
         total_steps = self.get_total_steps()
