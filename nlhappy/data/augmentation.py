@@ -1,6 +1,4 @@
-import googletrans
 import requests
-from googletrans import Translator
 
 
 def augment_text_from_youdao_translator(text: str):
@@ -29,17 +27,4 @@ def augment_text_from_youdao_translator(text: str):
                 results.append(res)
         except:
             pass
-    return results
-
-def augment_text_from_google_translator(text: str, num_augs: int=2):
-    translator = Translator(service_urls=['translate.google.cn'])
-    res_ls = []
-    langs = list(googletrans.LANGUAGES.keys())
-    for lang in langs:
-        aug = translator.translate(text, dest=lang, src='zh-cn').text
-        res = translator.translate(aug, dest='zh-cn', src=lang).text
-        if res not in res_ls and res != text:
-            res_ls.append(res)
-        if len(res_ls) == num_augs:
-            break
-    return res_ls    
+    return results  
