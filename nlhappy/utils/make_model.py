@@ -24,7 +24,7 @@ def get_hf_tokenizer(config: Union[Dict, DictConfig] , vocab: Union[Dict, DictCo
             if type(config) == DictConfig:
                 config = OmegaConf.to_container(config)
             assert type(config)==dict, f'config must be type dict, but found {type(config)}'
-            d = json.dumps(config)
+            d = json.dumps(dict(config))
             f.write(d)
         tokenizer = AutoTokenizer.from_pretrained(tmpdirname)
     return tokenizer
@@ -41,7 +41,7 @@ def get_hf_config_object(config: Union[DictConfig , Dict]) -> AutoConfig:
             except:
                 pass
             assert type(config)==dict, f'config must be type dict, but found {type(config)}'
-            d = json.dumps(config)
+            d = json.dumps(dict(config))
             f.write(d)
         config = AutoConfig.from_pretrained(tmpdirname)
     return config
@@ -83,9 +83,6 @@ class PLMBaseModel(LightningModule):
         self.save_hyperparameters()
         assert self.hparams.scheduler in self.scheduler_names, f'availabel names {self.scheduler_names}'
         assert 'plm' in self.hparams and 'plm_dir' in self.hparams, 'you have to at least pass in plm and plm_dir'
-        
-    def prepare_data(self) -> None:
-        self.prepare_vocab_and_trf_config()
           
     @property
     @lru_cache()
@@ -108,13 +105,10 @@ class PLMBaseModel(LightningModule):
             return get_hf_config_object(self.hparams.trf_config)
         elif 'plm' in self.hparams.keys() and 'plm_dir' in self.hparams.keys():
             plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
-            plm_config = AutoConfig.from_pretrained(plm_path)   
+            plm_config = AutoConfig.from_pretrained(plm_path) 
+            self.hparams.trf_config = plm_config.to_dict() 
+            self.hparams.vocab = dict(sorted(self.tokenizer.vocab.items(), key=lambda x: x[1]))  
             return plm_config
-    
-    def prepare_vocab_and_trf_config(self):
-        if 'vocab' not in self.hparams and 'trf_config' not in self.hparams:
-            self.hparams.vocab = dict(sorted(self.tokenizer.vocab.items(), key=lambda x: x[1]))
-            self.hparams.trf_config = self.trf_config.to_dict() 
     
     def get_plm_architecture(self, add_pooler_layer: bool = False) -> torch.nn.Module:
         trf_config = self.trf_config
