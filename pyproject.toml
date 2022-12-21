@@ -20,14 +20,6 @@ rich = "^12.4.3"
 srsly = ">=2.4.5"
 pydantic = "1.10.2"
 
-# extras
-googletrans = "4.0.0rc1"
-wandb = ">=0.12.18"
-
-[tool.poetry.extras] 
-# pip install nlhappy[all]
-all = [ "googletrans", "wandb"]
-
 
 [tool.poetry.scripts]
 nlhappy = "nlhappy.run:train"
