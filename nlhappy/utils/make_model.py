@@ -11,6 +11,7 @@ from omegaconf import OmegaConf, DictConfig
 from pathlib import Path
 from torch.utils.data import DataLoader, BatchSampler, RandomSampler
 from datasets import load_from_disk, load_dataset
+from torch.optim.lr_scheduler import CyclicLR
 
 
 def get_hf_tokenizer(config: Union[Dict, DictConfig] , vocab: Union[Dict, DictConfig]):
@@ -75,7 +76,7 @@ class PLMBaseModel(LightningModule):
     - 通过self.get_plm_architecture可以得到没有加载参数的预训练模型的架构
     """
     
-    scheduler_names = ['linear_warmup', 'cosine_warmup', 'harmonic']
+    scheduler_names = ['linear_warmup', 'cosine_warmup', 'harmonic', 'cycle']
     
     def __init__(self) -> None:
         super().__init__()
@@ -89,7 +90,11 @@ class PLMBaseModel(LightningModule):
     def tokenizer(self):
         keys = self.hparams.keys()
         if 'trf_config' in keys and 'vocab' in keys:
-            return get_hf_tokenizer(self.hparams.trf_config, self.hparams.vocab)
+            try:
+                tokenizer = get_hf_tokenizer(self.hparams.trf_config, self.hparams.vocab)
+            except:
+                tokenizer = AutoTokenizer.from_pretrained(os.path.join(self.hparams.plm_dir, self.hparams.plm))
+            return tokenizer
         elif 'plm' in keys and 'plm_dir' in keys:
             plm_path = Path(self.hparams.plm_dir, self.hparams.plm)
             if plm_path.exists():
@@ -134,6 +139,14 @@ class PLMBaseModel(LightningModule):
         scheduler_config = {'scheduler': scheduler, 'interval':'epoch'}
         return scheduler_config
     
+    def get_cycle_step_scheduler_config(self, optimizer):
+        step_size_up = self.get_one_epoch_steps() // 2
+        max_lr = self.hparams.lr
+        base_lr = max_lr / 4
+        scheduler = CyclicLR(optimizer=optimizer, base_lr=base_lr, max_lr=max_lr, step_size_up=step_size_up, cycle_momentum=False)
+        scheduler_config = {'scheduler': scheduler, 'interval':'step'}
+        return scheduler_config
+        
     def get_total_steps(self):
         return self.trainer.estimated_stepping_batches
     
@@ -158,6 +171,8 @@ class PLMBaseModel(LightningModule):
             return self.get_linear_warmup_step_scheduler_config(optimizer=optimizer)
         elif name == 'cosine_warmup':
             return self.get_cosine_warmup_step_scheduler_config(optimizer=optimizer)
+        elif name == 'cycle':
+            return self.get_cycle_step_scheduler_config(optimizer=optimizer)
 
     def to_onnx(self, 
                 file_path: str, 
