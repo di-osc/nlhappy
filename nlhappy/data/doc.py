@@ -511,8 +511,11 @@ class DocBin():
     def __str__(self) -> str:
         return f"{len(self._docs)} docs"
     
-    def __add__(self, other: "DocBin") -> "DocBin":
-        return DocBin(self._docs + other._docs)
+    def __add__(self, other: Union["DocBin", List[Doc]]) -> "DocBin":
+        if isinstance(other, list):
+            return DocBin(self._docs + other)
+        if isinstance(other, DocBin):
+            return DocBin(self._docs + other._docs)
         
     def save_to_disk(self, file_path: Path):
         """将数据以jsonl的格式保存到硬盘

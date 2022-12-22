@@ -3,7 +3,6 @@ _target_: nlhappy.models.PointerForQuestionAnswering
 lr: 3e-5 
 scheduler: linear_warmup
 threshold: 0.0
-hidden_size: 256
 weight_decay: 0.01
 
 name: pointer4qa

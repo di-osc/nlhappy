@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from ...metrics.span import SpanIndexF1
 from ...utils.make_model import PLMBaseModel
-from ...layers import MultiLabelCategoricalCrossEntropy, MultiDropout
+from ...layers import MultiLabelCategoricalCrossEntropy
 from ...data.doc import Doc
 from typing import List, Set, Tuple
 
@@ -16,12 +16,10 @@ class PointerForQuestionAnswering(PLMBaseModel):
         super().__init__()
 
         self.plm = self.get_plm_architecture()
-        self.dropout = MultiDropout()
         self.start_classifier = nn.Linear(in_features=self.plm.config.hidden_size, out_features=1)
         self.end_classifier = nn.Linear(in_features=self.plm.config.hidden_size, out_features=1)
 
         self.criterion = MultiLabelCategoricalCrossEntropy()
-
         self.train_metric = SpanIndexF1()
         self.val_metric = SpanIndexF1()
         self.test_metric = SpanIndexF1()
@@ -33,7 +31,6 @@ class PointerForQuestionAnswering(PLMBaseModel):
 
     def forward(self, input_ids, token_type_ids, attention_mask=None) -> torch.Tensor:
         x = self.plm(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask).last_hidden_state
-        x = self.dropout(x)
         start_logits = self.start_classifier(x).squeeze(-1)
         end_logits = self.end_classifier(x).squeeze(-1)
         return start_logits, end_logits
