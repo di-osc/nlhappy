@@ -67,6 +67,66 @@ def align_token_span(token_span_offset: Tuple, token_offset_mapping: List[Tuple]
         char_span_offset = (start, end)
         return char_span_offset
     
+class BaseModel(LightningModule):
+    """最基础的模型类,配置了
+    """
+    scheduler_names = ['linear_warmup', 'cosine_warmup', 'harmonic', 'cycle']
+    
+    def get_linear_warmup_step_scheduler_config(self, optimizer) -> Dict:
+        total_steps = self.get_total_steps()
+        warmup_steps = self.get_one_epoch_steps() // 3
+        scheduler = get_linear_schedule_with_warmup(optimizer=optimizer, num_training_steps=total_steps, num_warmup_steps=warmup_steps)
+        scheduler_config = {'scheduler': scheduler, 'interval':'step'}
+        return scheduler_config
+    
+    def get_cosine_warmup_step_scheduler_config(self, optimizer) -> Dict:
+        total_steps = self.get_total_steps()
+        warmup_steps = self.get_one_epoch_steps() // 3
+        scheduler = get_cosine_schedule_with_warmup(optimizer=optimizer, num_training_steps=total_steps, num_warmup_steps=warmup_steps)
+        scheduler_config = {'scheduler': scheduler, 'interval':'step'}
+        return scheduler_config
+    
+    def get_harmonic_epoch_scheduler_config(self, optimizer):
+        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 1.0 / (epoch + 1.0))
+        scheduler_config = {'scheduler': scheduler, 'interval':'epoch'}
+        return scheduler_config
+    
+    def get_cycle_step_scheduler_config(self, optimizer):
+        step_size_up = self.get_one_epoch_steps() // 2
+        max_lr = self.hparams.lr
+        base_lr = max_lr / 4
+        scheduler = CyclicLR(optimizer=optimizer, base_lr=base_lr, max_lr=max_lr, step_size_up=step_size_up, cycle_momentum=False)
+        scheduler_config = {'scheduler': scheduler, 'interval':'step'}
+        return scheduler_config
+        
+    def get_total_steps(self):
+        return self.trainer.estimated_stepping_batches
+    
+    def get_one_epoch_steps(self):
+        total_steps = self.get_total_steps()
+        max_epochs = self.trainer.max_epochs
+        return total_steps // max_epochs
+    
+    def get_scheduler_config(self, optimizer, name: str):
+        """
+
+        Args:
+            optimizer (): 优化器实例
+            name (str): 'harmonic_epoch', 'linear_warmup_step', 'cosine_warmup_step'之一
+
+        Returns:
+            dict: scheduler配置字典
+        """
+        if name == 'harmonic':
+            return self.get_harmonic_epoch_scheduler_config(optimizer=optimizer)
+        elif name == 'linear_warmup':
+            return self.get_linear_warmup_step_scheduler_config(optimizer=optimizer)
+        elif name == 'cosine_warmup':
+            return self.get_cosine_warmup_step_scheduler_config(optimizer=optimizer)
+        elif name == 'cycle':
+            return self.get_cycle_step_scheduler_config(optimizer=optimizer)
+    
+    
     
 class PLMBaseModel(LightningModule):
     """基于预训练语言模型的基类,在继承类的时候需要传入plm和plm_dir
@@ -195,15 +255,9 @@ class PLMBaseModel(LightningModule):
         print('export to onnx successfully')
         
 
-class NLPBaseModel(LightningModule):
+class HFPretrainedModel(BaseModel):
     """配置了所有功能的模型基类
-    
-    - 内置了scheduler,可以通过cls.scheduler_names查看所有的scheduler,通过self.get_scheduler_config方法得到pl的scheduler config
-    - 通过self.tokenizer直接调用tokenizer
-    - 通过self.get_plm_architecture可以得到没有加载参数的预训练模型的架构
     """
-    
-    scheduler_names = ['linear_warmup', 'cosine_warmup', 'harmonic']
     
     def __init__(self,
                  plm_max_length: int = 512,
@@ -216,8 +270,7 @@ class NLPBaseModel(LightningModule):
         super().__init__()
         # 保存所有参数
         self.save_hyperparameters()
-        assert self.hparams.scheduler in self.scheduler_names, f'availabel names {self.scheduler_names}'
-        assert 'plm' in self.hparams in self.hparams, 'you have to at least pass in plm'
+        assert 'plm' in self.hparams, 'you have to at least pass in plm'
         
     @property
     @lru_cache()
@@ -246,60 +299,17 @@ class NLPBaseModel(LightningModule):
             plm_config = AutoConfig.from_pretrained(self.hparams.plm)    
             return plm_config
     
-    def get_plm_architecture(self, add_pooler_layer: bool = False) -> torch.nn.Module:
+    def get_plm(self) -> torch.nn.Module:
+        """获取预训练模型,用于初始化模型
+        """
         if 'trf_config' in self.hparams.keys():
             plm_config = get_hf_config_object(self.hparams.trf_config)
-        elif 'plm' in self.hparams.keys() and 'plm_dir' in self.hparams.keys():
-            plm_path = os.path.join(self.hparams.plm_dir, self.hparams.plm)
-            plm_config = AutoConfig.from_pretrained(plm_path)
-            self.hparams.trf_config = plm_config.to_dict()
+            plm = AutoModel(plm_config)
+        elif 'plm' in self.hparams.keys():
+            plm = AutoModel.from_pretrained(self.hparams.plm)
+            self.hparams.trf_config = plm.config.to_dict()
             self.hparams.vocab = dict(sorted(self.tokenizer.vocab.items(), key=lambda x: x[1]))
-        plm_config.add_pooler_layer = add_pooler_layer
-        return AutoModel.from_config(plm_config)    
-    
-    def get_linear_warmup_step_scheduler_config(self, optimizer) -> Dict:
-        total_steps = self.get_total_steps()
-        warmup_steps = self.get_one_epoch_steps() // 3
-        scheduler = get_linear_schedule_with_warmup(optimizer=optimizer, num_training_steps=total_steps, num_warmup_steps=warmup_steps)
-        scheduler_config = {'scheduler': scheduler, 'interval':'step'}
-        return scheduler_config
-    
-    def get_cosine_warmup_step_scheduler_config(self, optimizer) -> Dict:
-        total_steps = self.get_total_steps()
-        warmup_steps = self.get_one_epoch_steps() // 3
-        scheduler = get_cosine_schedule_with_warmup(optimizer=optimizer, num_training_steps=total_steps, num_warmup_steps=warmup_steps)
-        scheduler_config = {'scheduler': scheduler, 'interval':'step'}
-        return scheduler_config
-    
-    def get_harmonic_epoch_scheduler_config(self, optimizer):
-        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 1.0 / (epoch + 1.0))
-        scheduler_config = {'scheduler': scheduler, 'interval':'epoch'}
-        return scheduler_config
-    
-    def get_total_steps(self):
-        return self.trainer.estimated_stepping_batches
-    
-    def get_one_epoch_steps(self):
-        total_steps = self.get_total_steps()
-        max_epochs = self.trainer.max_epochs
-        return total_steps // max_epochs
-        
-    def get_scheduler_config(self, optimizer, name: str):
-        """
-
-        Args:
-            optimizer (): 优化器实例
-            name (str): 'harmonic_epoch', 'linear_warmup_step', 'cosine_warmup_step'之一
-
-        Returns:
-            dict: scheduler配置字典
-        """
-        if name == 'harmonic':
-            return self.get_harmonic_epoch_scheduler_config(optimizer=optimizer)
-        elif name == 'linear_warmup':
-            return self.get_linear_warmup_step_scheduler_config(optimizer=optimizer)
-        elif name == 'cosine_warmup':
-            return self.get_cosine_warmup_step_scheduler_config(optimizer=optimizer)
+        return plm   
 
     def to_onnx(self, 
                 file_path: str, 
