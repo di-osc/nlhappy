@@ -360,4 +360,3 @@ class BertBaseConfig:
     type_vocab_size= 2,
     use_cache= True,
     vocab_size= 21128
-
