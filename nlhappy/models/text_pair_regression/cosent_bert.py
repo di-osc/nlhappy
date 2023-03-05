@@ -41,7 +41,6 @@ class CoSentBERT(pl.LightningModule):
         hidden_state = torch.sum(hidden_state * attention_mask[:, :, None], dim=1)
         attention_mask = torch.sum(attention_mask, dim=1)[:, None]
         return hidden_state / attention_mask
-        # return hidden_state[:,0]
     
     def step(self, batch):
         inputs_a = batch['inputs_a']

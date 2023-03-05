@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Dict, Tuple, Union, List
 import os
-from transformers import AutoTokenizer, AutoConfig, AutoModel
+from transformers import AutoTokenizer, AutoConfig, AutoModel, BertModel, BertConfig
 from transformers.optimization import get_linear_schedule_with_warmup, get_cosine_schedule_with_warmup
 from pytorch_lightning import LightningModule
 import torch
@@ -298,12 +298,28 @@ class HFPretrainedModel(BaseModel):
         elif 'plm' in self.hparams.keys():
             plm_config = AutoConfig.from_pretrained(self.hparams.plm)    
             return plm_config
+        
+    def get_hf_config_object(self, config: Union[DictConfig , Dict]) -> AutoConfig:
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            config_path = os.path.join(tmpdirname, 'config.json')
+            with open(config_path, 'w') as f:
+                if type(config) == DictConfig:
+                    config = OmegaConf.to_container(config)
+                try:
+                    config = config.to_dict() # 兼容huffingface config 对象
+                except:
+                    pass
+                assert type(config)==dict, f'config must be type dict, but found {type(config)}'
+                d = json.dumps(dict(config))
+                f.write(d)
+            config = AutoConfig.from_pretrained(tmpdirname)
+        return config
     
     def get_plm(self) -> torch.nn.Module:
         """获取预训练模型,用于初始化模型
         """
         if 'trf_config' in self.hparams.keys():
-            plm_config = get_hf_config_object(self.hparams.trf_config)
+            plm_config = self.get_hf_config_object(self.hparams.trf_config)
             plm = AutoModel(plm_config)
         elif 'plm' in self.hparams.keys():
             plm = AutoModel.from_pretrained(self.hparams.plm)
@@ -370,3 +386,91 @@ class HFPretrainedModel(BaseModel):
                           pin_memory=self.hparams.pin_memory,
                           shuffle=self.hparams.shuffle_test,
                           sampler=BatchSampler(RandomSampler(self.dataset['test']), batch_size=self.hparams.batch_size, drop_last=self.hparams.drop_last_batch))
+
+
+
+class HFBertModel(BaseModel):
+    """配置了所有功能的模型基类
+    """
+    
+    def __init__(self,
+                 plm_dir: str,
+                 input_max_length: int = 512):
+        super().__init__()
+        # 保存所有参数
+        self.save_hyperparameters()
+        self.input_max_length = input_max_length
+        self.bert = self.get_plm()
+        
+    def on_train_start(self) -> None:
+        ckpt_path = Path(self.hparams.plm_dir, 'pytorch_model.bin')
+        if ckpt_path.exists():
+            self.bert.load_state_dict(torch.load(ckpt_path))
+        else:
+            self.bert = self.bert.from_pretrained(self.hparams.plm_dir)
+        
+    @property
+    @lru_cache()
+    def tokenizer(self):
+        keys = self.hparams.keys()
+        if 'trf_config' in keys and 'vocab' in keys:
+            return get_hf_tokenizer(self.hparams.trf_config, self.hparams.vocab)
+        elif 'plm' in keys:
+            plm_path = Path(self.hparams.plm_dir)
+            tokenizer = AutoTokenizer.from_pretrained(plm_path)
+            return tokenizer
+
+    def get_plm_config(self):
+        if 'trf_config' in self.hparams.keys():
+            return get_hf_config_object(self.hparams.trf_config)
+        elif 'plm' in self.hparams.keys():
+            plm_config = BertConfig.from_pretrained(self.hparams.plm_dir)    
+            return plm_config
+        
+    def get_hf_config_object(self, config: Union[DictConfig , Dict]) -> AutoConfig:
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            config_path = os.path.join(tmpdirname, 'config.json')
+            with open(config_path, 'w') as f:
+                if type(config) == DictConfig:
+                    config = OmegaConf.to_container(config)
+                try:
+                    config = config.to_dict() # 兼容huffingface config 对象
+                except:
+                    pass
+                assert type(config)==dict, f'config must be type dict, but found {type(config)}'
+                d = json.dumps(dict(config))
+                f.write(d)
+            config = AutoConfig.from_pretrained(tmpdirname)
+        return config
+    
+    def get_plm(self) -> torch.nn.Module:
+        """获取预训练模型,用于初始化模型
+        """
+        if 'trf_config' in self.hparams.keys():
+            plm_config = self.get_hf_config_object(self.hparams.trf_config)
+            plm = BertModel(plm_config)
+        elif 'plm' in self.hparams.keys():
+            plm = BertModel.from_pretrained(self.hparams.plm_dir)
+            self.hparams.trf_config = plm.config.to_dict()
+            self.hparams.vocab = dict(sorted(self.tokenizer.vocab.items(), key=lambda x: x[1]))
+        return plm   
+
+    def to_onnx(self, 
+                file_path: str, 
+                text: str = '中国人'):
+        torch_inputs = self.tokenizer(text, return_tensors='pt')
+        dynamic_axes = {
+                    'input_ids': {0: 'batch', 1: 'seq'},
+                    'attention_mask': {0: 'batch', 1: 'seq'},
+                    'token_type_ids': {0: 'batch', 1: 'seq'},
+                }
+        with torch.no_grad():
+            torch.onnx.export(model=self,
+                              args=tuple(torch_inputs.values()), 
+                              f=file_path, 
+                              input_names=list(torch_inputs.keys()),
+                              dynamic_axes=dynamic_axes, 
+                              opset_version=14,
+                              output_names=['logits'],
+                              export_params=True)
+        print('export to onnx successfully')
