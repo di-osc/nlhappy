@@ -13,13 +13,27 @@
 ## 📌&nbsp;&nbsp; 简介
 
 nlhappy致力于复现自然语言处理各类任务的SOTA模型。
+
 > 文档地址:
 - [notion文档](https://wangmengdi.notion.site/NLHAPPY-264f05d1084848efa42068c83539904a)
 > 它主要的依赖有
 - [transformers](https://huggingface.co/docs/transformers/index): 下载预训练权重
-- [pytorch-lightning](https://pytorch-lightning.readthedocs.io/en/latest/): 模型训练
+- [pytorch-lightning](https://lightning.ai/docs/pytorch/stable/): 模型训练
 - [datasets](https://huggingface.co/docs/datasets/index): 构建数据集
 - [pydantic](https://wandb.ai/): 数据校验
+
+## 📌&nbsp;&nbsp; 支持NLP任务
+
+- [x] 实体抽取
+- [x] 嵌套实体抽取
+- [x] 非连续实体抽取
+- [x] 关系抽取
+- [x] 事件抽取
+- [x] 文本单标签分类
+- [x] 文本多标签分类
+- [x] 阅读理解
+- [x] 文本对分类
+- [x] 文本对相似度(文本向量化)
 
 
 ## 📌&nbsp;&nbsp; 安装
@@ -55,27 +69,3 @@ nlhappy datamodule=xxx model=xxx trainer=xxx logger=wandb
 ```
 模型训练开始后去[官网](https://wandb.ai/)查看训练实况
 </details>
-
-
-## 📌&nbsp;&nbsp; 模型复现
-
-### 实体抽取
-|模型名称|参考链接|
-|----|----|
-|GlobalPointer|[科学空间](https://kexue.fm/archives/8373)|
-|EfficientGlobalPointer|[科学空间](https://kexue.fm/archives/8877)|
-
-### 关系抽取
-|模型名称|参考链接|
-|----|----|
-|GPLinker|[科学空间](https://kexue.fm/archives/8888)|
-
-### 事件抽取
-|模型名称|参考链接|
-|----|----|
-|GPLinker|[科学空间](https://kexue.fm/archives/8926)|
-
-### 答案抽取
-|模型名称|参考链接|
-|----|----|
-|GPLinker|-|
