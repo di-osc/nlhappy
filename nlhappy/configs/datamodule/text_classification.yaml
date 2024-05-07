@@ -2,8 +2,8 @@ _target_: nlhappy.datamodules.TextClassificationDataModule
 dataset_dir: ${dataset_dir} 
 plm_dir: ${plm_dir}
 
-dataset: 
-batch_size: 
+dataset: nlhappy/CHIP-TC
+batch_size: 16
 plm: hfl/chinese-roberta-wwm-ext
 num_workers: 4
 pin_memory: True

@@ -3,12 +3,11 @@ from .utils import get_logger
 from typing import Union, List
 from torch.utils.data import DataLoader, BatchSampler, RandomSampler
 from datasets import load_from_disk, load_dataset, DatasetDict
-import pytorch_lightning as pl
 from transformers import AutoConfig, AutoTokenizer, AutoModel, PreTrainedTokenizerFast
 from functools import lru_cache
 from pathlib import Path
 import numpy as np
-from pytorch_lightning import LightningDataModule
+from lightning.pytorch import LightningDataModule
 
 
 log = get_logger()
@@ -144,6 +143,7 @@ def prepare_dataset(dataset_name: str, dataset_dir) -> None:
         try:
             log.info(f'download dataset {dataset_name} from huffingface')
             dataset = load_dataset(dataset_name)
+            dataset.save_to_disk(path)
             log.info(f'download dataset succeed')
         except Exception as e:
             log.error('download dataset failed')
@@ -179,7 +179,7 @@ def prepare_from_huffingface(dataset: str,
         prepare_plm(plm_name=plm, plm_dir=plm_dir)
 
 
-class PLMBaseDataModule(pl.LightningModule):
+class PLMBaseDataModule(LightningDataModule):
     """数据模块的基类,子类需要完成setup方法,子类初始化的时候至少包含dataset,plm,batch_size参数,
     内置功能:
     - 自动保存超参数

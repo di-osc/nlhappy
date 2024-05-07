@@ -50,6 +50,9 @@ name: ${model_info}&plm=${datamodule.plm}&bs=${datamodule.batch_size}
 # monitor of all callbacks
 monitor: val/f1
 
+# use hf-mirror to download hf models and datasets
+use_hf_mirror: True
+
 hydra:
   run:
     dir: logs/runs/${datamodule.dataset}/${model.name}/${now:%Y-%m-%d}_${now:%H-%M-%S}

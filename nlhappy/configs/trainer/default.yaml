@@ -1,4 +1,4 @@
-_target_: pytorch_lightning.Trainer
+_target_: lightning.pytorch.Trainer
 
 accelerator: gpu
 devices: 1
@@ -13,6 +13,3 @@ profiler: "simple"
 num_sanity_val_steps: 0
 # 梯度积累
 accumulate_grad_batches: 1
-
-# ckpt path
-resume_from_checkpoint: null

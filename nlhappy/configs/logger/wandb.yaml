@@ -1,6 +1,6 @@
 # https://wandb.ai
 
-_target_: pytorch_lightning.loggers.wandb.WandbLogger
+_target_: lightning.pytorch.loggers.wandb.WandbLogger
 project: ${datamodule.dataset}
 name: ${name}
 save_dir: "."
