@@ -28,9 +28,9 @@ class BertForTextClassification(PLMBaseModel):
         self.criterion = torch.nn.CrossEntropyLoss()
 
         # 评价指标
-        self.train_f1 = F1Score(num_classes=len(self.hparams.id2label), average='macro')
-        self.val_f1= F1Score(num_classes=len(self.hparams.id2label), average='macro')
-        self.test_f1 = F1Score(num_classes=len(self.hparams.id2label), average='macro')
+        self.train_f1 = F1Score(num_classes=len(self.hparams.id2label), average='macro', task='multiclass')
+        self.val_f1= F1Score(num_classes=len(self.hparams.id2label), average='macro', task='multiclass')
+        self.test_f1 = F1Score(num_classes=len(self.hparams.id2label), average='macro', task='multiclass')
         
     def setup(self, stage: str):
         self.trainer.datamodule.dataset.set_transform(self.trainer.datamodule.bert_transform)

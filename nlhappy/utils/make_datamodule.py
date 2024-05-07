@@ -8,6 +8,7 @@ from functools import lru_cache
 from pathlib import Path
 import numpy as np
 from lightning.pytorch import LightningDataModule
+from huggingface_hub import snapshot_download
 
 
 log = get_logger()
@@ -142,6 +143,9 @@ def prepare_dataset(dataset_name: str, dataset_dir) -> None:
         log.info('cannot found dataset in {}.'.format(path))
         try:
             log.info(f'download dataset {dataset_name} from huffingface')
+            snapshot_download(dataset_name, 
+                              repo_type='dataset',
+                              endpoint="https://hf-mirror.com")
             dataset = load_dataset(dataset_name)
             dataset.save_to_disk(path)
             log.info(f'download dataset succeed')
