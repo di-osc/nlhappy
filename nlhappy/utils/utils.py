@@ -1,11 +1,12 @@
 import logging
 import warnings
 from typing import List, Sequence
-import pytorch_lightning as pl
+from lightning.pytorch.loggers import Logger, WandbLogger
+from lightning.pytorch import LightningDataModule, LightningModule, Trainer, Callback
 import rich.syntax
 import rich.tree
 from omegaconf import DictConfig, OmegaConf
-from pytorch_lightning.utilities import rank_zero_only
+from lightning.pytorch.utilities import rank_zero_only
 import os
 
 
@@ -116,11 +117,11 @@ def print_config(
 @rank_zero_only
 def log_hyperparameters(
     config: DictConfig,
-    model: pl.LightningModule,
-    datamodule: pl.LightningDataModule,
-    trainer: pl.Trainer,
-    callbacks: List[pl.Callback],
-    logger: List[pl.loggers.LightningLoggerBase],
+    model: LightningModule,
+    datamodule: LightningDataModule,
+    trainer: Trainer,
+    callbacks: List[Callback],
+    logger: List[Logger],
 ) -> None:
     """This method controls which parameters from Hydra config are saved by Lightning loggers.
 
@@ -158,17 +159,17 @@ def log_hyperparameters(
 
 def finish(
     config: DictConfig,
-    model: pl.LightningModule,
-    datamodule: pl.LightningDataModule,
-    trainer: pl.Trainer,
-    callbacks: List[pl.Callback],
-    logger: List[pl.loggers.LightningLoggerBase],
+    model: LightningModule,
+    datamodule: LightningDataModule,
+    trainer: Trainer,
+    callbacks: List[Callback],
+    logger: List[Logger],
 ) -> None:
     """Makes sure everything closed properly."""
 
     # without this sweeps with wandb logger might crash!
     for lg in logger:
-        if isinstance(lg, pl.loggers.wandb.WandbLogger):
+        if isinstance(lg, WandbLogger):
             import wandb
 
             wandb.finish()

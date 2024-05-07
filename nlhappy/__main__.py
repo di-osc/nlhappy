@@ -30,7 +30,11 @@ def run(config: DictConfig) -> Optional[float]:
     utils.extras(config)
     if config.get("print_config"):
         utils.print_config(config, resolve=True)
-
+        
+    if config.get("use_hf_mirror"):
+        os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+        log.info("Using hf-mirror to download datasets and models!")
+        
     # Set seed for random number generators in pytorch, numpy and python.random
     if config.get("seed"):
         seed_everything(config.seed, workers=True)
@@ -69,8 +73,7 @@ def run(config: DictConfig) -> Optional[float]:
     log.info(f"Instantiating trainer <{config.trainer._target_}>")
     trainer: Trainer = hydra.utils.instantiate(config.trainer, 
                                                callbacks=callbacks, 
-                                               logger=logger, 
-                                               _convert_="partial")
+                                               logger=logger)
 
     # Send some parameters from config to all lightning loggers
     log.info("Logging hyperparameters!")

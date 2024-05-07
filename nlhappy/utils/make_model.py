@@ -3,7 +3,7 @@ from typing import Dict, Tuple, Union, List
 import os
 from transformers import AutoTokenizer, AutoConfig, AutoModel, BertModel, BertConfig
 from transformers.optimization import get_linear_schedule_with_warmup, get_cosine_schedule_with_warmup
-from pytorch_lightning import LightningModule
+from lightning.pytorch import LightningModule
 import torch
 import tempfile
 import json
