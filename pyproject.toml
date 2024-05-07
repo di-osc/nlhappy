@@ -22,7 +22,7 @@ pydantic = ">=1.10.2"
 
 
 [tool.poetry.scripts]
-nlhappy = "nlhappy.__main__:train"
+nlhappy = "nlhappy.__main__:run"
 
 
 [build-system]
