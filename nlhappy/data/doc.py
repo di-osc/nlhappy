@@ -61,7 +61,7 @@ class Span(BaseModel):
     - 当文本去除首尾空格后,下标会自动修正,例如当text=' 中国'变为'中国', 下标[0,1,2]会变为[1,2]
     """
     text: Optional[constr(min_length=1)] = None
-    indices: conset(item_type=int, min_items=1)
+    indices: conset(item_type=int)
     score: Optional[float] = None
     
     @property
