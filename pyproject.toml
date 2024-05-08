@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "nlhappy"
-version = "2024.5.7"
+version = "2024.5.8"
 description = "自然语言处理(NLP)"
 authors = ["wangmengdi <790990241@qq.om>"]
 license = "MIT"
