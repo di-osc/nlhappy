@@ -62,7 +62,7 @@ class TextClassificationDataModule(PLMBaseDataModule):
 
     @property
     def id2label(self):
-        return {i:l for l,i in enumerate(self.label2id)}
+        return {i:l for l,i in self.label2id.items()}
 
         
     @classmethod
