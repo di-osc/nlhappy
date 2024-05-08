@@ -219,7 +219,7 @@ class PLMBaseDataModule(LightningDataModule):
     def dataset(self) -> DatasetDict:
         dataset_path = Path(self.hparams.dataset_dir, self.hparams.dataset)
         if dataset_path.exists():  
-            dsd = load_from_disk(dataset_path)
+            dsd = load_from_disk(str(dataset_path))
         else:
             dsd = load_dataset(self.hparams.dataset)
         return dsd
