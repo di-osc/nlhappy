@@ -90,8 +90,7 @@ class BertForTextClassification(PLMBaseModel):
     def predict(self, text: str, device: str='cpu') -> List[Tuple[str, int]]:
         device = torch.device(device)
         inputs = self.tokenizer(text,
-                                padding='max_length',
-                                max_length=self.hparams.max_length,
+                                max_length=self.hparams.plm_max_length,
                                 return_tensors='pt',
                                 truncation=True)
         self.to(device)
